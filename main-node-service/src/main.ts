@@ -1,11 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join, resolve } from 'path';
-import * as session from 'express-session';
-import * as cookieParser from 'cookie-parser';
+import { resolve } from 'path';
 import * as express from 'express';
 import { Eta } from 'eta';
 import { AppModule } from './app.module';
+
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
 
 const PORT = Number(process.env.PORT || 8080);
 

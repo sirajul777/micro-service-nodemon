@@ -82,12 +82,14 @@
 - [x] `requirements.txt` — redis, psycopg2-binary, SQLAlchemy, requests, grpcio(+tools)
 - [x] **Verification** — `python3 -m py_compile` on all modules → EXIT=0
 
-## Phase 6 — Gateway / BFF (`main-node-service`)
-- [ ] Scaffold NestJS + Eta views (stateless)
-- [ ] Move views + static assets from `nodemon/`
-- [ ] Replace direct service calls with REST/gRPC/Redis
-- [ ] Wire auth guard to validate JWT from auth-service
-- [ ] Remove all `@Optional()` cross-module injections
+## Phase 6 — Gateway / BFF (`main-node-service`) ✅
+- [x] Scaffold NestJS + Eta views (stateless)
+- [x] Move views + static assets from `nodemon/`
+- [x] Replace direct service calls with REST/gRPC/Redis (aggregate proxy)
+- [x] Wire auth guard to validate JWT from auth-service (session + validate-token)
+- [x] Remove all `@Optional()` cross-module injections (BFF holds no DB; proxy only)
+- [ ] Full app.js API-path mapping to the BFF proxy (deferred → Phase 7)
+- [ ] In-memory session → Redis store for horizontal scaling (deferred)
 
 ## Phase 7 — Cutover & Cleanup
 - [ ] Shadow traffic / parallel run (monolith + microservices)
