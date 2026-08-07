@@ -40,11 +40,11 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     // Validate the token against auth-node-service.
-    let payload: any;
+let payload: any;
     try {
       const res = await firstValueFrom(
         this.http.post(
-          `${this.authServiceUrl}/auth/validate-token`,
+          `${this.authServiceUrl}/api/auth/validate-token`,
           {},
           {
             headers: { authorization: `Bearer ${token}` },

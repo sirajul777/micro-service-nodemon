@@ -148,11 +148,19 @@
 - [x] Protect payment-service config endpoint with `JwtAuthGuard` +
       `RequirePermission('manageSystem')`: `GET/POST /api/payment-config`
 - [x] `npm run build` in payment-service → EXIT 0 (guard wired, HttpModule already present)
-- [ ] **Routing gap (needs Phase 6/7 follow-up):** the frontend calls
-      `/api/qris/*`, `/qris/*`, `/payments/*` directly and nginx routes those
-      straight to payment-service, bypassing the BFF/JWT. The new guard closes
-      the *service-level* hole, but the frontend must send a Bearer JWT on those
-      calls. Recommended: route `/api/qris/`, `/qris/`, `/payments/` through the
-      BFF proxy (like `/api/erp/`, `/api/payment/`) so the BFF injects the
-      cached session JWT — keeping `/payments/payhook/app-webhook`, `/qris/buy`,
-      `/qris/checkout`, `/qris/status` public.
+- [x] **Bug fix — JWT validation URL missing `/api` prefix:** both payment-service
+      and erp-node-service `jwt-auth.guard.ts` called `${AUTH_SERVICE_URL}/auth/validate-token`,
+      but auth-service's route is `/api/auth/validate-token`. Fixed both guards to
+      call `/api/auth/validate-token` — otherwise every guarded request would have
+      401'd (404 → UnauthorizedException), breaking all authenticated access.
+- [x] **Bug fix — QRIS admin UI would 401 (routing gap closed):** the frontend
+      (`app.js`) calls QRIS admin endpoints via `/api/qris/stats|orders|callbacks|
+      orders/:id/verify`. nginx routed `/api/qris/` straight to payment-service,
+      so the new `JwtAuthGuard` would 401 the cookie-session-only admin UI. Fixed
+      by routing `/api/qris/` through the BFF (nginx) and adding a `qris → payment`
+      alias to the BFF `ProxyController.TARGETS`, which enforces the session and
+      injects the cached JWT. Public customer routes (`/payments/payhook/app-webhook`,
+      `/api/qris/orders` POST, `/api/qris/orders/:id/qr` POST, `/qris/status/:id`)
+      remain public via a rewritten `isPublic` canonical-path check.
+- [x] Rebuild: **all 4 Node services** (`auth`, `erp`, `payment`, `main`) → EXIT 0
+      with the JWT URL fix + qris BFF routing in place.

@@ -19,6 +19,11 @@ const TARGETS: Record<string, Target> = {
   erp: 'erp',
   payment: 'payment',
   bot: 'bot',
+  // The frontend calls QRIS admin endpoints via `/api/qris/*` (see app.js:
+  // req('/qris/stats') → fetch(API + '/qris/stats') = /api/qris/stats).
+  // Route them through the BFF so the session is enforced and the cached
+  // JWT is injected, satisfying payment-service's JwtAuthGuard.
+  qris: 'payment',
 };
 
 /**
@@ -50,18 +55,37 @@ export class ProxyController {
       return res.status(404).json({ success: false, message: `Unknown service: ${targetRaw}` });
     }
 
-    const session = (req as any).session;
+const session = (req as any).session;
 
     // Public routes that don't require auth (e.g. payment app-webhook, qris
     // checkout, qris status). These are forwarded without a token.
+    //
+    // The rest path depends on which target alias was used:
+    //   /api/payment/api/qris/orders → target=payment, rest=api/qris/orders
+    //   /api/qris/orders            → target=qris,   rest=orders
+    // Normalize both to a canonical path so the public-route checks below
+    // are correct regardless of routing alias.
     const restPath = rest ? `/${rest}` : '';
-    const fullPath = restPath;
+    let canonical: string;
+    if (targetRaw === 'qris') {
+      // /api/qris/* → downstream payment-service paths are /api/qris/*.
+      canonical = `/api/qris${restPath}`;
+    } else {
+      canonical = restPath;
+    }
+
+    // Public payment/QRIS routes that must NOT require auth:
+    //   POST /payments/payhook/app-webhook   (PayHook Android app webhook)
+    //   POST /api/qris/orders               (customer checkout — create order)
+    //   POST /api/qris/orders/:id/qr        (re-generate QR for an order)
+    //   GET  /qris/status/:orderId          (checkout polling)
     const isPublic =
+      (target === 'payment' && canonical.startsWith('/payments/payhook/app-webhook')) ||
       (target === 'payment' &&
-        (fullPath.startsWith('/api/qris/orders')) &&
         req.method === 'POST' &&
-        !String(query?.public === 'true')) ||
-      (target === 'payment' && fullPath.startsWith('/payments/payhook/app-webhook'));
+        (canonical === '/api/qris/orders' ||
+          /^\/api\/qris\/orders\/[^/]+\/qr$/.test(canonical))) ||
+      (target === 'payment' && canonical.startsWith('/qris/status/'));
 
     // Enforce auth for everything else.
     if (!isPublic) {
@@ -78,8 +102,10 @@ export class ProxyController {
 
     const token = isPublic ? null : this.authService.getToken(session);
 
-    // Build the downstream path: /api/:target/:rest* → /:rest*
-    const downstreamPath = fullPath;
+    // Build the downstream path. `canonical` already normalizes the qris
+    // alias to the payment-service's real paths (e.g. /api/payment/... →
+    // /api/qris/..., and /api/qris/... → /api/qris/...).
+    const downstreamPath = canonical;
     const method = req.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 const resp = await this.proxyService.forward(target, downstreamPath, method, token, body, query);
