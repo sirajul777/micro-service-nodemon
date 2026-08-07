@@ -93,12 +93,16 @@ services:
       - AUTH_SERVICE_URL=http://auth-node-service:3001
       - ERP_SERVICE_URL=http://erp-node-service:3003
       - PAYMENT_SERVICE_URL=http://payment-service:3002
+      - BOT_SERVICE_URL=http://bot-py-service:5000
       - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
       - SESSION_SECRET=${SESSION_SECRET:-mikhmon-session-secret}
+      # Phase 8: shared Redis session store (horizontal scaling of BFF pods).
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-super_secure_redis_pass_123}@redis-broker:6379
     depends_on:
       - auth-node-service
       - erp-node-service
       - payment-service
+      - redis-broker
     ports:
       - "8080:8080"
     networks:

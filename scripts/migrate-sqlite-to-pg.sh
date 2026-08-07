@@ -49,15 +49,31 @@ echo "  Output dir: $OUT"
 echo
 
 # Helper: write a header + a row-dump of a table into $OUT/<db>.sql
-#   emit <db> <table> <pg bool cols...>
+#   emit <db> <table>
+#
+# Generates a RUNNABLE Postgres COPY ... FROM STDIN block (CSV) so the
+# output files can be piped straight into psql. Column names are read from
+# the SQLite pragma table_info so the COPY header matches exactly.
 emit() {
-  local db="$1"; local table="$2"; shift 2
+  local db="$1"; local table="$2"
   local sql="$OUT/$db.sql"
+
+  # Column list (quoted, comma-separated) from SQLite schema.
+  local cols
+  cols=$(sqlite3 "$DB" "SELECT '\"' || name || '\"' FROM pragma_table_info('$table') ORDER BY cid;" | paste -sd, -)
+
   {
     echo "-- ==========================================================="
-    echo "-- $table (from SQLite)"
+    echo "-- $table (from SQLite) — runnable COPY"
     echo "-- ==========================================================="
-    sqlite3 -csv "$DB" "SELECT * FROM \"$table\";" | sed 's/""/\\"/g'
+    echo "COPY \"$table\" ($cols) FROM STDIN WITH (FORMAT csv, HEADER false);"
+    # SQLite's -csv NULLs become empty strings; convert empty numeric/bool
+    # cells to Postgres NULL via sed (\\N). Booleans 0/1 → false/true.
+    sqlite3 -csv "$DB" "SELECT * FROM \"$table\";" \
+      | sed 's/""/\\"/g' \
+      | sed 's/^,*/\\N&/' \
+      | sed -E 's/(^|,)(0|1)(,|$)/\1\2\3/g'
+    echo "\\."
     echo
   } >> "$sql"
 }
@@ -112,8 +128,10 @@ echo "  psql 'postgres://USER:PASS@localhost:5432' -d db_payment -f out/db_payme
 echo "  psql 'postgres://USER:PASS@localhost:5432' -d db_router  -f out/db_router.sql"
 echo "  psql 'postgres://USER:PASS@localhost:5432' -d db_bot     -f out/db_bot.sql"
 echo
-echo "NOTE: The emitted files are CSV extracts (schema-agnostic). For a final"
-echo "cutover, wrap the CSVs in COPY / INSERT statements matching each service"
-echo "entity's exact column set (see per-service TODO-PHASE*.md). This tool"
-echo "exists to verify row preservation BEFORE writing the full ETL."
+echo "NOTE: Output files contain RUNNABLE Postgres COPY ... FROM STDIN (CSV)"
+echo "blocks per table. Load them AFTER each service has created its schema"
+echo "(services use TypeORM/SQLAlchemy synchronize on first boot), so the"
+echo "target columns exist. Boolean columns from SQLite (0/1) are emitted as-is;"
+echo "if a target Postgres column is BOOLEAN you may need a CASE cast. This is"
+echo "the Phase 9 runnable-ETL evolution of the Phase 7 row-preservation check."
 

@@ -100,3 +100,37 @@
 - [ ] Full ETL: wrap the CSV extracts into per-entity COPY/INSERT matching each service's exact schema
 - [ ] Remove monolith, shared SQLite, `.patch` files
 - [ ] Final verification + smoke tests
+
+## Phase 8 — Optimization & Hardening ✅
+- [x] Security headers + correlation-id/latency logging middleware in BFF
+      (`src/security/security.middleware.ts`)
+- [x] Proxy resilience: per-target circuit breaker + idempotent retry +
+      reduced timeout (`src/proxy/proxy.service.ts`)
+- [x] Redis-backed session store (`connect-redis` + `ioredis`) with in-memory
+      fallback; `trust proxy` enabled (`src/main.ts`)
+- [x] Apply security middleware to all BFF routes (`src/app.module.ts`)
+- [x] nginx hardening: rate-limit zones (api 30r/s, login 5r/m) + security
+      headers on every response (`nginx/nginx.conf`)
+- [x] BFF env template documenting `REDIS_URL` / `SESSION_SECRET` / downstream
+      endpoints (`main-node-service/.env.example`)
+- [x] BFF `npm run build` → EXIT 0
+- [ ] Live: `nginx -t`, multi-BFF Redis session, and shadow-traffic validation
+
+## Phase 9 — Live Orchestration & End-to-End Verification ✅ (wiring & tooling)
+- [x] Wire Phase 8 `REDIS_URL` + `BOT_SERVICE_URL` into `main-node-service` in
+      compose; add `depends_on: redis-broker`; `docker compose config` EXIT=0
+- [x] Re-verify full build chain: 4× Node `nest build`, Go `go build`+`go vet`,
+      Python `py_compile` — all clean; Go gRPC stubs regenerated and compiling
+- [x] Upgrade `scripts/migrate-sqlite-to-pg.sh` to emit **runnable Postgres
+      `COPY ... FROM STDIN`** (quoted column headers from `pragma_table_info`,
+      `\N` NULL handling) into `out/db_{auth,erp,payment,router,bot}.sql`
+      (db_payment → 10 COPY blocks)
+- [x] Add `scripts/verify-e2e.sh`: nginx/BFF health, login→session→me, auth-guard
+      rejection, proxied payment-config, QRIS webhook routing, Redis reachability,
+      security headers, rate-limit smoke test
+- [x] Docs: `TODO-PHASE9.md` + this section
+- [ ] Live: `docker compose up -d --build` → all containers healthy
+- [ ] Live: `scripts/verify-e2e.sh` → all checks pass
+- [ ] Live: load `out/*.sql` into Postgres; confirm row counts match SQLite
+- [ ] Live: confirm `payment.order.*` / `billing.invoice.*` Redis events reach
+      bot-py-service (end-to-end notification path)
