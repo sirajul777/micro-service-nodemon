@@ -19,5 +19,7 @@ nginx's own location. Two services were crashing:
 - [x] Restart nginx to clear stale upstream DNS/IP cache after main container recreation.
 - [x] Fix `main-node-service/src/proxy/proxy.controller.ts` payment target canonical path (`/api/payment/*` → `/api/*`).
 - [x] Fix `scripts/verify-e2e.sh` (me key, REDIS_PASSWORD default) and `nginx/nginx.conf` (security headers on /healthz).
+- [x] Add `main-node-service/src/proxy/payment-webhook.controller.ts` so the BFF-direct mode routes the public `/payments/payhook/app-webhook` and `/qris/status/:orderId` to payment-service.
 - [x] Run `GATEWAY_PORT=80 ./scripts/verify-e2e.sh` — **Passed: 10, Failed: 0**.
+- [x] Run `GATEWAY_PORT=8080 ./scripts/verify-e2e.sh` (BFF-direct) — **Passed: 10, Failed: 0**.
 </content>

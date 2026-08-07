@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { AppController } from './app.controller';
 import { AuthController } from './auth/auth.controller';
 import { ProxyController } from './proxy/proxy.controller';
+import { PaymentWebhookController } from './proxy/payment-webhook.controller';
 import { HealthController } from './health/health.controller';
 import { AuthService } from './auth/auth.service';
 import { ProxyService } from './proxy/proxy.service';
@@ -22,7 +23,13 @@ import { SecurityMiddleware } from './security/security.middleware';
  */
 @Module({
   imports: [HttpModule],
-  controllers: [AppController, AuthController, ProxyController, HealthController],
+  controllers: [
+    AppController,
+    AuthController,
+    ProxyController,
+    PaymentWebhookController,
+    HealthController,
+  ],
   providers: [AuthService, ProxyService, ViewService],
 })
 export class AppModule implements NestModule {
