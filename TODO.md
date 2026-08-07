@@ -134,3 +134,25 @@
 - [ ] Live: load `out/*.sql` into Postgres; confirm row counts match SQLite
 - [ ] Live: confirm `payment.order.*` / `billing.invoice.*` Redis events reach
       bot-py-service (end-to-end notification path)
+
+## Phase 9 — Security Hardening (payment-service direct-route guard)
+- [x] Add `auth/permissions.decorator.ts` (NestJS `PermissionKey` + `PERMISSIONS_KEY`
+      + `RequirePermission` decorator) to payment-service
+- [x] Add `auth/jwt-auth.guard.ts` to payment-service — validates Bearer token
+      against auth-node-service `POST /auth/validate-token`, enforces
+      `manageBilling` / `manageSystem` permissions (admin always passes)
+- [x] Protect payment-service admin endpoints with `JwtAuthGuard` +
+      `RequirePermission('manageBilling')`:
+      `GET/POST /api/qris/orders*`, `/api/qris/orders/:id`,
+      `/api/qris/orders/:id/verify`, `/api/qris/callbacks`, `/api/qris/stats`
+- [x] Protect payment-service config endpoint with `JwtAuthGuard` +
+      `RequirePermission('manageSystem')`: `GET/POST /api/payment-config`
+- [x] `npm run build` in payment-service → EXIT 0 (guard wired, HttpModule already present)
+- [ ] **Routing gap (needs Phase 6/7 follow-up):** the frontend calls
+      `/api/qris/*`, `/qris/*`, `/payments/*` directly and nginx routes those
+      straight to payment-service, bypassing the BFF/JWT. The new guard closes
+      the *service-level* hole, but the frontend must send a Bearer JWT on those
+      calls. Recommended: route `/api/qris/`, `/qris/`, `/payments/` through the
+      BFF proxy (like `/api/erp/`, `/api/payment/`) so the BFF injects the
+      cached session JWT — keeping `/payments/payhook/app-webhook`, `/qris/buy`,
+      `/qris/checkout`, `/qris/status` public.

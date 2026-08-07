@@ -8,6 +8,7 @@ import {
   Query,
   Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import * as crypto from 'crypto';
@@ -15,6 +16,8 @@ import * as crypto from 'crypto';
 import { VoucherOrderService } from './voucher-order.service';
 import { PayhookAppWebhookDto } from './dto/payhook-app-webhook.dto';
 import { PaymentConfigService } from './payment-config.service';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { RequirePermission } from './auth/permissions.decorator';
 
 /**
  * QRIS GoPay Merchant voucher-selling controller (payment-service).
@@ -25,20 +28,17 @@ import { PaymentConfigService } from './payment-config.service';
  *   GET  /qris/status/:orderId          ← polling status for the checkout page
  *   POST /api/qris/orders/:id/qr        ← (re)generate QR image
  *
- * Admin routes (auth via JWT from api-gateway; see note below):
- *   GET  /api/qris/orders               ← order list
- *   GET  /api/qris/orders/:id           ← order detail
- *   POST /api/qris/orders/:id/verify    ← manual fallback verification
- *   GET  /api/qris/callbacks            ← PayHook callback monitor log
- *   GET  /api/qris/stats                ← summary stats
+ * Admin routes (JWT via auth-node-service — defense-in-depth behind the BFF):
+ *   GET  /api/qris/orders               ← order list (requires manageBilling)
+ *   GET  /api/qris/orders/:id           ← order detail (requires manageBilling)
+ *   POST /api/qris/orders/:id/verify    ← manual fallback verification (requires manageBilling)
+ *   GET  /api/qris/callbacks            ← PayHook callback monitor log (requires manageBilling)
+ *   GET  /api/qris/stats                ← summary stats (requires manageBilling)
  *
- * NOTE: In the monolith these admin routes were protected by
- * AuthGuard + PermissionsGuard with `manageBilling`. In the microservice the
- * api-gateway (main-node-service) terminates the session/JWT and forwards the
- * caller's identity; each domain service validates the Bearer token via a
- * shared secret. A lightweight JWT guard is applied here (see jwt-auth.guard).
- * For Phase 3 the guard is optional so the service runs standalone; tighten it
- * when the gateway is wired (Phase 6).
+ * NOTE: These admin routes are protected by JwtAuthGuard which validates the
+ * Bearer token against auth-node-service. The BFF enforces the session AND
+ * injects the cached JWT, so a direct hit to payment-service (bypassing nginx)
+ * still requires a valid token.
  */
 @Controller()
 export class VoucherOrderController {
@@ -183,6 +183,8 @@ export class VoucherOrderController {
 
   // ── Admin: order list ───────────────────────────────────────────
   @Get('api/qris/orders')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('manageBilling')
   async listOrders(@Query('status') status?: string) {
     const orders = await this.orderService.listOrders(status);
     return { success: true, orders, total: orders.length };
@@ -190,6 +192,8 @@ export class VoucherOrderController {
 
   // ── Admin: order detail ─────────────────────────────────────────
   @Get('api/qris/orders/:id')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('manageBilling')
   async orderDetail(@Param('id') id: string) {
     const order = await this.orderService.getOrderById(id);
     if (!order) {
@@ -201,6 +205,8 @@ export class VoucherOrderController {
   // ── Admin: manual fallback verification ─────────────────────────
   @Post('api/qris/orders/:id/verify')
   @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('manageBilling')
   async verifyOrder(@Param('id') id: string) {
     const order = await this.orderService.markPaidManual(id);
     return { success: true, order };
@@ -208,6 +214,8 @@ export class VoucherOrderController {
 
   // ── Admin: PayHook callback monitor log ─────────────────────────
   @Get('api/qris/callbacks')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('manageBilling')
   async callbacks(@Query('limit') limit?: string) {
     const logs = await this.orderService.listCallbackLogs(limit ? parseInt(limit, 10) : 100);
     return { success: true, logs, total: logs.length };
@@ -215,6 +223,8 @@ export class VoucherOrderController {
 
   // ── Admin: stats ────────────────────────────────────────────────
   @Get('api/qris/stats')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('manageBilling')
   async stats() {
     return { success: true, ...(await this.orderService.getStats()) };
   }
