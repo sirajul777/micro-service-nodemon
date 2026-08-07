@@ -65,11 +65,15 @@ const session = (req as any).session;
     //   /api/qris/orders            → target=qris,   rest=orders
     // Normalize both to a canonical path so the public-route checks below
     // are correct regardless of routing alias.
-    const restPath = rest ? `/${rest}` : '';
+const restPath = rest ? `/${rest}` : '';
     let canonical: string;
     if (targetRaw === 'qris') {
       // /api/qris/* → downstream payment-service paths are /api/qris/*.
       canonical = `/api/qris${restPath}`;
+    } else if (targetRaw === 'payment') {
+      // /api/payment/* → downstream payment-service paths live under /api/*
+      // (e.g. /api/payment/payment-config → /api/payment-config).
+      canonical = `/api${restPath}`;
     } else {
       canonical = restPath;
     }

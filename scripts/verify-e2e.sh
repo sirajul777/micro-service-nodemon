@@ -20,6 +20,7 @@ BASE="http://localhost:${GATEWAY_PORT}"
 USERNAME="${TEST_USERNAME:-mikhmon}"
 PASSWORD="${TEST_PASSWORD:-1234}"
 COOKIE_JAR="$(mktemp)"
+REDIS_PASSWORD="${REDIS_PASSWORD:-super_secure_redis_pass_123}"
 declare -i PASS=0
 declare -i FAIL=0
 
@@ -56,7 +57,7 @@ fi
 # 3. Session carries the cached JWT (validated downstream)
 say "3. Me endpoint via session"
 me_json=$(curl -s -b "$COOKIE_JAR" "$BASE/api/auth/me")
-if echo "$me_json" | grep -q '"success"'; then ok "GET /api/auth/me → 200"; else fail "me → $(echo "$me_json" | head -c 200)"; fi
+if echo "$me_json" | grep -q '"authenticated":true'; then ok "GET /api/auth/me → 200"; else fail "me → $(echo "$me_json" | head -c 200)"; fi
 
 # 4. Unauthenticated access to a protected route is rejected
 say "4. Auth guard rejects anonymous protected route"

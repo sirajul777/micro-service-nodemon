@@ -641,17 +641,18 @@ def _process_topup_request(chat_id, user_id, username, reseller, amount, note, c
         "requestedAt": datetime.now().isoformat(), "status": "pending",
     }
     tg_cfg.add_topup_request(topup_req)
+    note_line = f"📝 Catatan: {note}" if note else ""
 
     send_message(cfg, chat_id,
         f"✅ <b>Request Topup Terkirim!</b>\n\n💰 Jumlah: <b>{_fmt_rp(amount)}</b>\n"
-        f"{f'📝 Catatan: {note}\n' if note else ''}"
+        f"{note_line}\n"
         f"🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\nTunggu konfirmasi admin.\nKetik /cektopup untuk cek status.")
 
     if cfg.get("chatId"):
         send_message(cfg, cfg["chatId"],
             f"💰 <b>Request Topup Saldo</b>\n\n👤 <b>{reseller['name']}</b>\n"
             f"🆔 ID: <code>{reseller['id']}</code>\n📱 @{username} (<code>{user_id}</code>)\n"
-            f"💵 Jumlah: <b>{_fmt_rp(amount)}</b>\n{f'📝 Catatan: {note}\n' if note else ''}"
+            f"💵 Jumlah: <b>{_fmt_rp(amount)}</b>\n{note_line}\n"
             f"💳 Saldo saat ini: <b>{_fmt_rp(reseller.get('saldo'))}</b>\n\n<i>ID: {req_id}</i>",
             {"reply_markup": {"inline_keyboard": [
                 [{"text": f"✅ Approve Rp {int(amount):,}".replace(",", "."), "callback_data": f"topup_approve:{req_id}"},

@@ -4,7 +4,7 @@ import { resolve } from 'path';
 import * as express from 'express';
 import { Eta } from 'eta';
 import * as RedisStore from 'connect-redis';
-import * as Redis from 'ioredis';
+import * as Redis from 'redis';
 import { AppModule } from './app.module';
 
 const session = require('express-session');
@@ -20,15 +20,21 @@ const PORT = Number(process.env.PORT || 8080);
 function buildSessionStore() {
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
-    const client = new Redis.default(redisUrl, {
-      lazyConnect: false,
-      maxRetriesPerRequest: 1,
-    });
+    // connect-redis v10 requires the `redis` (node-redis) client API, NOT
+    // ioredis. The `redis` package is a CJS module exporting `createClient`.
+    const client = (Redis as any).createClient
+      ? (Redis as any).createClient({ url: redisUrl })
+      : new (Redis as any).default({ url: redisUrl });
     client.on('error', (e: any) =>
       console.error('[session-redis] error:', e?.message),
     );
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const RedisStoreCtor = (RedisStore as any).default || RedisStore;
+    if (typeof client.connect === 'function') client.connect();
+// connect-redis v10 CJS entry does `exports.RedisStore = RedisStore` (a
+    // named export, no `.default`). Resolve the class regardless of how the
+    // bundler/interop shapes it.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+    const RedisStoreCtor =
+      ((RedisStore as any).RedisStore || (RedisStore as any).default) as any;
     return new RedisStoreCtor({ client, prefix: 'mikhmon:ses:' });
   }
   console.warn('[session] REDIS_URL not set — using in-memory MemoryStore (single-instance only)');
