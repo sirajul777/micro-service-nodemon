@@ -91,8 +91,12 @@
 - [ ] Full app.js API-path mapping to the BFF proxy (deferred → Phase 7)
 - [ ] In-memory session → Redis store for horizontal scaling (deferred)
 
-## Phase 7 — Cutover & Cleanup
+## Phase 7 — Cutover & Cleanup (in progress)
+- [x] Verify all 6 services build: 4× Node `nest build` EXIT 0, Go `go build ./...` OK, Python `py_compile` OK
+- [x] Create per-service Postgres seed extractor (`scripts/migrate-sqlite-to-pg.sh`) → `out/db_{auth,erp,payment,router,bot}.sql`
+- [x] Row-preservation check: admin `USR-ADMIN` extracted from `nodemon/data/mikhmon.db` (1 user, 1 payment_config, remainder empty)
+- [ ] Docker smoke test — `docker compose up` and verify nginx → BFF → services health
 - [ ] Shadow traffic / parallel run (monolith + microservices)
-- [ ] Migrate live data per table (SQL dumps per DB)
+- [ ] Full ETL: wrap the CSV extracts into per-entity COPY/INSERT matching each service's exact schema
 - [ ] Remove monolith, shared SQLite, `.patch` files
 - [ ] Final verification + smoke tests
