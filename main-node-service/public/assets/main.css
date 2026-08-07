@@ -1,0 +1,199 @@
+/* ══════════════════════════════════════════════
+   01 — BASE VARIABLES & RESET
+   Semua CSS custom properties dan reset dasar
+══════════════════════════════════════════════ */
+
+:root {
+  /* Background */
+  --bg: #050608;
+  --sb: rgba(13, 17, 23, 0.85);
+  --card: #0d1117;
+  --card2: #161b22;
+  --border: rgba(255, 255, 255, 0.08);
+  --font-main: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace; /* Add this *
+  /* Accent */
+  --acc: linear-gradient(135deg, #316ce8, #4f95ff);
+  /* Solid-color counterpart of --acc, for contexts that can't use a
+     gradient directly (plain text/icon color, border-color, accent-color
+     on checkboxes, etc). Used extensively across the app (voucher, mobile
+     API, topbar, reports, user management, ...) but was never actually
+     defined here — every one of those usages was silently falling back to
+     the browser default instead of the intended accent blue. */
+  --acc2: #4f95ff;
+  --acc-glow: 0 0 15px rgba(56, 139, 253, 0.35);
+
+  /* Text */
+  --text: #f0f6fc;
+  --muted: #8b949e;
+
+  /* Status colors */
+  --green: #57da68;
+  --yellow: #f2c053;
+  --red: #f66961;
+  --purple: #bc8cff;
+  --cyan: #2f8e87;
+  --orange: #db6d28;
+
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  letter-spacing: -0.01em;
+  background: var(--bg);
+  background-image: radial-gradient(circle at 50% -20%, #1f6feb22, transparent);
+  color: var(--text);
+  display: flex;
+  min-height: 100vh;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+/* Animations */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slideIn {
+  from {
+    transform: translateX(50px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.logo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 36px;
+}
+
+.wordmark {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 1px;
+  color: var(--text);
+  line-height: 1;
+}
+
+.wordmark span {
+  color: var(--blue);
+}
+
+.tagline {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-top: -4px;
+}
+
+.divider {
+  width: 40px;
+  height: 2px;
+  background: var(--blue);
+  border-radius: 2px;
+  margin: 0 auto 6px;
+  opacity: 0.5;
+}
+
+.field {
+  margin-bottom: 18px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 16px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.btn:hover {
+  background: var(--blue-dark);
+}
+.btn:active {
+  transform: scale(0.98);
+}
+
+.footer-text {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--muted);
+}

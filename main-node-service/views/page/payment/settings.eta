@@ -1,0 +1,208 @@
+  <div class="page" id="page-payment-settings">
+    <div class="card" style="margin-bottom: 14px">
+      <div class="card-hd">
+        <i class="fa fa-cog"></i> Konfigurasi Payment Gateway
+      </div>
+      <p style="color: var(--muted); font-size: 0.83rem; margin-bottom: 14px">
+        Semua kredensial disimpan di database. Gateway yang diaktifkan akan
+        tersedia sebagai metode pembayaran QRIS.
+      </p>
+
+      <div class="err" id="ps-err"></div>
+
+      <!-- Payment provider -->
+      <div class="fg" style="max-width: 360px">
+        <label>Gateway Default</label>
+        <select id="ps-default">
+          <option value="duitku">Duitku</option>
+          <option value="midtrans">Midtrans</option>
+        </select>
+      </div>
+
+      <hr style="border-color: var(--border); margin: 18px 0" />
+
+      <!-- Duitku -->
+      <div style="margin-bottom: 18px">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
+          <input type="checkbox" id="ps-duitku-enabled" style="width: auto; accent-color: var(--acc2)" />
+          <b><i class="fa fa-university"></i> Duitku (QRIS)</b>
+          <select id="ps-duitku-env" style="max-width: 100px">
+            <option value="sandbox">Sandbox</option>
+            <option value="production">Production</option>
+          </select>
+          <span id="ps-duitku-status" class="badge b-mu">Nonaktif</span>
+        </div>
+        <div class="g2">
+          <div class="fg">
+            <label>Merchant Code</label>
+            <input id="ps-duitku-merchant" placeholder="D1234" />
+          </div>
+          <div class="fg">
+            <label>API Key</label>
+            <input id="ps-duitku-apikey" type="password" placeholder="••••••••" />
+          </div>
+        </div>
+        <div class="g2">
+          <div class="fg">
+            <label>Callback URL</label>
+            <input id="ps-duitku-callback" placeholder="https://contoh.com/api/payments/duitku/callback" />
+          </div>
+          <div class="fg">
+            <label>Return URL</label>
+            <input id="ps-duitku-return" placeholder="https://contoh.com/payment/return" />
+          </div>
+        </div>
+        <div class="fg" style="max-width: 200px">
+          <label>Masa Berlaku QRIS (menit, 10–60)</label>
+          <input id="ps-duitku-expiry" type="number" min="10" max="60" value="10" />
+        </div>
+      </div>
+
+      <hr style="border-color: var(--border); margin: 18px 0" />
+
+      <!-- Midtrans -->
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
+          <input type="checkbox" id="ps-midtrans-enabled" style="width: auto; accent-color: var(--acc2)" />
+          <b><i class="fa fa-credit-card"></i> Midtrans (QRIS)</b>
+          <select id="ps-midtrans-env" style="max-width: 100px">
+            <option value="sandbox">Sandbox</option>
+            <option value="production">Production</option>
+          </select>
+          <span id="ps-midtrans-status" class="badge b-mu">Nonaktif</span>
+        </div>
+        <div class="g2">
+          <div class="fg">
+            <label>Server Key</label>
+            <input id="ps-midtrans-server" type="password" placeholder="SB-Mid-server-..." />
+          </div>
+          <div class="fg">
+            <label>Client Key</label>
+            <input id="ps-midtrans-client" type="password" placeholder="SB-Mid-client-..." />
+          </div>
+        </div>
+      </div>
+
+      <hr style="border-color: var(--border); margin: 18px 0" />
+
+<!-- QRIS GoPay Merchant (PayHook Android app) -->
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
+          <b><i class="fa fa-qrcode"></i> QRIS GoPay Merchant (Tanpa Payment Gateway)</b>
+        </div>
+        <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 10px">
+          Gunakan GoPay Merchant + PayHook Android app untuk menerima pembayaran QRIS tanpa payment gateway. Pelanggan membayar nominal unik (harga + kode unik), PayHook meneruskan notifikasi ke server.
+        </p>
+        <div class="fg">
+          <label>QRIS Statis GoPay Merchant (string hasil decode)</label>
+          <input id="ps-payhook-static-qris" placeholder="000201010212..." />
+        </div>
+        <div class="g3">
+          <div class="fg">
+            <label>Digit Kode Unik</label>
+            <input id="ps-payhook-unique-digits" type="number" min="2" max="5" placeholder="3" />
+          </div>
+          <div class="fg">
+            <label>QRIS Expiry (menit)</label>
+            <input id="ps-payhook-qris-expiry" type="number" min="5" max="60" placeholder="15" />
+          </div>
+          <div class="fg">
+            <label>Auto-hapus Order Gagal (hari)</label>
+            <input id="ps-payhook-retention-days" type="number" min="0" max="90" placeholder="3" />
+          </div>
+        </div>
+        <div class="g3">
+          <div class="fg" style="display: flex; align-items: center; gap: 6px; padding-top: 22px">
+            <input type="checkbox" id="ps-payhook-wa-enabled" style="width: auto; accent-color: var(--acc2)" />
+            <label style="margin: 0">WA Notifikasi Customer</label>
+          </div>
+        </div>
+        <div class="g3">
+          <div class="fg">
+            <label>Provider WhatsApp</label>
+            <select id="ps-payhook-wa-provider">
+              <option value="fonnte">Fonnte</option>
+              <option value="wablas">Wablas</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Token WA Gateway</label>
+            <input id="ps-payhook-wa-token" placeholder="token dari Fonnte/Wablas" />
+          </div>
+          <div class="fg">
+            <label>Domain Wablas (khusus Wablas)</label>
+            <input id="ps-payhook-wa-domain" placeholder="https://console.wablas.com" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>Walled Garden Hosts (dipisah koma, untuk hotspot)</label>
+          <input id="ps-payhook-walled-garden" placeholder="cdn.jsdelivr.net, voucher.sysbill.ink" />
+        </div>
+
+        <hr style="border-color: var(--border); margin: 16px 0" />
+
+        <div style="margin-bottom: 10px">
+          <b style="font-size: 0.88rem"><i class="fa fa-lock"></i> Keamanan Webhook PayHook</b>
+          <p style="color: var(--muted); font-size: 0.78rem; margin: 4px 0 0">
+            Wajib diisi salah satu supaya endpoint webhook tidak bisa dipanggil sembarang orang. Samakan nilainya dengan pengaturan webhook di aplikasi PayHook Android.
+          </p>
+        </div>
+        <div class="g3">
+          <div class="fg">
+            <label>Tipe Autentikasi</label>
+            <select id="ps-payhook-webhook-authtype">
+              <option value="none">Tanpa Autentikasi (tidak disarankan)</option>
+              <option value="bearer">Bearer Token</option>
+              <option value="api_key">API Key (header custom)</option>
+              <option value="basic">Basic</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Token / Secret</label>
+            <input id="ps-payhook-webhook-token" placeholder="samakan dengan token di app PayHook" />
+          </div>
+          <div class="fg">
+            <label>Nama Header (khusus API Key)</label>
+            <input id="ps-payhook-webhook-header" placeholder="X-API-Key" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>HMAC Secret Key (opsional, disarankan untuk produksi)</label>
+          <input id="ps-payhook-webhook-secret" placeholder="isi jika Secret Key diaktifkan di app PayHook" />
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: flex; gap: 8px">
+        <button class="btn b-p" onclick="savePaymentSettings()" style="justify-content: center">
+          <i class="fa fa-save"></i> Simpan Konfigurasi
+        </button>
+        <button class="btn b-s" onclick="loadPaymentSettings()">
+          <i class="fa fa-refresh"></i> Muat Ulang
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><i class="fa fa-flask"></i> Uji Coba Pembayaran</div>
+      <p style="color: var(--muted); font-size: 0.83rem; margin-bottom: 12px">
+        Buat transaksi QRIS percobaan untuk memastikan gateway berfungsi.
+      </p>
+      <div class="g2" style="align-items: end">
+        <div class="fg">
+          <label>Nominal (Rp)</label>
+          <input id="ps-test-amount" type="number" min="1000" value="10000" />
+        </div>
+        <div class="fg">
+          <label>Gateway</label>
+          <select id="ps-test-gateway">
+            <option value="">Default</option>
+            <option value="midtrans">Midtrans (QRIS)</option>
+            <option value="duitku">Duitku (QRIS)</option>
+          </select>
+        </div>
+        <button class="btn b-p" onclick="testPayment()"><i class="fa fa-flask"></i> Uji Coba</button>
+      </div>
+      <div id="ps-test-result" style="margin-top: 12px; font-size: 0.8rem"></div>
+    </div>
+  </div>
+

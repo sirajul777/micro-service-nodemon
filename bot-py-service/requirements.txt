@@ -1,0 +1,12 @@
+# MikHMon — Telegram/WA Bot service (Phase 5)
+# Event-driven bot/notification service for the MikHMon platform.
+redis==5.0.4
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.31
+requests==2.32.3
+# gRPC client for RouterService (mikrotik-go-service). Generated stubs from
+# proto/router.proto are wired in clients/mikrotik_grpc.py; grpcio is kept
+# here so the stub can be imported without degrading the whole service.
+grpcio==1.64.1
+grpcio-tools==1.64.1
+

@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package router;
+
+option go_package = "github.com/mikhmon/mikrotik-go-service/proto";
+
+// RouterService exposes MikroTik operations to other microservices.
+// This is a copy of mikrotik-go-service/proto/router.proto so payment-service
+// can load the contract at runtime (no compile-time codegen needed).
+service RouterService {
+  rpc TestConnect(TestConnectRequest) returns (TestConnectResponse);
+  rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse);
+  rpc ListActiveHotspotUsers(ListActiveRequest) returns (ListActiveResponse);
+  rpc ListHotspotUsers(ListHotspotUsersRequest) returns (ListHotspotUsersResponse);
+  rpc AddHotspotUser(AddHotspotUserRequest) returns (AddHotspotUserResponse);
+  rpc RemoveHotspotUser(RemoveHotspotUserRequest) returns (RemoveHotspotUserResponse);
+  rpc ListHotspotProfiles(ListProfilesRequest) returns (ListProfilesResponse);
+  rpc GetHotspotProfile(GetProfileRequest) returns (GetProfileResponse);
+  rpc GetSystemResource(SystemResourceRequest) returns (SystemResourceResponse);
+  rpc GetInterfaces(InterfacesRequest) returns (InterfacesResponse);
+}
+
+message TestConnectRequest { string session_id = 1; }
+message TestConnectResponse {
+  bool success = 1;
+  string identity = 2;
+  string ros_version = 3;
+  string error = 4;
+}
+
+message GetDashboardRequest { string session_id = 1; }
+message GetDashboardResponse {
+  bool success = 1;
+  string error = 2;
+  string identity = 3;
+  string ros_version = 4;
+  string uptime = 5;
+  string version = 6;
+  string cpu_load = 7;
+  string free_memory = 8;
+  string total_memory = 9;
+  string free_hdd = 10;
+  string total_hdd = 11;
+  int32 active_hotspot_users = 12;
+  int32 total_hotspot_users = 13;
+}
+
+message ListActiveRequest {
+  string session_id = 1;
+  string server = 2;
+}
+message ActiveHotspotUser {
+  string id = 1;
+  string user = 2;
+  string address = 3;
+  string mac_address = 4;
+  string uptime = 5;
+  string bytes_in = 6;
+  string bytes_out = 7;
+  string packets_in = 8;
+  string packets_out = 9;
+  string server = 10;
+}
+message ListActiveResponse {
+  bool success = 1;
+  string error = 2;
+  repeated ActiveHotspotUser users = 3;
+}
+
+message ListHotspotUsersRequest {
+  string session_id = 1;
+  string profile = 2;
+  string comment = 3;
+}
+message HotspotUser {
+  string id = 1;
+  string name = 2;
+  string password = 3;
+  string profile = 4;
+  string comment = 5;
+  string limit_uptime = 6;
+  string disabled = 7;
+}
+message ListHotspotUsersResponse {
+  bool success = 1;
+  string error = 2;
+  repeated HotspotUser users = 3;
+}
+
+message AddHotspotUserRequest {
+  string session_id = 1;
+  string name = 2;
+  string password = 3;
+  string profile = 4;
+  string comment = 5;
+  string limit_uptime = 6;
+}
+message AddHotspotUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message RemoveHotspotUserRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message RemoveHotspotUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ListProfilesRequest { string session_id = 1; }
+message HotspotProfile {
+  string id = 1;
+  string name = 2;
+  string on_login = 3;
+  string session_timeout = 4;
+  string idle_timeout = 5;
+  string rate_limit = 6;
+  string shared_users = 7;
+  string address_pool = 8;
+}
+message ListProfilesResponse {
+  bool success = 1;
+  string error = 2;
+  repeated HotspotProfile profiles = 3;
+}
+
+message GetProfileRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message GetProfileResponse {
+  bool success = 1;
+  string error = 2;
+  HotspotProfile profile = 3;
+}
+
+message SystemResourceRequest { string session_id = 1; }
+message SystemResourceResponse {
+  bool success = 1;
+  string error = 2;
+  string version = 3;
+  string uptime = 4;
+  string cpu_load = 5;
+  string free_memory = 6;
+  string total_memory = 7;
+  string free_hdd = 8;
+  string total_hdd = 9;
+  string ros_version = 10;
+}
+
+message InterfacesRequest { string session_id = 1; }
+message InterfaceInfo {
+  string id = 1;
+  string name = 2;
+  string type = 3;
+  string mac_address = 4;
+  string tx = 5;
+  string rx = 6;
+  string running = 7;
+}
+message InterfacesResponse {
+  bool success = 1;
+  string error = 2;
+  repeated InterfaceInfo interfaces = 3;
+}

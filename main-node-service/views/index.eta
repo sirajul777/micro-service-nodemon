@@ -1,0 +1,1573 @@
+<% layout("./layout") %>
+
+<!-- Include the modular login -->
+<%~ include("./login") %>
+
+<!-- Include the modular sidebar -->
+<%~ include("./partials/sidebar") %>
+
+<div id="main">
+  <!-- Topbar code goes here -->
+<%~ include("./partials/topbar") %>
+
+<div id="content">
+<%~ include("./page/dashboard") %>
+<!-- ══ HOTSPOT ACTIVE ══ -->
+<%~ include("./page/hotspot/active") %>
+
+<!-- ══ HOTSPOT USERS ══ -->
+<%~ include("./page/hotspot/user") %>
+<!-- ══ HOTSPOT PROFILES ══ -->
+<%~ include("./page/hotspot/profile") %>
+
+        <!-- ══ PPPoE ACTIVE ══ -->
+<%~ include("./page/pppoe/active") %>
+
+        <!-- ══ PPPoE USERS ══ -->
+<%~ include("./page/pppoe/user") %>
+
+        <!-- ══ PPPoE PROFILES ══ -->
+<%~ include("./page/pppoe/profile") %>
+
+        <!-- ══ RESELLER ══ -->
+<%~ include("./page/selling/reseller") %>
+
+        <!-- ══ BATCH VOUCHER ══ -->
+<%~ include("./page/voucher/batch") %>
+
+        <!-- ══ BATCH LIST ══ -->
+<%~ include("./page/voucher/batch-list") %>
+
+        <!-- ══ VOUCHER SETTINGS ══ -->
+<%~ include("./page/voucher/setting") %>
+
+        <!-- ══ SELLING REPORT ══ -->
+<%~ include("./page/selling/report") %>
+
+        <!-- ══ RESUME REPORT ══ -->
+<%~ include("./page/selling/resume") %>
+
+        <!-- ══ LIVE REPORT ══ -->
+<%~ include("./page/selling/live") %>
+
+        <!-- ══ TELEGRAM TOOLS ══ -->
+<%~ include("./page/telegram/setting") %>
+
+        <!-- ══ RESELLER BOT ══ -->
+<%~ include("./page/telegram/seller") %>
+
+        <!-- ══ USER MANAGEMENT ══ -->
+<%~ include("./page/managment/user") %>
+
+        <!-- ══ CHANGE PASSWORD ══ -->
+<%~ include("./page/managment/password") %>
+
+        <!-- ══ MOBILE API ══ -->
+<%~ include("./page/managment/mobile-api") %>
+
+        <!-- ══ BILLING ══ -->
+<%~ include("./page/billing/customer") %>
+
+        <!-- ══ INVOICES ══ -->
+<%~ include("./page/billing/invoice") %>
+
+        <!-- ══ PAYMENT MANAGE ══ -->
+<%~ include("./page/payment/manage") %>
+
+<!-- ══ PAYMENT SETTINGS ══ -->
+<%~ include("./page/payment/settings") %>
+
+<!-- ══ QRIS MONITOR ══ -->
+<%~ include("./page/payment/qris-monitor") %>
+
+        <!-- ══ BOT RESELLER ══ -->
+
+        <!-- ══ SESSIONS ══ -->
+<%~ include("./page/managment/router") %>
+
+    </div>
+
+    <!-- ══ MODALS ══ -->
+    <!-- User Modal -->
+    <div class="ov" id="m-um">
+      <div
+        class="modal"
+        style="width: 560px; max-height: 92vh; overflow-y: auto"
+      >
+        <h3>
+          <i class="fa fa-user-plus"></i> <span id="mum-ttl">Tambah User</span>
+        </h3>
+
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Username
+              <small style="color: var(--muted)">untuk login</small></label
+            ><input
+              id="mum-un"
+              placeholder="user01"
+              oninput="
+                this.value = this.value.toLowerCase().replace(/[^a-z0-9_]/g, '')
+              "
+            />
+          </div>
+          <div class="fg">
+            <label>Nama Lengkap</label
+            ><input id="mum-nm" placeholder="Nama pengguna" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Password
+              <small
+                id="mum-pw-hint"
+                style="color: var(--muted)"
+              ></small></label
+            ><input type="password" id="mum-pw" placeholder="min. 4 karakter" />
+          </div>
+          <div class="fg">
+            <label>Role</label>
+            <select id="mum-role" onchange="onRoleChange()">
+              <option value="admin">Admin — Akses Penuh</option>
+              <option value="reseller">Reseller — Voucher & Laporan</option>
+              <option value="collector">Collector — Billing & Tagihan</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg">
+          <label
+            >Akses Router
+            <small style="color: var(--muted)"
+              >kosong = semua router</small
+            ></label
+          >
+          <div
+            id="mum-sessions-list"
+            style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px"
+          ></div>
+        </div>
+
+        <hr style="border-color: var(--border); margin: 14px 0" />
+        <div
+          style="
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 10px;
+          "
+        >
+          <i class="fa fa-shield"></i> Permissions — centang untuk mengizinkan
+        </div>
+        <div
+          id="mum-perms"
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px"
+        ></div>
+
+        <div class="fg" style="margin-top: 14px">
+          <label
+            >Catatan
+            <small style="color: var(--muted)">(opsional)</small></label
+          ><input id="mum-note" placeholder="Catatan tentang user ini" />
+        </div>
+        <div class="fg">
+          <label>Status</label
+          ><select id="mum-active">
+            <option value="true">Aktif</option>
+            <option value="false">Nonaktif</option>
+          </select>
+        </div>
+
+        <div class="err" id="mum-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-um')">Batal</button
+          ><button class="btn b-p" onclick="saveUm()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="ov" id="m-reset-pw">
+      <div class="modal" style="width: 400px">
+        <h3><i class="fa fa-key"></i> Reset Password</h3>
+        <p style="color: var(--muted); font-size: 0.83rem; margin-bottom: 14px">
+          Reset password untuk user <b id="rpw-name"></b>. User harus ganti
+          password setelah login.
+        </p>
+        <div class="fg">
+          <label>Password Baru</label
+          ><input type="password" id="rpw-new" placeholder="min. 4 karakter" />
+        </div>
+        <div class="fg">
+          <label>Konfirmasi</label
+          ><input
+            type="password"
+            id="rpw-confirm"
+            placeholder="ulangi password baru"
+          />
+        </div>
+        <div class="err" id="rpw-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-reset-pw')">Batal</button
+          ><button class="btn b-p" onclick="doResetPw()">
+            <i class="fa fa-check"></i> Reset Password
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Billing Customer Modal -->
+    <div class="ov" id="m-bill">
+      <div
+        class="modal"
+        style="width: 560px; max-height: 90vh; overflow-y: auto"
+      >
+        <h3>
+          <i class="fa fa-user-plus"></i>
+          <span id="mbill-ttl">Tambah Pelanggan</span>
+        </h3>
+        <div class="fg2">
+          <div class="fg">
+            <label>Nama Pelanggan</label
+            ><input id="mb-nm" placeholder="Nama lengkap" />
+          </div>
+          <div class="fg">
+            <label>No. HP / WA</label><input id="mb-ph" placeholder="08xxx" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Tipe Layanan</label>
+            <select id="mb-tp" onchange="loadBillUsers()">
+              <option value="pppoe">PPPoE</option>
+              <option value="hotspot">Hotspot Member</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Username MikroTik</label>
+            <select id="mb-user">
+              <option value="">Loading...</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Paket / Profile</label
+            ><input id="mb-prof" placeholder="PPPoE-10M" readonly />
+          </div>
+          <div class="fg">
+            <label>Harga Tagihan/Bulan (Rp)</label
+            ><input id="mb-price" type="number" min="0" placeholder="100000" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Tanggal Tagih
+              <small style="color: var(--muted)">(tgl 1-28)</small></label
+            ><input id="mb-date" type="number" min="1" max="28" value="1" />
+          </div>
+          <div class="fg">
+            <label>Grace Period (hari)</label
+            ><input id="mb-grace" type="number" min="0" max="30" value="3" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Telegram ID Pelanggan
+              <small style="color: var(--muted)">(untuk notif)</small></label
+            ><input id="mb-tg" placeholder="opsional" />
+          </div>
+          <div class="fg">
+            <label>Status</label>
+            <select id="mb-st">
+              <option value="active">Aktif</option>
+              <option value="suspended">Diblokir</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Pengingat tagihan (hari sebelum jatuh tempo)</label>
+          <div
+            style="display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap"
+          >
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 0.8rem;
+                color: var(--text);
+              "
+              ><input type="checkbox" id="mb-rem7" checked /> 7 hari</label
+            >
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 0.8rem;
+                color: var(--text);
+              "
+              ><input type="checkbox" id="mb-rem3" checked /> 3 hari</label
+            >
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 0.8rem;
+                color: var(--text);
+              "
+              ><input type="checkbox" id="mb-rem1" checked /> 1 hari</label
+            >
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 0.8rem;
+                color: var(--text);
+              "
+              ><input type="checkbox" id="mb-rem0" /> H-0 (hari H)</label
+            >
+          </div>
+        </div>
+        <div class="fg">
+          <label>Auto-disable jika belum bayar</label>
+          <select id="mb-auto">
+            <option value="true">Ya (otomatis blokir)</option>
+            <option value="false">Tidak (manual)</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Catatan</label><input id="mb-note" placeholder="opsional" />
+        </div>
+        <div class="err" id="mb-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-bill')">Batal</button
+          ><button class="btn b-p" onclick="saveBillCustomer()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- import Billing Customer Modal -->
+    <div class="ov" id="m-import-billing">
+      <div class="modal" style="width:640px;max-height:92vh;overflow-y:auto">
+
+        <h3 style="margin-bottom:4px;display:flex;align-items:center;gap:10px">
+          <i class="fa fa-upload" style="color:#58a6ff"></i>
+          Import Pelanggan Billing dari JSON
+        </h3>
+        <p style="color:var(--muted);font-size:.8rem;margin-bottom:16px">
+          Upload file JSON hasil export sistem lain. Data akan diimport satu per satu ke billing MikHMon.
+        </p>
+
+        <!-- STEP 1: Drop zone -->
+        <div id="imp-step-upload">
+          <div class="import-dropzone" id="imp-dropzone"
+              ondragover="impDragOver(event)" ondragleave="impDragLeave(event)"
+              ondrop="impDrop(event)">
+            <input type="file" accept=".json" onchange="impFileSelected(this)">
+            <i class="fa fa-cloud-upload"></i>
+            <div class="dz-title">Drop file JSON di sini atau klik untuk browse</div>
+            <div class="dz-sub">Format: customers_clean.json atau billing_import_ready.json</div>
+          </div>
+
+          <!-- Mapping info (collapsed) -->
+          <div class="mapping-section" style="margin-top:12px">
+            <div class="mapping-toggle" onclick="toggleMapping()">
+              <i class="fa fa-chevron-right" id="map-chevron"></i>
+              Field mapping yang didukung
+            </div>
+            <div class="mapping-grid" id="map-grid">
+              <div class="mapping-row"><span class="mk">name</span><i class="fa fa-arrow-right"></i><span class="mv">Nama Pelanggan</span></div>
+              <div class="mapping-row"><span class="mk">phone</span><i class="fa fa-arrow-right"></i><span class="mv">No. HP</span></div>
+              <div class="mapping-row"><span class="mk">service_type / type</span><i class="fa fa-arrow-right"></i><span class="mv">Tipe (pppoe/hotspot)</span></div>
+              <div class="mapping-row"><span class="mk">pppoe_username / mikrotikUser</span><i class="fa fa-arrow-right"></i><span class="mv">Username MikroTik</span></div>
+              <div class="mapping-row"><span class="mk">pppoe_profile / profile</span><i class="fa fa-arrow-right"></i><span class="mv">Profile Paket</span></div>
+              <div class="mapping-row"><span class="mk">package_price / price</span><i class="fa fa-arrow-right"></i><span class="mv">Harga Tagihan</span></div>
+              <div class="mapping-row"><span class="mk">billing_day / billDate</span><i class="fa fa-arrow-right"></i><span class="mv">Tanggal Tagih</span></div>
+              <div class="mapping-row"><span class="mk">auto_suspension / autoDisable</span><i class="fa fa-arrow-right"></i><span class="mv">Auto Blokir</span></div>
+              <div class="mapping-row"><span class="mk">status</span><i class="fa fa-arrow-right"></i><span class="mv">Status</span></div>
+              <div class="mapping-row"><span class="mk">package_name / note</span><i class="fa fa-arrow-right"></i><span class="mv">Catatan</span></div>
+            </div>
+          </div>
+
+          <span class="err" id="imp-file-err"></span>
+        </div>
+
+        <!-- STEP 2: Preview + options (setelah file dipilih) -->
+        <div id="imp-step-preview" style="display:none">
+
+          <!-- Stats -->
+          <div class="import-stats">
+            <div class="import-stat">
+              <div class="sv" id="imp-total" style="color:#58a6ff">0</div>
+              <div class="sl">Total</div>
+            </div>
+            <div class="import-stat">
+              <div class="sv" id="imp-valid" style="color:var(--green)">0</div>
+              <div class="sl">Valid</div>
+            </div>
+            <div class="import-stat">
+              <div class="sv" id="imp-warn-ct" style="color:var(--yellow)">0</div>
+              <div class="sl">Peringatan</div>
+            </div>
+            <div class="import-stat">
+              <div class="sv" id="imp-invalid-ct" style="color:var(--red)">0</div>
+              <div class="sl">Error</div>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="import-options">
+            <label>
+              <input type="checkbox" id="imp-opt-skip-dup" checked>
+              Skip duplikat (username sudah ada)
+            </label>
+            <label>
+              <input type="checkbox" id="imp-opt-clean-phone" checked>
+              Bersihkan karakter unicode di nomor HP
+            </label>
+            <label>
+              <input type="checkbox" id="imp-opt-grace">
+              Grace period:
+              <select id="imp-grace-days">
+                <option value="0">0 hari</option>
+                <option value="3" selected>3 hari</option>
+                <option value="5">5 hari</option>
+                <option value="7">7 hari</option>
+              </select>
+            </label>
+          </div>
+
+          <!-- Preview table -->
+          <div class="import-preview-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nama</th>
+                  <th>Username MikroTik</th>
+                  <th>Profile</th>
+                  <th>Harga</th>
+                  <th>Tgl Tagih</th>
+                  <th>Status</th>
+                  <th>Cek</th>
+                </tr>
+              </thead>
+              <tbody id="imp-preview-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="btn b-s" onclick="impReset()">
+              <i class="fa fa-arrow-left"></i> Ganti File
+            </button>
+            <button class="btn b-p" id="imp-start-btn" onclick="startBillingImport()"
+                    style="flex:1;justify-content:center">
+              <i class="fa fa-play"></i>
+              Mulai Import <span id="imp-count-label"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 3: Progress (saat import berjalan) -->
+        <div id="imp-step-progress" style="display:none">
+
+          <div class="import-progress-wrap">
+            <div class="import-progress-bar-bg">
+              <div class="import-progress-fill" id="imp-prog-fill" style="width:0%"></div>
+            </div>
+            <div class="import-progress-label">
+              <span id="imp-prog-label">0 / 0 selesai</span>
+              <span id="imp-prog-pct">0%</span>
+            </div>
+          </div>
+
+          <!-- Live log -->
+          <div class="import-log" id="imp-log"></div>
+
+          <!-- Result summary (muncul setelah selesai) -->
+          <div id="imp-result-summary" style="display:none;margin-bottom:14px">
+            <div class="import-stats">
+              <div class="import-stat">
+                <div class="sv" id="res-imported" style="color:var(--green)">0</div>
+                <div class="sl">Berhasil</div>
+              </div>
+              <div class="import-stat">
+                <div class="sv" id="res-skipped" style="color:var(--yellow)">0</div>
+                <div class="sl">Dilewati</div>
+              </div>
+              <div class="import-stat">
+                <div class="sv" id="res-errors" style="color:var(--red)">0</div>
+                <div class="sl">Gagal</div>
+              </div>
+              <div class="import-stat">
+                <div class="sv" id="res-time" style="color:var(--muted)">0s</div>
+                <div class="sl">Durasi</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="imp-prog-actions" style="display:none;gap:8px">
+            <button class="btn b-s" onclick="closeM('m-import-billing');loadBilling()" style="flex:1;justify-content:center">
+              <i class="fa fa-check"></i> Selesai — Lihat Data Billing
+            </button>
+            <button class="btn b-ghost" onclick="impReset()" style="flex:1;justify-content:center">
+              <i class="fa fa-upload"></i> Import Lagi
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Pay Invoice Modal -->
+    <div class="ov" id="m-pay">
+      <div class="modal" style="width: 420px">
+        <h3><i class="fa fa-check-circle"></i> Konfirmasi Pembayaran</h3>
+        <div
+          style="
+            background: var(--card2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+          "
+        >
+          <div style="font-weight: 600" id="pay-name">—</div>
+          <div style="color: var(--muted); font-size: 0.8rem" id="pay-period">
+            —
+          </div>
+          <div style="margin-top: 6px; font-size: 0.95rem">
+            Tagihan: <b style="color: var(--green)" id="pay-amount">Rp 0</b>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--muted); margin-top: 2px">
+            Jatuh tempo: <span id="pay-due">—</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Diterima Oleh</label><input id="pay-by" placeholder="Admin" />
+        </div>
+        <div class="fg">
+          <label>Keterangan</label
+          ><input id="pay-note" placeholder="Transfer, Cash, dst..." />
+        </div>
+        <div class="err" id="pay-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-pay')">Batal</button>
+          <button
+            class="btn b-p"
+            onclick="confirmPay()"
+            style="background: var(--green)"
+          >
+            <i class="fa fa-check"></i> Lunas
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send Reminder Modal -->
+    <div class="ov" id="m-reminder">
+      <div class="modal" style="width: 420px">
+        <h3><i class="fa fa-paper-plane"></i> Kirim Reminder Telegram</h3>
+        <p style="color: var(--muted); font-size: 0.82rem; margin-bottom: 12px">
+          Preview pesan yang akan dikirim:
+        </p>
+        <div
+          id="rem-preview"
+          style="
+            background: var(--card2);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+            line-height: 1.6;
+          "
+        ></div>
+        <div class="err" id="rem-err" style="margin-top: 8px"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-reminder')">Batal</button>
+          <button class="btn b-p" onclick="sendReminder()">
+            <i class="fa fa-paper-plane"></i> Kirim Sekarang
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bot Reseller Modal -->
+    <div class="ov" id="m-brs">
+      <div class="modal" style="width: 500px">
+        <h3>
+          <i class="fa fa-users"></i> <span id="mbrs-ttl">Tambah Agen</span>
+        </h3>
+        <div class="fg2">
+          <div class="fg">
+            <label>Nama Agen</label
+            ><input id="mbrs-nm" placeholder="Nama lengkap" />
+          </div>
+          <div class="fg">
+            <label
+              >Username Telegram
+              <small style="color: var(--muted)">@user</small></label
+            ><input id="mbrs-un" placeholder="@username" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Telegram ID
+              <small style="color: var(--muted)">angka numeric</small></label
+            ><input id="mbrs-tid" placeholder="1234567890" type="number" />
+          </div>
+          <div class="fg">
+            <label>Status</label
+            ><select id="mbrs-st">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Diskon %
+              <small style="color: var(--muted)"
+                >dari selling price</small
+              ></label
+            ><input id="mbrs-dc" type="number" value="0" min="0" max="100" />
+          </div>
+          <div class="fg">
+            <label>Saldo Awal (Rp)</label
+            ><input id="mbrs-sl" type="number" value="0" min="0" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>Catatan</label><input id="mbrs-nt" placeholder="opsional" />
+        </div>
+        <div class="err" id="mbrs-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-brs')">Batal</button
+          ><button class="btn b-p" onclick="saveBrs()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Topup Saldo Modal -->
+    <div class="ov" id="m-topup">
+      <div class="modal" style="width: 420px">
+        <h3><i class="fa fa-money"></i> Topup Saldo</h3>
+        <div
+          style="
+            background: var(--card2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+          "
+        >
+          <div style="font-weight: 600; font-size: 0.92rem" id="tp-name">—</div>
+          <div style="color: var(--muted); font-size: 0.8rem" id="tp-tid">
+            —
+          </div>
+          <div style="margin-top: 6px; font-size: 0.85rem">
+            Saldo saat ini: <b style="color: var(--green)" id="tp-cur">Rp 0</b>
+          </div>
+        </div>
+        <div class="fg">
+          <label
+            >Jumlah Topup (Rp)
+            <small style="color: var(--muted)"
+              >negatif = potong saldo</small
+            ></label
+          ><input
+            id="tp-amt"
+            type="number"
+            min="-9999999"
+            placeholder="50000"
+          />
+        </div>
+        <div
+          style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px"
+        >
+          <button class="btn b-s b-sm" onclick="quickTopup(10000)">+10K</button>
+          <button class="btn b-s b-sm" onclick="quickTopup(20000)">+20K</button>
+          <button class="btn b-s b-sm" onclick="quickTopup(50000)">+50K</button>
+          <button class="btn b-s b-sm" onclick="quickTopup(100000)">
+            +100K
+          </button>
+          <button class="btn b-s b-sm" onclick="quickTopup(200000)">
+            +200K
+          </button>
+          <button class="btn b-s b-sm" onclick="quickTopup(500000)">
+            +500K
+          </button>
+        </div>
+        <div class="fg">
+          <label>Keterangan</label
+          ><input id="tp-note" placeholder="Transfer BRI, dst..." />
+        </div>
+        <div class="err" id="tp-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-topup')">Batal</button>
+          <button class="btn b-p" onclick="doTopup()">
+            <i class="fa fa-check"></i> Proses Topup
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reseller Bot Modal -->
+    <div class="ov" id="m-rb">
+      <div class="modal" style="width: 500px">
+        <h3>
+          <i class="fa fa-users"></i> <span id="mrb-ttl">Tambah Reseller</span>
+        </h3>
+        <div class="fg2">
+          <div class="fg">
+            <label>Nama Lengkap</label
+            ><input id="mrb-name" placeholder="Nama reseller" />
+          </div>
+          <div class="fg">
+            <label
+              >Username Telegram
+              <small style="color: var(--muted)">tanpa @</small></label
+            ><input id="mrb-uname" placeholder="username123" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Telegram ID
+              <small style="color: var(--muted)">angka</small></label
+            ><input id="mrb-tid" placeholder="123456789" type="number" />
+          </div>
+          <div class="fg">
+            <label>Router Session</label
+            ><select id="mrb-sess">
+              <option value="">Pilih router...</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Markup per Voucher (Rp)</label
+            ><input id="mrb-markup" type="number" value="0" min="0" />
+          </div>
+          <div class="fg">
+            <label>Status</label
+            ><select id="mrb-status">
+              <option value="active">Aktif</option>
+              <option value="inactive">Nonaktif</option>
+            </select>
+          </div>
+        </div>
+        <div class="err" id="mrb-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-rb')">Batal</button
+          ><button class="btn b-p" onclick="saveRb()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Topup Modal -->
+    <div class="ov" id="m-topup">
+      <div class="modal" style="width: 420px">
+        <h3><i class="fa fa-money"></i> Topup Saldo Reseller</h3>
+        <input type="hidden" id="tu-id" />
+        <div
+          style="
+            background: var(--card2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+          "
+        >
+          <div style="font-size: 0.82rem; color: var(--muted)">Reseller</div>
+          <div id="tu-name" style="font-weight: 700; font-size: 0.95rem"></div>
+          <div style="font-size: 0.82rem; color: var(--muted); margin-top: 4px">
+            Saldo saat ini:
+            <b id="tu-current-saldo" style="color: var(--green)"></b>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Jumlah Topup (Rp)</label
+          ><input
+            id="tu-amount"
+            type="number"
+            min="1000"
+            step="1000"
+            placeholder="50000"
+          />
+        </div>
+        <div class="fg">
+          <label>Catatan</label
+          ><input id="tu-note" placeholder="Transfer BRI / Tunai / dll..." />
+        </div>
+        <div
+          id="tu-preview"
+          style="
+            background: var(--acc) 15;
+            border: 1px solid var(--acc) 30;
+            border-radius: 7px;
+            padding: 9px;
+            font-size: 0.82rem;
+            margin-top: 4px;
+            display: none;
+          "
+        >
+          Saldo setelah topup: <b id="tu-after" style="color: var(--green)"></b>
+        </div>
+        <div class="err" id="tu-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-topup')">Batal</button
+          ><button class="btn b-p" onclick="doTopup()">
+            <i class="fa fa-money"></i> Topup Sekarang
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Voucher Modal -->
+    <div class="ov" id="m-import">
+      <div class="modal" style="width: 560px">
+        <h3><i class="fa fa-download"></i> Import Voucher dari MikroTik</h3>
+        <p style="color: var(--muted); font-size: 0.82rem; margin-bottom: 14px">
+          Pilih profile yang ingin diimport. Import dilakukan satu per satu agar
+          tidak timeout.
+        </p>
+
+        <!-- Step 1: Profile list -->
+        <div id="imp-step1">
+          <div
+            id="imp-profiles-list"
+            style="max-height: 340px; overflow-y: auto"
+          >
+            <div style="text-align: center; padding: 20px; color: var(--muted)">
+              <i class="fa fa-spinner fa-spin"></i> Memuat daftar profile...
+            </div>
+          </div>
+          <div
+            style="
+              margin-top: 12px;
+              display: flex;
+              gap: 7px;
+              align-items: center;
+              flex-wrap: wrap;
+            "
+          >
+            <label style="font-size: 0.78rem; color: var(--muted)"
+              >Cek selling script:</label
+            >
+            <select id="imp-months" style="max-width: 160px; width: auto">
+              <option value="1">1 bulan terakhir</option>
+              <option value="3" selected>3 bulan terakhir</option>
+              <option value="6">6 bulan terakhir</option>
+              <option value="12">12 bulan terakhir</option>
+            </select>
+          </div>
+          <div
+            style="
+              margin-top: 10px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <button class="btn b-s b-sm" onclick="selectAllProfiles()">
+              <i class="fa fa-check-square-o"></i> Pilih Semua
+            </button>
+            <div style="display: flex; gap: 7px">
+              <button class="btn b-s" onclick="closeM('m-import')">
+                Batal
+              </button>
+              <button
+                class="btn b-p"
+                id="imp-start-btn"
+                onclick="startImport()"
+              >
+                <i class="fa fa-play"></i> Mulai Import
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Progress -->
+        <div id="imp-step2" style="display: none">
+          <div
+            id="imp-progress-list"
+            style="max-height: 340px; overflow-y: auto"
+          ></div>
+          <div style="margin-top: 12px">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.78rem;
+                color: var(--muted);
+                margin-bottom: 5px;
+              "
+            >
+              <span id="imp-progress-label">0 / 0 selesai</span>
+              <span id="imp-progress-pct">0%</span>
+            </div>
+            <div
+              style="
+                background: var(--border);
+                border-radius: 4px;
+                height: 7px;
+                overflow: hidden;
+              "
+            >
+              <div
+                id="imp-progress-bar"
+                style="
+                  height: 100%;
+                  background: var(--acc2);
+                  border-radius: 4px;
+                  transition: 0.3s;
+                  width: 0%;
+                "
+              ></div>
+            </div>
+          </div>
+          <div
+            style="
+              margin-top: 12px;
+              display: flex;
+              justify-content: flex-end;
+              gap: 7px;
+            "
+          >
+            <div
+              id="imp-summary"
+              style="flex: 1; font-size: 0.8rem; color: var(--muted)"
+            ></div>
+            <button
+              class="btn b-p"
+              id="imp-done-btn"
+              onclick="
+                closeM('m-import');
+                loadBatchList();
+              "
+              style="display: none"
+            >
+              <i class="fa fa-check"></i> Selesai — Lihat Batch
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Print Voucher Modal -->
+    <div class="ov" id="m-print" style="z-index: 2000">
+      <div
+        class="modal"
+        style="
+          width: 98vw;
+          max-width: 1100px;
+          max-height: 95vh;
+          padding: 0;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        "
+      >
+        <!-- Header -->
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+          "
+        >
+          <div style="flex: 1">
+            <h3 style="margin: 0; font-size: 0.95rem">
+              <i class="fa fa-print"></i> Print Voucher (<span id="pv-count"
+                >0</span
+              >
+              buah)
+            </h3>
+          </div>
+          <button class="btn b-p" onclick="downloadPDF()" style="gap: 6px">
+            <i class="fa fa-download"></i> Download PDF
+          </button>
+          <button
+            class="btn b-p"
+            onclick="doPrint()"
+            style="background: var(--green); gap: 6px"
+          >
+            <i class="fa fa-print"></i> Print
+          </button>
+          <button class="btn b-s" onclick="closeM('m-print')">Tutup</button>
+        </div>
+        <!-- Controls -->
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            font-size: 0.82rem;
+            color: var(--muted);
+          "
+        >
+          <span>Kertas:</span>
+          <div style="display: flex; gap: 4px" id="paper-btns">
+            <button class="pv-btn active" onclick="setPaper('A4', this)">
+              A4
+            </button>
+            <button class="pv-btn" onclick="setPaper('F4', this)">F4</button>
+          </div>
+          <span style="margin-left: 8px">Orientasi:</span>
+          <div style="display: flex; gap: 4px" id="orient-btns">
+            <button class="pv-btn active" onclick="setOrient('portrait', this)">
+              Portrait
+            </button>
+            <button class="pv-btn" onclick="setOrient('landscape', this)">
+              Landscape
+            </button>
+          </div>
+          <span style="margin-left: 8px">Kolom:</span>
+          <div style="display: flex; gap: 4px" id="col-btns">
+            <button class="pv-btn" onclick="setCols(3, this)">3</button>
+            <button class="pv-btn" onclick="setCols(4, this)">4</button>
+            <button class="pv-btn active" onclick="setCols(5, this)">5</button>
+            <button class="pv-btn" onclick="setCols(6, this)">6</button>
+            <button class="pv-btn" onclick="setCols(7, this)">7</button>
+          </div>
+          <span
+            id="pv-info"
+            style="margin-left: auto; color: var(--acc2); font-weight: 500"
+          ></span>
+        </div>
+        <!-- Preview -->
+        <div
+          style="
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            background: var(--bg);
+          "
+        >
+          <div id="pv-preview"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Modal -->
+    <div class="ov" id="m-sess">
+      <div class="modal">
+        <h3>
+          <i class="fa fa-server"></i> <span id="ms-ttl">Add Router</span>
+        </h3>
+        <div class="fg2">
+          <div class="fg">
+            <label>Session ID</label
+            ><input
+              id="ms-id"
+              placeholder="SIWARNET"
+              oninput="
+                this.value = this.value.toUpperCase().replace(/[^A-Z0-9_]/g, '')
+              "
+            />
+          </div>
+          <div class="fg">
+            <label>Display Name</label
+            ><input id="ms-nm" placeholder="My Router" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>IP Address</label
+            ><input id="ms-ip" placeholder="192.168.1.1" />
+          </div>
+          <div class="fg">
+            <label>API Port</label
+            ><input id="ms-pt" type="number" value="8728" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>API Username</label><input id="ms-us" placeholder="admin" />
+          </div>
+          <div class="fg">
+            <label
+              >API Password
+              <small id="ms-ph" style="color: var(--muted)"></small></label
+            ><input id="ms-pw" type="password" placeholder="password" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Currency</label><input id="ms-cr" value="Rp" />
+          </div>
+          <div class="fg">
+            <label>Live Report</label
+            ><select id="ms-lv">
+              <option value="enable">Enable</option>
+              <option value="disable">Disable</option>
+            </select>
+          </div>
+        </div>
+        <div class="err" id="ms-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-sess')">Batal</button
+          ><button class="btn b-p" onclick="saveSession()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HS Profile Modal -->
+    <div class="ov" id="m-hsp">
+      <div class="modal">
+        <h3>
+          <i class="fa fa-id-card"></i> <span id="mhp-ttl">Add HS Profile</span>
+        </h3>
+        <div class="fg">
+          <label>Profile Name</label
+          ><input id="mhp-nm" placeholder="VOCER-1K" />
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Rate Limit</label><input id="mhp-rl" placeholder="2M/2M" />
+          </div>
+          <div class="fg">
+            <label>Shared Users</label
+            ><input id="mhp-su" type="number" value="1" min="1" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Session Timeout</label
+            ><input id="mhp-st" placeholder="00:00:00" />
+          </div>
+          <div class="fg">
+            <label>Idle Timeout</label
+            ><input id="mhp-it" placeholder="00:05:00" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>Address Pool</label><input id="mhp-ap" placeholder="hs-pool" />
+        </div>
+        <hr style="border-color: var(--border); margin: 12px 0" />
+        <div class="fg">
+          <label>Expired Mode</label
+          ><select id="mhp-em">
+            <option value="">None</option>
+            <option value="rem">Remove</option>
+            <option value="ntf">Notice</option>
+            <option value="remc">Remove &amp; Record</option>
+            <option value="ntfc">Notice &amp; Record</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label
+            >Validity
+            <small style="color: var(--muted)">e.g. 4h, 1d, 7d</small></label
+          ><input id="mhp-vl" placeholder="1d" />
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Price (Modal) Rp</label
+            ><input id="mhp-pr" type="number" value="0" />
+          </div>
+          <div class="fg">
+            <label>Selling Price Rp</label
+            ><input id="mhp-sp" type="number" value="0" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>Lock User</label
+          ><select id="mhp-lu">
+            <option value="">Disable</option>
+            <option value="Enable">Enable</option>
+          </select>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Warna Voucher
+              <small style="color: var(--muted)">(untuk print)</small></label
+            >
+            <div style="display: flex; gap: 8px; align-items: center">
+              <input
+                type="color"
+                id="mhp-color"
+                value="#1f6feb"
+                style="
+                  width: 44px;
+                  height: 34px;
+                  padding: 2px;
+                  cursor: pointer;
+                  flex-shrink: 0;
+                "
+              />
+              <input
+                id="mhp-color-hex"
+                placeholder="#1f6feb"
+                style="font-family: monospace"
+                oninput="syncColorHex()"
+                maxlength="7"
+              />
+            </div>
+          </div>
+          <div class="fg">
+            <label>Caption Voucher</label
+            ><input id="mhp-caption" placeholder="cth: Hotspot 10M" />
+          </div>
+        </div>
+        <div class="err" id="mhp-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-hsp')">Batal</button
+          ><button class="btn b-p" onclick="saveHsProfile()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PPPoE User Modal -->
+    <div class="ov" id="m-pu">
+      <div class="modal">
+        <h3>
+          <i class="fa fa-users"></i> <span id="mpu-ttl">Add PPPoE User</span>
+        </h3>
+        <div class="fg2">
+          <div class="fg">
+            <label>Username</label><input id="mpu-nm" placeholder="user01" />
+          </div>
+          <div class="fg">
+            <label>Password</label
+            ><input id="mpu-pw" type="password" placeholder="password" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Profile</label
+            ><select id="mpu-pr">
+              <option value="default">default</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Service</label
+            ><select id="mpu-sv">
+              <option value="pppoe">pppoe</option>
+              <option value="any">any</option>
+              <option value="pptp">pptp</option>
+              <option value="l2tp">l2tp</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Local Address</label
+            ><input id="mpu-la" placeholder="opsional" />
+          </div>
+          <div class="fg">
+            <label>Remote Address</label
+            ><input id="mpu-ra" placeholder="opsional" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>Comment</label
+          ><input id="mpu-cm" placeholder="Nama pelanggan" />
+        </div>
+        <div class="err" id="mpu-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-pu')">Batal</button
+          ><button class="btn b-p" onclick="savePppUser()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PPPoE Profile Modal -->
+    <div class="ov" id="m-pp">
+      <div class="modal">
+        <h3>
+          <i class="fa fa-id-card-o"></i>
+          <span id="mpp-ttl">Add PPPoE Profile</span>
+        </h3>
+        <div class="fg">
+          <label>Profile Name</label
+          ><input id="mpp-nm" placeholder="PPPoE-10M" />
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Rate Limit</label><input id="mpp-rl" placeholder="10M/10M" />
+          </div>
+          <div class="fg">
+            <label>Address Pool</label
+            ><input id="mpp-ap" placeholder="pppoe-pool" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Local Address</label
+            ><input id="mpp-la" placeholder="opsional" />
+          </div>
+          <div class="fg">
+            <label>Session Timeout</label
+            ><input id="mpp-st" placeholder="00:00:00" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Idle Timeout</label
+            ><input id="mpp-it" placeholder="00:05:00" />
+          </div>
+          <div class="fg">
+            <label>Only One</label
+            ><select id="mpp-oo">
+              <option value="default">default</option>
+              <option value="yes">yes</option>
+              <option value="no">no</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Comment</label><input id="mpp-cm" placeholder="" />
+          </div>
+          <div class="fg" style="max-width: 120px">
+            <label>Status</label
+            ><select id="mpp-act">
+              <option value="true">Aktif</option>
+              <option value="false">Nonaktif</option>
+            </select>
+          </div>
+        </div>
+        <div class="err" id="mpp-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-pp')">Batal</button
+          ><button class="btn b-p" onclick="savePppProfile()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reseller Modal -->
+    <div class="ov" id="m-rs">
+      <div class="modal">
+        <h3>
+          <i class="fa fa-handshake-o"></i>
+          <span id="mrs-ttl">Add Reseller</span>
+        </h3>
+        <div class="fg2">
+          <div class="fg">
+            <label>ID/Tag</label
+            ><input
+              id="mrs-id"
+              placeholder="MOM"
+              oninput="
+                this.value = this.value.toUpperCase().replace(/[^A-Z0-9_]/g, '')
+              "
+            />
+          </div>
+          <div class="fg">
+            <label>Nama</label><input id="mrs-nm" placeholder="Nama reseller" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>No. HP</label><input id="mrs-ph" placeholder="08xxx" />
+          </div>
+          <div class="fg">
+            <label>Diskon %</label
+            ><input id="mrs-dc" type="number" value="0" min="0" max="100" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>Alamat</label><textarea id="mrs-ad" rows="2"></textarea>
+        </div>
+        <input id="mrs-rt" disable />
+
+        <div class="err" id="mrs-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-rs')">Batal</button
+          ><button class="btn b-p" onclick="saveReseller()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Voucher Type Modal -->
+    <div class="ov" id="m-vt">
+      <div class="modal" style="width: 520px">
+        <h3>
+          <i class="fa fa-cog"></i>
+          <span id="mvt-ttl">Tambah Tipe Voucher</span>
+        </h3>
+        <div class="fg2">
+          <div class="fg">
+            <label
+              >Nama
+              <small style="color: var(--muted)">e.g. VOCER 1K</small></label
+            ><input id="mvt-nm" placeholder="VOCER 1K" />
+          </div>
+          <div class="fg">
+            <label>Harga Jual (Rp)</label
+            ><input id="mvt-pr" type="number" value="1000" min="0" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Profile MikroTik</label
+            ><select id="mvt-prof">
+              <option value="">Loading...</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label
+              >Durasi
+              <small style="color: var(--muted)">e.g. 4j, 1 hari</small></label
+            ><input id="mvt-dur" placeholder="4j" />
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>User Type</label
+            ><select id="mvt-type">
+              <option value="up">User + Password</option>
+              <option value="vc">User = Password</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Panjang Kode</label
+            ><input id="mvt-len" type="number" value="6" min="4" max="12" />
+          </div>
+          <div class="fg">
+            <label>Format Kode</label
+            ><select id="mvt-fmt">
+              <option value="lowerdigit">Small Letters + Digits</option>
+              <option value="upperdigit">Capital Letters + Digits</option>
+              <option value="mixeddigit">Mixed Letters + Digits</option>
+              <option value="digit">Digits only</option>
+              <option value="alphabet">Letters only</option>
+              <option value="lower">Small Letters only</option>
+              <option value="upper">Capital Letters only</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg2">
+          <div class="fg">
+            <label>Maks/Order</label
+            ><input id="mvt-max" type="number" value="10" min="1" max="200" />
+          </div>
+          <div class="fg">
+            <label>Status</label
+            ><select id="mvt-act">
+              <option value="true">Aktif</option>
+              <option value="false">Nonaktif</option>
+            </select>
+          </div>
+        </div>
+        <div class="err" id="mvt-err"></div>
+        <div class="mfoot">
+          <button class="btn b-s" onclick="closeM('m-vt')">Batal</button
+          ><button class="btn b-p" onclick="saveVt()">
+            <i class="fa fa-save"></i> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telegram Bot Config Modal -->
+    <div class="ov" id="m-tg-config"><div class="modal" style="width:520px">
+      <h3><i class="fa fa-telegram"></i> <span id="mtg-ttl">Tambah Bot</span></h3>
+
+      <div class="fg">
+        <label>Router Session <small style="color:var(--muted)">bot ini handle router mana</small></label>
+        <select id="mtg-session"><option value="">Pilih router...</option></select>
+      </div>
+
+      <div class="fg">
+        <label>Bot Token <small style="color:var(--muted)" id="mtg-token-hint">wajib diisi</small></label>
+        <input id="mtg-token" type="password" placeholder="1234567890:ABCdef..." autocomplete="off">
+      </div>
+
+      <div class="fg">
+        <label>Telegram ID Admin <small style="color:var(--muted)">penerima notif & approve topup</small></label>
+        <input id="mtg-chatid" placeholder="5510679225" type="number">
+      </div>
+
+      <div class="fg">
+        <label>User ID Diizinkan <small style="color:var(--muted)">pisah koma, kosong = semua reseller</small></label>
+        <input id="mtg-allowed" placeholder="123456,789012 (opsional)">
+      </div>
+
+      <div class="fg2">
+        <div class="fg">
+          <label>Notif Harian</label>
+          <select id="mtg-notif-daily">
+            <option value="true">Aktif</option>
+            <option value="false">Nonaktif</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Jam Laporan</label>
+          <input id="mtg-daily-time" type="time" value="23:59">
+        </div>
+      </div>
+
+      <div class="fg2">
+        <div class="fg">
+          <label>Notif Setiap Penjualan</label>
+          <select id="mtg-notif-sale">
+            <option value="false">Nonaktif</option>
+            <option value="true">Aktif</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Status Bot</label>
+          <select id="mtg-enabled">
+            <option value="true">Aktif</option>
+            <option value="false">Nonaktif</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Test koneksi -->
+      <div style="background:var(--card2);border-radius:8px;padding:10px 12px;margin-bottom:12px">
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px">
+          <i class="fa fa-plug"></i> Test koneksi sebelum simpan
+        </div>
+        <button class="btn b-s b-sm" onclick="testTgConfig()">
+          <i class="fa fa-paper-plane"></i> Test Token
+        </button>
+        <span id="mtg-test-result" style="font-size:.78rem;margin-left:8px"></span>
+      </div>
+
+      <div class="err" id="mtg-err"></div>
+      <div class="mfoot">
+        <button class="btn b-s" onclick="closeM('m-tg-config')">Batal</button>
+        <button class="btn b-p" onclick="saveTgConfig()">
+          <i class="fa fa-save"></i> Simpan & Aktifkan
+        </button>
+      </div>
+    </div>
+</div>

@@ -1,0 +1,29 @@
+# Environment
+.env
+.env.local
+*.local
+
+# Node
+node_modules/
+dist/
+npm-debug.log*
+yarn-error.log*
+
+# Go
+*.exe
+mikrotik-go-service/mikrotik-go-service
+
+# Python
+__pycache__/
+*.pyc
+
+# Build artifacts
+*.tgz
+*.zip
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/

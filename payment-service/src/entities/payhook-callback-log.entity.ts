@@ -1,0 +1,56 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn
+} from 'typeorm';
+
+/**
+ * Monitoring log for every webhook received from the PayHook Android app
+ * (or any callback source). Used by the admin "Monitoring Callback PayHook"
+ * feature: time, amount, raw payload, and verification status.
+ */
+@Entity('payhook_callback_logs')
+export class PayhookCallbackLogEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  /** Source identifier: 'payhook-app', 'payhook-server', 'manual', ... */
+  @Column({ default: 'payhook-app' })
+  source: string;
+
+  /**
+   * PayHook's official idempotency key (`event_id` in the payload). Stays
+   * identical across delivery retries, so it's used to detect and skip
+   * re-processing a callback that already succeeded.
+   */
+  @Column({ nullable: true })
+  eventId: string;
+
+  /** The nominal that arrived in the webhook. */
+  @Column({ type: 'int', default: 0 })
+  amount: number;
+
+  /** Status as reported by the sender (e.g. 'COMPLETED', 'SUCCESS', 'PENDING'). */
+  @Column({ nullable: true })
+  status: string;
+
+  /** Whether the amount matched a pending voucher order. */
+  @Column({ default: false })
+  matched: boolean;
+
+  /** The orderId of the matched voucher order (if any). */
+  @Column({ nullable: true })
+  matchedOrderId: string;
+
+  /** Human-readable note about what happened when processing this callback. */
+  @Column({ type: 'text', nullable: true })
+  note: string;
+
+  /** Full raw payload sent by the sender, kept for audit/debugging. */
+  @Column({ type: 'text', nullable: true })
+  rawPayload: string;
+
+  @CreateDateColumn()
+  processedAt: string;
+}

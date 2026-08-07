@@ -1,0 +1,197 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { PaymentConfigEntity } from './entities/payment-config.entity';
+
+/** Mask a secret so it can be safely shown in the UI. */
+export function mask(value?: string | null): string {
+  if (!value) return '';
+  if (value.length <= 8) return '********';
+  return `${value.slice(0, 3)}****${value.slice(-4)}`;
+}
+
+@Injectable()
+export class PaymentConfigService {
+  private readonly logger = new Logger(PaymentConfigService.name);
+
+  constructor(
+    @InjectRepository(PaymentConfigEntity)
+    private readonly configRepo: Repository<PaymentConfigEntity>,
+  ) {}
+
+  /** Get the singleton config row, creating it with defaults if needed. */
+  async getConfig(): Promise<PaymentConfigEntity> {
+    let row = await this.configRepo.findOne({ where: { key: 'default' } });
+    if (row) return row;
+
+    const defaults: Partial<PaymentConfigEntity> = {
+      key: 'default',
+      defaultProvider: 'duitku',
+      midtransEnabled: false,
+      midtransEnv: 'sandbox',
+      midtransServerKey: null,
+      midtransClientKey: null,
+      duitkuEnabled: false,
+      duitkuEnv: 'sandbox',
+      duitkuMerchantCode: null,
+      duitkuApiKey: null,
+      duitkuCallbackUrl: null,
+      duitkuReturnUrl: null,
+      duitkuExpiryMinutes: 10,
+      payhookUniqueDigits: 3,
+      payhookQrisExpiryMinutes: 15,
+      payhookExpiredRetentionDays: 3,
+      payhookWaEnabled: false,
+      payhookWaProvider: 'fonnte',
+      payhookWaToken: null,
+      payhookWaDomain: null,
+      payhookWalledGardenHosts: 'cdn.jsdelivr.net, voucher.sysbill.ink',
+      payhookStaticQris: null,
+      payhookWebhookAuthType: 'none',
+      payhookWebhookToken: null,
+      payhookWebhookHeaderName: 'X-API-Key',
+      payhookWebhookSecretKey: null,
+    };
+
+    try {
+      row = this.configRepo.create(defaults as PaymentConfigEntity);
+      row = await this.configRepo.save(row);
+      return row;
+    } catch (e: any) {
+      // Race: two async factories can both try to INSERT the singleton row
+      // at boot. On a UNIQUE violation, return whatever exists now.
+      if (String(e?.message || '').toLowerCase().includes('unique')) {
+        const existing = await this.configRepo.findOne({ where: { key: 'default' } });
+        if (existing) return existing;
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Persist gateway settings. Masked values (containing '****') sent back
+   * from the UI are treated as "unchanged" and skipped.
+   */
+  async saveConfig(data: Partial<PaymentConfigEntity>): Promise<PaymentConfigEntity> {
+    const row = await this.getConfig();
+
+    if (data.defaultProvider !== undefined) {
+      if (data.defaultProvider === 'midtrans' || data.defaultProvider === 'duitku') {
+        row.defaultProvider = data.defaultProvider;
+      }
+    }
+
+    if (data.midtransEnabled !== undefined) row.midtransEnabled = !!data.midtransEnabled;
+    if (data.midtransEnv !== undefined) {
+      row.midtransEnv = data.midtransEnv === 'production' ? 'production' : 'sandbox';
+    }
+    if (data.midtransServerKey !== undefined && !String(data.midtransServerKey).includes('****')) {
+      row.midtransServerKey = data.midtransServerKey;
+    }
+    if (data.midtransClientKey !== undefined && !String(data.midtransClientKey).includes('****')) {
+      row.midtransClientKey = data.midtransClientKey;
+    }
+
+    if (data.duitkuEnabled !== undefined) row.duitkuEnabled = !!data.duitkuEnabled;
+    if (data.duitkuEnv !== undefined) {
+      row.duitkuEnv = data.duitkuEnv === 'production' ? 'production' : 'sandbox';
+    }
+    if (data.duitkuMerchantCode !== undefined && !String(data.duitkuMerchantCode).includes('****')) {
+      row.duitkuMerchantCode = data.duitkuMerchantCode;
+    }
+    if (data.duitkuApiKey !== undefined && !String(data.duitkuApiKey).includes('****')) {
+      row.duitkuApiKey = data.duitkuApiKey;
+    }
+    if (data.duitkuCallbackUrl !== undefined) row.duitkuCallbackUrl = data.duitkuCallbackUrl;
+    if (data.duitkuReturnUrl !== undefined) row.duitkuReturnUrl = data.duitkuReturnUrl;
+    if (data.duitkuExpiryMinutes !== undefined) {
+      const mins = Number(data.duitkuExpiryMinutes);
+      if (!isNaN(mins)) row.duitkuExpiryMinutes = Math.min(60, Math.max(10, Math.round(mins)));
+    }
+
+    // ── QRIS GoPay Merchant fields ──────────────────────────
+    if (data.payhookUniqueDigits !== undefined) {
+      const d = Number(data.payhookUniqueDigits);
+      if (!isNaN(d)) row.payhookUniqueDigits = Math.min(5, Math.max(2, Math.round(d)));
+    }
+    if (data.payhookQrisExpiryMinutes !== undefined) {
+      const m = Number(data.payhookQrisExpiryMinutes);
+      if (!isNaN(m)) row.payhookQrisExpiryMinutes = Math.min(60, Math.max(5, Math.round(m)));
+    }
+    if (data.payhookExpiredRetentionDays !== undefined) {
+      const d = Number(data.payhookExpiredRetentionDays);
+      if (!isNaN(d)) row.payhookExpiredRetentionDays = Math.min(90, Math.max(0, Math.round(d)));
+    }
+    if (data.payhookWaEnabled !== undefined) row.payhookWaEnabled = !!data.payhookWaEnabled;
+    if (data.payhookWaProvider !== undefined) {
+      row.payhookWaProvider = data.payhookWaProvider === 'wablas' ? 'wablas' : 'fonnte';
+    }
+    if (data.payhookWaToken !== undefined && !String(data.payhookWaToken).includes('****')) {
+      row.payhookWaToken = data.payhookWaToken || null;
+    }
+    if (data.payhookWaDomain !== undefined) {
+      row.payhookWaDomain = data.payhookWaDomain || null;
+    }
+    if (data.payhookWalledGardenHosts !== undefined) {
+      row.payhookWalledGardenHosts = data.payhookWalledGardenHosts || '';
+    }
+    if (data.payhookStaticQris !== undefined && !String(data.payhookStaticQris).includes('****')) {
+      row.payhookStaticQris = data.payhookStaticQris || null;
+    }
+    if (data.payhookWebhookAuthType !== undefined) {
+      const t = String(data.payhookWebhookAuthType);
+      row.payhookWebhookAuthType = ['bearer', 'api_key', 'basic', 'none'].includes(t) ? t : 'none';
+    }
+    if (data.payhookWebhookToken !== undefined && !String(data.payhookWebhookToken).includes('****')) {
+      row.payhookWebhookToken = data.payhookWebhookToken || null;
+    }
+    if (data.payhookWebhookHeaderName !== undefined) {
+      row.payhookWebhookHeaderName = data.payhookWebhookHeaderName || 'X-API-Key';
+    }
+    if (data.payhookWebhookSecretKey !== undefined && !String(data.payhookWebhookSecretKey).includes('****')) {
+      row.payhookWebhookSecretKey = data.payhookWebhookSecretKey || null;
+    }
+
+    const saved = await this.configRepo.save(row);
+    this.logger.log('Payment gateway config updated');
+    return saved;
+  }
+
+  /** Safe copy for the UI — secrets masked. */
+  async getConfigMasked(): Promise<Record<string, any>> {
+    const c = await this.getConfig();
+    return {
+      defaultProvider: c.defaultProvider,
+      midtransEnabled: c.midtransEnabled,
+      midtransEnv: c.midtransEnv,
+      midtransServerKey: mask(c.midtransServerKey),
+      midtransClientKey: mask(c.midtransClientKey),
+      midtransHasServerKey: !!c.midtransServerKey,
+      duitkuEnabled: c.duitkuEnabled,
+      duitkuEnv: c.duitkuEnv,
+      duitkuMerchantCode: mask(c.duitkuMerchantCode),
+      duitkuApiKey: mask(c.duitkuApiKey),
+      duitkuHasMerchantCode: !!c.duitkuMerchantCode,
+      duitkuHasApiKey: !!c.duitkuApiKey,
+      duitkuCallbackUrl: c.duitkuCallbackUrl || '',
+      duitkuReturnUrl: c.duitkuReturnUrl || '',
+      duitkuExpiryMinutes: c.duitkuExpiryMinutes,
+      payhookUniqueDigits: c.payhookUniqueDigits,
+      payhookQrisExpiryMinutes: c.payhookQrisExpiryMinutes,
+      payhookExpiredRetentionDays: c.payhookExpiredRetentionDays ?? 3,
+      payhookWaEnabled: c.payhookWaEnabled,
+      payhookWaProvider: c.payhookWaProvider || 'fonnte',
+      payhookWaToken: mask(c.payhookWaToken),
+      payhookWaHasToken: !!c.payhookWaToken,
+      payhookWaDomain: c.payhookWaDomain || '',
+      payhookWalledGardenHosts: c.payhookWalledGardenHosts || '',
+      payhookStaticQris: c.payhookStaticQris || '',
+      payhookWebhookAuthType: c.payhookWebhookAuthType || 'none',
+      payhookWebhookToken: mask(c.payhookWebhookToken),
+      payhookWebhookHasToken: !!c.payhookWebhookToken,
+      payhookWebhookHeaderName: c.payhookWebhookHeaderName || 'X-API-Key',
+      payhookWebhookSecretKey: mask(c.payhookWebhookSecretKey),
+      payhookWebhookHasSecretKey: !!c.payhookWebhookSecretKey,
+    };
+  }
+}

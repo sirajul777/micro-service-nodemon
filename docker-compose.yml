@@ -1,0 +1,265 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MikHMon — Microservice Infrastructure (Phase 0)
+#
+# One shared PostgreSQL container hosts FIVE isolated databases (one per
+# service): db_auth, db_erp, db_payment, db_router, db_bot. This gives
+# database-per-service isolation while keeping local dev simple. For true
+# physical separation in production, split into per-service containers and
+# point each DATABASE_NAME at its own instance.
+#
+# Redis is the async broker (pub/sub) and shared cache.
+#
+# Services (all are minimal runnable stubs in Phase 0 — health checks only):
+#   main-node-service   :8080  Gateway/BFF (NestJS + Eta UI)
+#   auth-node-service   :3001  Auth & User Management (NestJS)
+#   erp-node-service    :3003  Voucher/Report/ERP (NestJS)
+#   payment-service     :3002  Payment & Billing (NestJS)
+#   mikrotik-go-service :50051 MikroTik control (Go gRPC)
+#   bot-py-service      :---   Telegram/WA bot (Python, Redis consumer)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── 1. Cache & Async Broker (Redis) ───────────────────────────────────────
+  redis-broker:
+    image: redis:7-alpine
+    container_name: ms_redis_broker
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-super_secure_redis_pass_123}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - net-mikrotik-cluster
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-super_secure_redis_pass_123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── 2. PostgreSQL (one container, multiple per-service databases) ────────
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: ms_postgres_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin_mikrotik}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-super_postgres_password_123}
+      POSTGRES_DB: ${POSTGRES_DB:-db_mikrotik_app}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro  # creates db_auth, db_erp, db_payment, db_router, db_bot
+    networks:
+      - net-mikrotik-cluster
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin_mikrotik} -d ${POSTGRES_DB:-db_mikrotik_app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── 3. API Gateway (Nginx) — single public entry ─────────────────────────
+  api-gateway:
+    image: nginx:alpine
+    container_name: ms_nginx_gateway
+    ports:
+      - "${GATEWAY_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - main-node-service
+      - auth-node-service
+      - erp-node-service
+      - payment-service
+    networks:
+      - net-mikrotik-cluster
+    restart: always
+
+  # ── 4. Gateway / BFF (NestJS + Eta UI) ───────────────────────────────────
+  main-node-service:
+    build:
+      context: ./main-node-service
+      dockerfile: Dockerfile
+    container_name: ms_nestjs_main
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=8080
+      - AUTH_SERVICE_URL=http://auth-node-service:3001
+      - ERP_SERVICE_URL=http://erp-node-service:3003
+      - PAYMENT_SERVICE_URL=http://payment-service:3002
+      - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
+      - SESSION_SECRET=${SESSION_SECRET:-mikhmon-session-secret}
+    depends_on:
+      - auth-node-service
+      - erp-node-service
+      - payment-service
+    ports:
+      - "8080:8080"
+    networks:
+      - net-mikrotik-cluster
+    restart: on-failure
+
+  # ── 5. Auth & User Management (NestJS) ───────────────────────────────────
+  auth-node-service:
+    build:
+      context: ./auth-node-service
+      dockerfile: Dockerfile
+    container_name: ms_nestjs_auth
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3001
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-admin_mikrotik}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-super_postgres_password_123}
+      - DB_NAME=db_auth
+      - JWT_SECRET=${JWT_SECRET:-kunci_rahasia_auth_identity_provider_999}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    networks:
+      - net-mikrotik-cluster
+    restart: on-failure
+
+  # ── 6. ERP / Voucher / Report (NestJS) ───────────────────────────────────
+  erp-node-service:
+    build:
+      context: ./erp-node-service
+      dockerfile: Dockerfile
+    container_name: ms_nestjs_erp
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3003
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-admin_mikrotik}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-super_postgres_password_123}
+      - DB_NAME=db_erp
+      - REDIS_HOST=redis-broker
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+    ports:
+      - "3003:3003"
+    networks:
+      - net-mikrotik-cluster
+    restart: on-failure
+
+  # ── 7. Payment & Billing (NestJS + Redis publisher) ──────────────────────
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: ms_nestjs_payment
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3002
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-admin_mikrotik}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-super_postgres_password_123}
+      - DB_NAME=db_payment
+      - REDIS_HOST=redis-broker
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+      - JWT_SECRET=${JWT_SECRET:-kunci_rahasia_auth_identity_provider_999}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+    networks:
+      - net-mikrotik-cluster
+    restart: on-failure
+
+  # ── 8. MikroTik Control (Go gRPC + Redis consumer) ───────────────────────
+  mikrotik-go-service:
+    build:
+      context: ./mikrotik-go-service
+      dockerfile: Dockerfile
+    container_name: ms_golang_mikrotik
+    expose:
+      - "50051" # internal only — reached by other services via Docker DNS
+    environment:
+      - GRPC_PORT=:50051
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-admin_mikrotik}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-super_postgres_password_123}
+      - DB_NAME=db_router
+      - REDIS_HOST=redis-broker
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+    networks:
+      - net-mikrotik-cluster
+    restart: on-failure
+
+  # ── 9. Telegram/WA Bot (Python, Redis consumer + gRPC client) ────────────
+  bot-py-service:
+    build:
+      context: ./bot-py-service
+      dockerfile: Dockerfile
+    container_name: ms_python_bot
+    environment:
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-admin_mikrotik}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-super_postgres_password_123}
+      - DB_NAME=db_bot
+      - REDIS_HOST=redis-broker
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+      - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+      mikrotik-go-service:
+        condition: service_started
+    networks:
+      - net-mikrotik-cluster
+    restart: on-failure
+
+  # ── 10. Jaeger (optional distributed tracing for Phase 0 observability) ──
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: ms_jaeger
+    profiles: ["tracing"]
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318"   # OTLP HTTP
+    networks:
+      - net-mikrotik-cluster
+    restart: unless-stopped
+
+# Isolated Docker network for the cluster
+networks:
+  net-mikrotik-cluster:
+    driver: bridge
+
+# Persistent storage (survives container restarts / down)
+volumes:
+  pgdata:
+    driver: local
+  redis_data:
+    driver: local
