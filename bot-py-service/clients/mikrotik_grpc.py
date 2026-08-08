@@ -1,66 +1,154 @@
-"""gRPC client → mikrotik-go-service (RouterService).
+"""gRPC client -> mikrotik-go-service (RouterService).
 
 The bot service needs router operations for admin commands (/status, /aktif,
-/cek, /hapus, /pppoe, /rekap). The Go service resolves router credentials by
-sessionId, so we never touch secrets here.
+/cek, /hapus, /pppoe, /rekap) and for provisioning hotspot users when a
+voucher is sold or generated via Telegram. The Go service resolves router
+credentials by sessionId, so we never touch secrets here.
+
+Uses real generated stubs (clients/pb/router_pb2*.py, generated from
+mikrotik-go-service/proto/router.proto via grpcio-tools — see
+scripts/gen_grpc_stubs.sh) rather than a hand-rolled/degraded client. A
+previous version of this module had every function permanently stubbed out
+("gRPC not wired") with no add_hotspot_user at all, which meant every voucher
+sold or generated through the bot was reported to the customer as
+successful without ever touching the router.
 """
-import json
 import logging
 
 import grpc
+from google.protobuf.json_format import MessageToDict
 
+from clients.pb import router_pb2, router_pb2_grpc
 from config import MIKROTIK_GRPC_ADDR
 
-# Generic dynamic client using reflection-free proto dispatch. To keep this
-# dependency-light, we implement the protobuf wire calls via grpc with a
-# minimal inline message encoder. In production, generate stubs from
-# proto/router.proto with grpcio-tools. This module degrades gracefully when
-# the Go service is not deployed.
-try:
-    from grpc import ssl_channel_credentials
-    _HAS_TLS = True
-except Exception:
-    _HAS_TLS = False
-
 log = logging.getLogger("bot-py-service.mikrotik-grpc")
+
+_DEADLINE_SECONDS = 15
 
 
 class MikrotikError(Exception):
     pass
 
 
+def _stub():
+    # A short-lived channel per call keeps this module stateless and safe to
+    # call from any thread (the bot runs handlers in a thread pool); grpc
+    # channels are cheap enough for this call volume.
+    channel = grpc.insecure_channel(MIKROTIK_GRPC_ADDR)
+    return router_pb2_grpc.RouterServiceStub(channel), channel
+
+
+def _to_dict(msg) -> dict:
+    # preserving_proto_field_name=True keeps snake_case keys (session_id,
+    # not sessionId) so callers aren't tripped by protobuf's default
+    # camelCase JSON conversion.
+    #
+    # We DO need default-valued fields included: proto3 omits scalar
+    # fields left at their zero value (empty string / 0 / false) from
+    # MessageToDict's output regardless of whether the server explicitly
+    # set them. Without this, a legitimate `success: false` response would
+    # come back with no "success" key at all, and every caller here does
+    # `result["success"]` / `result.get("success")` expecting it to always
+    # be present.
+    #
+    # The kwarg for this was renamed across protobuf major versions
+    # (including_default_value_fields -> always_print_fields_with_no_presence
+    # in protobuf 5.26+), and this package doesn't pin an exact protobuf
+    # version, so support both.
+    try:
+        return MessageToDict(
+            msg, preserving_proto_field_name=True, always_print_fields_with_no_presence=True
+        )
+    except TypeError:
+        return MessageToDict(
+            msg, preserving_proto_field_name=True, including_default_value_fields=True
+        )
+
+
+def _call(rpc_name: str, request, default_error: dict) -> dict:
+    stub, channel = _stub()
+    try:
+        method = getattr(stub, rpc_name)
+        resp = method(request, timeout=_DEADLINE_SECONDS)
+        return _to_dict(resp)
+    except grpc.RpcError as e:
+        log.error("gRPC %s failed: %s", rpc_name, e)
+        result = dict(default_error)
+        result["error"] = f"mikrotik-go-service unreachable or errored: {e.details() or e.code()}"
+        return result
+    finally:
+        channel.close()
+
+
 def test_connect(session_id: str) -> dict:
-    """Best-effort TestConnect via gRPC. Returns {success, error?}."""
-    # Without generated stubs we cannot call gRPC directly. Provide a
-    # degraded result so the bot can still run while Go is not deployed.
-    # In prod, replace with a real generated client.
-    log.warning("gRPC not wired (no generated RouterService stubs) — TestConnect(%s) skipped", session_id)
-    return {
-        "success": False,
-        "error": "mikrotik-go-service gRPC client not wired (no generated stubs). "
-                 "Generate stubs from proto/router.proto to enable router ops.",
-    }
-
-
-def list_hotspot_users(session_id: str, profile: str | None = None) -> dict:
-    log.warning("gRPC not wired — listHotspotUsers(%s) skipped", session_id)
-    return {
-        "success": False,
-        "users": [],
-        "error": "mikrotik-go-service gRPC client not wired (no generated stubs).",
-    }
-
-
-def list_hotspot_profiles(session_id: str) -> dict:
-    log.warning("gRPC not wired — listHotspotProfiles(%s) skipped", session_id)
-    return {"success": False, "profiles": [], "error": "gRPC client not wired (no generated stubs)."}
+    return _call("TestConnect", router_pb2.TestConnectRequest(session_id=session_id), {"success": False})
 
 
 def get_dashboard(session_id: str) -> dict:
-    log.warning("gRPC not wired — getDashboard(%s) skipped", session_id)
-    return {"success": False, "error": "gRPC client not wired (no generated stubs)."}
+    return _call("GetDashboard", router_pb2.GetDashboardRequest(session_id=session_id), {"success": False})
+
+
+def list_active_hotspot_users(session_id: str) -> dict:
+    return _call(
+        "ListActiveHotspotUsers",
+        router_pb2.ListActiveRequest(session_id=session_id),
+        {"success": False, "users": []},
+    )
+
+
+def list_hotspot_users(session_id: str, profile: str = "", comment: str = "") -> dict:
+    return _call(
+        "ListHotspotUsers",
+        router_pb2.ListHotspotUsersRequest(session_id=session_id, profile=profile, comment=comment),
+        {"success": False, "users": []},
+    )
+
+
+def add_hotspot_user(
+    session_id: str,
+    name: str,
+    password: str,
+    profile: str,
+    validity: str = "",
+    comment: str = "",
+) -> dict:
+    """Provision one hotspot user on the router. Returns {"success": bool,
+    "error"?: str} — callers MUST check "success" rather than assume it, and
+    must NOT treat a gRPC/connection failure as success (see MikrotikError
+    below for callers that want a hard failure instead of a dict check)."""
+    return _call(
+        "AddHotspotUser",
+        router_pb2.AddHotspotUserRequest(
+            session_id=session_id,
+            name=name,
+            password=password,
+            profile=profile,
+            comment=comment,
+            limit_uptime=validity,
+        ),
+        {"success": False},
+    )
 
 
 def remove_hotspot_user(session_id: str, username: str) -> dict:
-    log.warning("gRPC not wired — removeHotspotUser(%s, %s) skipped", session_id, username)
-    return {"success": False, "error": "gRPC client not wired (no generated stubs)."}
+    return _call(
+        "RemoveHotspotUser",
+        router_pb2.RemoveHotspotUserRequest(session_id=session_id, name=username),
+        {"success": False},
+    )
+
+
+def list_hotspot_profiles(session_id: str) -> dict:
+    return _call(
+        "ListHotspotProfiles",
+        router_pb2.ListProfilesRequest(session_id=session_id),
+        {"success": False, "profiles": []},
+    )
+
+
+def get_hotspot_profile(session_id: str, name: str) -> dict:
+    return _call(
+        "GetHotspotProfile",
+        router_pb2.GetProfileRequest(session_id=session_id, name=name),
+        {"success": False},
+    )

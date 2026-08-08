@@ -326,8 +326,8 @@ def _handle_cek(chat_id: str, args: list, cfg: dict):
         send_message(cfg, chat_id, f"❌ User <code>{username}</code> tidak ditemukan.")
         return
     text = f"🔍 <b>Info User: {username}</b>\n\n📦 Profile: {found.get('profile', '—')}\n💬 Comment: {found.get('comment', '—')}\n"
-    if found.get("limit-uptime"):
-        text += f"⏰ Limit Uptime: {found['limit-uptime']}\n"
+    if found.get("limit_uptime"):
+        text += f"⏰ Limit Uptime: {found['limit_uptime']}\n"
     send_message(cfg, chat_id, text)
 
 
@@ -453,15 +453,27 @@ def _cb_confirm_generate(chat_id, user_id, username, msg_id, profile_name, qty, 
     _execute_generate(chat_id, username, item, qty, cfg)
 
 
-def _provision(session_id, username, password, profile, validity):
-    """Provision one hotspot user via Go. Returns True on success or degraded-not-wired."""
+def _provision(session_id, username, password, profile, validity) -> tuple[bool, str]:
+    """Provision one hotspot user via the Go router service.
+
+    Returns (ok, error_message). Previously this treated "gRPC client not
+    wired" (AttributeError) as success, and callers didn't even check the
+    return value — so every purchase/generation was reported to the user as
+    successful whether or not the router actually got the user created. Now
+    a real failure (router unreachable, rejected by the router, etc.) is
+    reported back honestly so the caller can decide what to do (currently:
+    don't charge / refund and tell the customer).
+    """
+    if not session_id:
+        return False, "Router belum dikonfigurasi untuk bot ini (sessionId kosong)."
     try:
-        add = mikrotik_grpc.add_hotspot_user
-        result = add(session_id, username, password, profile, validity)
-        return result.get("success", True)
-    except AttributeError:
-        # No generated stub yet — best-effort (Go not deployed).
-        return True
+        result = mikrotik_grpc.add_hotspot_user(session_id, username, password, profile, validity)
+    except Exception as e:
+        log.error(f"[provision] add_hotspot_user raised: {e}")
+        return False, str(e)
+    if not result.get("success"):
+        return False, result.get("error") or "Gagal membuat user di router."
+    return True, ""
 
 
 def _execute_beli(chat_id, user_id, username, item, cfg):
@@ -474,14 +486,27 @@ def _execute_beli(chat_id, user_id, username, item, cfg):
 
     price = parse_float(item.get("price"))
     reseller = reseller_svc.get_by_telegram_id(user_id)
+    charged = False
     if reseller and reseller.get("status") == "active":
         if not reseller_svc.deduct_saldo(user_id, price, f"Beli {profile}"):
             send_message(cfg, chat_id,
-                f"❌ Saldo tidak cukup.\nSaldo kamu: <b>{_fmt_rp(reseller.get('saldo'))}</b>\n"
+                f"❌ Saldo tidak cukup.\n Saldo kamu: <b>{_fmt_rp(reseller.get('saldo'))}</b>\n"
                 f"Harga: <b>{_fmt_rp(price)}</b>\n\nHubungi admin untuk topup.")
             return
+        charged = True
 
-    _provision(cfg.get("sessionId", ""), uname, upass, profile, validity)
+    ok, err = _provision(cfg.get("sessionId", ""), uname, upass, profile, validity)
+    if not ok:
+        # Don't leave the reseller charged for a voucher that doesn't exist
+        # on the router — this was previously silent: the success message
+        # below was always sent regardless of what _provision() returned.
+        if charged:
+            reseller_svc.refund_saldo(user_id, price, f"Refund - gagal provisioning {profile}: {err}")
+        log.error(f"[beli] provisioning failed for {uname}/{profile}: {err}")
+        send_message(cfg, chat_id,
+            f"❌ Gagal membuat voucher di router.\n{err}\n\n"
+            f"{'Saldo kamu sudah dikembalikan. ' if charged else ''}Coba lagi nanti atau hubungi admin.")
+        return
 
     text = (f"✅ <b>Voucher Berhasil Dibuat!</b>\n\n👤 Username: <code>{uname}</code>\n"
             f"🔑 Password: <code>{upass}</code>\n📦 Profile: {profile}")
@@ -503,14 +528,28 @@ def _execute_generate(chat_id, username, item, qty, cfg):
     length = int(item.get("codeLength") or 5)
     fmt = item.get("codeFormat") or "upperdigit"
     validity = _parse_validity(item.get("duration") or "")
+    session_id = cfg.get("sessionId", "")
+
     vouchers = []
+    failed = 0
+    last_err = ""
     for _ in range(qty):
         u = _random_str(length, fmt)
         p = u if item.get("userType") == "vc" else _random_str(length, fmt)
-        vouchers.append((u, p))
+        ok, err = _provision(session_id, u, p, profile, validity)
+        if ok:
+            vouchers.append((u, p))
+        else:
+            # Previously every generated username/password was listed
+            # regardless of whether the router actually created it — a
+            # failed batch (e.g. router down midway) would hand out
+            # credentials that don't work.
+            failed += 1
+            last_err = err
 
-    for u, p in vouchers:
-        _provision(cfg.get("sessionId", ""), u, p, profile, validity)
+    if not vouchers:
+        send_message(cfg, chat_id, f"❌ Gagal membuat voucher.\n{last_err or 'Router tidak merespons.'}")
+        return
 
     price = parse_float(item.get("price"))
     total = price * len(vouchers)
@@ -529,6 +568,9 @@ def _execute_generate(chat_id, username, item, qty, cfg):
             text += f"{str(k).zfill(3)}. {u}  {p}\n"
         text += "</pre>"
         send_message(cfg, chat_id, text)
+
+    if failed:
+        send_message(cfg, chat_id, f"⚠️ {failed} dari {qty} voucher gagal dibuat di router: {last_err}")
 
 
 def _parse_validity(val):
@@ -813,7 +855,7 @@ def _handle_status(chat_id, cfg):
     identity = res.get("identity", "—")
     version = res.get("version", "—")
     uptime = res.get("uptime", "—")
-    cpu = res.get("cpuLoad", 0)
+    cpu = res.get("cpu_load", 0)
     send_message(cfg, chat_id,
         f"📡 <b>Status Router</b>\n\n🏷️ {identity}\n🔧 RouterOS {version}\n⏱️ Uptime: {uptime}\n🔥 CPU: {cpu}%")
 

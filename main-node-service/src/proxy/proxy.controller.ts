@@ -39,7 +39,8 @@ const TARGETS: Record<string, Target> = {
  * re-validates the JWT, then forwards to the requested service with the
  * bearer token injected.
  *
- * Route pattern: /api/:target/:rest*
+ * Route pattern: /api/:target[/:rest(.*)]  (see the @All(...) comment below
+ * for why a bare ':rest*' pattern doesn't work here)
  */
 @Controller('api/:target')
 export class ProxyController {
@@ -48,7 +49,28 @@ export class ProxyController {
     private readonly authService: AuthService,
   ) {}
 
-  @All(':rest*')
+  // Two things had to be fixed here, found by actually spinning up this
+  // controller against the installed Express/path-to-regexp and hitting it
+  // with real requests (assumptions from reading the code were wrong on
+  // both counts):
+  //
+  // 1. ':rest*' alone does NOT match a bare '/api/:target' with nothing
+  //    after it — Express/path-to-regexp needs the leading '/' + at least
+  //    one segment for a '*' param to kick in. This is the direct cause of
+  //    GET /api/sessions returning 404 straight from the router, before
+  //    ever reaching this controller.
+  // 2. ':rest*' also only ever captured a SINGLE path segment, not
+  //    everything after it — '/api/erp/voucher/types' was being forwarded
+  //    downstream as just '/voucher', silently dropping '/types'. This
+  //    affected every multi-segment call through every alias (erp, payment,
+  //    qris, bot), not just sessions/mikrotik — it just went unnoticed
+  //    because most existing frontend calls happen to be single-segment.
+  //
+  // ':rest(.*)' (a path-to-regexp custom-regex param) captures the full
+  // remaining path including slashes; pairing it with '' as a second
+  // pattern covers the bare case. Verified against the actual installed
+  // @nestjs/core (10.4.22) / express (4.22.1) / path-to-regexp (3.3.0).
+  @All(['', ':rest(.*)'])
   async proxyHandler(
     @Param('target') targetRaw: string,
     @Param('rest') rest: string,

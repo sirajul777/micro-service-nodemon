@@ -139,6 +139,37 @@ def deduct_saldo(telegram_id, amount, note):
         s.close()
 
 
+def refund_saldo(telegram_id, amount, note):
+    """Reverse a deduct_saldo() call — used when a purchase was charged but
+    the voucher itself failed to provision on the router (e.g. Fonnte/router
+    down). Mirrors deduct_saldo's bookkeeping exactly (saldo, totalVoucher,
+    totalIncome) so stats stay consistent, rather than just adding the
+    amount back via topup() and leaving a phantom sale on the books.
+    """
+    s = get_session()
+    try:
+        row = s.query(BotReseller).filter(BotReseller.telegramId == telegram_id).first()
+        if not row:
+            return False
+        before = row.saldo or 0
+        row.saldo = before + amount
+        row.totalVoucher = max(0, (row.totalVoucher or 0) - 1)
+        row.totalIncome = max(0, (row.totalIncome or 0) - amount)
+        s.add(TopupLog(
+            reselerId=row.id,
+            amount=amount,
+            type="refund",
+            note=note,
+            by="system",
+            balanceBefore=before,
+            balanceAfter=row.saldo,
+        ))
+        s.commit()
+        return True
+    finally:
+        s.close()
+
+
 def load_logs(reseller_id=None, limit=100):
     s = get_session()
     try:
