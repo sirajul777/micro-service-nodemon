@@ -150,6 +150,7 @@ services:
       - REDIS_HOST=redis-broker
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+      - MIKROTIK_GRPC_ADDR=mikrotik-go-service:50051
       - USE_REDIS_STREAMS=true
     depends_on:
       postgres-db:
