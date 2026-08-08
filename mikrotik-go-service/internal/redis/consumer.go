@@ -29,9 +29,9 @@ type Handler func(ctx context.Context, ev Event) error
 
 // Consumer subscribes to Redis pub/sub topics.
 type Consumer struct {
-	client  *redis.Client
-	topics  []string
-	handler Handler
+	client     *redis.Client
+	topics     []string
+	handler    Handler
 	useStreams bool
 	group      string
 	consumer   string
@@ -106,10 +106,6 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 			default:
 			}
 			// Build streams args: stream -> '>' for new messages
-			streams := make([]string, 0, len(c.topics)*2)
-			for range c.topics {
-				// placeholder, actual XReadGroup uses Streams slice format: [stream1, stream2, ...]
-			}
 			// Use ReadGroup across all streams
 			args := &redis.XReadGroupArgs{
 				Group:    c.group,
