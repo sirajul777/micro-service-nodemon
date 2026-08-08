@@ -85,7 +85,7 @@ export class ProxyController {
       return res.status(404).json({ success: false, message: `Unknown service: ${targetRaw}` });
     }
 
-const session = (req as any).session;
+    const session = (req as any).session;
 
     // Public routes that don't require auth (e.g. payment app-webhook, qris
     // checkout, qris status). These are forwarded without a token.
@@ -95,7 +95,7 @@ const session = (req as any).session;
     //   /api/qris/orders            → target=qris,   rest=orders
     // Normalize both to a canonical path so the public-route checks below
     // are correct regardless of routing alias.
-const restPath = rest ? `/${rest}` : '';
+    const restPath = rest ? `/${rest}` : '';
     let canonical: string;
     if (targetRaw === 'qris') {
       // /api/qris/* → downstream payment-service paths are /api/qris/*.
@@ -150,7 +150,7 @@ const restPath = rest ? `/${rest}` : '';
     const downstreamPath = canonical;
     const method = req.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-const resp = await this.proxyService.forward(target, downstreamPath, method, token, body, query);
+    const resp = await this.proxyService.forward(target, downstreamPath, method, token, body, query);
     const { status, body: data } = this.proxyService.respond(resp);
     return res.status(status).json(data);
   }

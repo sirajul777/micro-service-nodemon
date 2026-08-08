@@ -32,9 +32,16 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
   }
 
   private get protoPath(): string {
+    // See the identical fix in erp-node-service's mikrotik-grpc.client.ts —
+    // compiled location is dist/clients/mikrotik-grpc.client.js and the
+    // proto is copied to dist/proto/router.proto (package.json's
+    // copy:proto), so this is one level up from dist/clients, not two.
+    // '..','..' resolved to /app/proto/router.proto, which the Docker
+    // runtime image never has (only dist/ is copied in) — so this ENOENT
+    // was silently breaking AddHotspotUser on every settled order.
     return (
       process.env.ROUTER_PROTO_PATH ||
-      join(__dirname, '..', '..', 'proto', 'router.proto')
+      join(__dirname, '..', 'proto', 'router.proto')
     );
   }
 

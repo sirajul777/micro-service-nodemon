@@ -27,9 +27,17 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
   }
 
   private get protoPath(): string {
+    // Compiled location is dist/clients/mikrotik-grpc.client.js, and
+    // `npm run build` copies the proto to dist/proto/router.proto (see
+    // package.json's copy:proto script) — so this only needs to go up ONE
+    // level (dist/clients → dist), not two. The previous '..', '..' landed
+    // at /app/proto/router.proto (outside dist/ entirely, and never
+    // copied into the Docker runtime image, which only COPYs dist/), which
+    // is what caused the "ENOENT ... /app/proto/router.proto" warning and
+    // every gRPC call (including the /api/sessions endpoints) failing.
     return (
       process.env.ROUTER_PROTO_PATH ||
-      join(__dirname, '..', '..', 'proto', 'router.proto')
+      join(__dirname, '..', 'proto', 'router.proto')
     );
   }
 
