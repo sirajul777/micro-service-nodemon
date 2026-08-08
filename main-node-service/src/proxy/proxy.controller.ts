@@ -85,7 +85,7 @@ const restPath = rest ? `/${rest}` : '';
     } else if (targetRaw === 'sessions') {
       // /api/sessions[...] → erp-node-service's RouterSessionController,
       // mounted at /sessions (not nested under /erp/).
-      canonical = `/sessions${restPath}`;
+      canonical = `/api/sessions${restPath}`;
     } else if (targetRaw === 'mikrotik') {
       // /api/mikrotik/:id/connect/test → erp-node-service's
       // RouterSessionController, mounted at /mikrotik/...
