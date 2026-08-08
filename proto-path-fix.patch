@@ -1,0 +1,89 @@
+diff --git a/erp-node-service/src/clients/mikrotik-grpc.client.ts b/erp-node-service/src/clients/mikrotik-grpc.client.ts
+index 231b29e..410a8db 100644
+--- a/erp-node-service/src/clients/mikrotik-grpc.client.ts
++++ b/erp-node-service/src/clients/mikrotik-grpc.client.ts
+@@ -27,9 +27,17 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
+   }
+ 
+   private get protoPath(): string {
++    // Compiled location is dist/clients/mikrotik-grpc.client.js, and
++    // `npm run build` copies the proto to dist/proto/router.proto (see
++    // package.json's copy:proto script) — so this only needs to go up ONE
++    // level (dist/clients → dist), not two. The previous '..', '..' landed
++    // at /app/proto/router.proto (outside dist/ entirely, and never
++    // copied into the Docker runtime image, which only COPYs dist/), which
++    // is what caused the "ENOENT ... /app/proto/router.proto" warning and
++    // every gRPC call (including the /api/sessions endpoints) failing.
+     return (
+       process.env.ROUTER_PROTO_PATH ||
+-      join(__dirname, '..', '..', 'proto', 'router.proto')
++      join(__dirname, '..', 'proto', 'router.proto')
+     );
+   }
+ 
+diff --git a/main-node-service/src/proxy/proxy.controller.ts b/main-node-service/src/proxy/proxy.controller.ts
+index 522c29b..5bec176 100644
+--- a/main-node-service/src/proxy/proxy.controller.ts
++++ b/main-node-service/src/proxy/proxy.controller.ts
+@@ -39,7 +39,8 @@ const TARGETS: Record<string, Target> = {
+  * re-validates the JWT, then forwards to the requested service with the
+  * bearer token injected.
+  *
+- * Route pattern: /api/:target/:rest*
++ * Route pattern: /api/:target[/:rest(.*)]  (see the @All(...) comment below
++ * for why a bare ':rest*' pattern doesn't work here)
+  */
+ @Controller('api/:target')
+ export class ProxyController {
+@@ -48,7 +49,28 @@ export class ProxyController {
+     private readonly authService: AuthService,
+   ) {}
+ 
+-  @All(':rest*')
++  // Two things had to be fixed here, found by actually spinning up this
++  // controller against the installed Express/path-to-regexp and hitting it
++  // with real requests (assumptions from reading the code were wrong on
++  // both counts):
++  //
++  // 1. ':rest*' alone does NOT match a bare '/api/:target' with nothing
++  //    after it — Express/path-to-regexp needs the leading '/' + at least
++  //    one segment for a '*' param to kick in. This is the direct cause of
++  //    GET /api/sessions returning 404 straight from the router, before
++  //    ever reaching this controller.
++  // 2. ':rest*' also only ever captured a SINGLE path segment, not
++  //    everything after it — '/api/erp/voucher/types' was being forwarded
++  //    downstream as just '/voucher', silently dropping '/types'. This
++  //    affected every multi-segment call through every alias (erp, payment,
++  //    qris, bot), not just sessions/mikrotik — it just went unnoticed
++  //    because most existing frontend calls happen to be single-segment.
++  //
++  // ':rest(.*)' (a path-to-regexp custom-regex param) captures the full
++  // remaining path including slashes; pairing it with '' as a second
++  // pattern covers the bare case. Verified against the actual installed
++  // @nestjs/core (10.4.22) / express (4.22.1) / path-to-regexp (3.3.0).
++  @All(['', ':rest(.*)'])
+   async proxyHandler(
+     @Param('target') targetRaw: string,
+     @Param('rest') rest: string,
+diff --git a/payment-service/src/clients/mikrotik-grpc.client.ts b/payment-service/src/clients/mikrotik-grpc.client.ts
+index fe688c3..8b2f7d4 100644
+--- a/payment-service/src/clients/mikrotik-grpc.client.ts
++++ b/payment-service/src/clients/mikrotik-grpc.client.ts
+@@ -32,9 +32,16 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
+   }
+ 
+   private get protoPath(): string {
++    // See the identical fix in erp-node-service's mikrotik-grpc.client.ts —
++    // compiled location is dist/clients/mikrotik-grpc.client.js and the
++    // proto is copied to dist/proto/router.proto (package.json's
++    // copy:proto), so this is one level up from dist/clients, not two.
++    // '..','..' resolved to /app/proto/router.proto, which the Docker
++    // runtime image never has (only dist/ is copied in) — so this ENOENT
++    // was silently breaking AddHotspotUser on every settled order.
+     return (
+       process.env.ROUTER_PROTO_PATH ||
+-      join(__dirname, '..', '..', 'proto', 'router.proto')
++      join(__dirname, '..', 'proto', 'router.proto')
+     );
+   }
+ 
