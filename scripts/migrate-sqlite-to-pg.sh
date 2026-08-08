@@ -69,10 +69,7 @@ emit() {
     echo "COPY \"$table\" ($cols) FROM STDIN WITH (FORMAT csv, HEADER false);"
     # SQLite's -csv NULLs become empty strings; convert empty numeric/bool
     # cells to Postgres NULL via sed (\\N). Booleans 0/1 → false/true.
-    sqlite3 -csv "$DB" "SELECT * FROM \"$table\";" \
-      | sed 's/""/\\"/g' \
-      | sed 's/^,*/\\N&/' \
-      | sed -E 's/(^|,)(0|1)(,|$)/\1\2\3/g'
+    sqlite3 -csv "$DB" "SELECT * FROM \"$table\";"
     echo "\\."
     echo
   } >> "$sql"
