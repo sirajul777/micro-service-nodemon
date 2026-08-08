@@ -48,7 +48,18 @@ export class RedisPublisherService implements OnModuleInit, OnModuleDestroy {
     try {
       // Write to Redis Stream (XADD) and keep Pub/Sub as a compatibility
       // fallback for any subscribers still listening on channels.
-      const id = await this.client.xadd(topic, '*', 'data', JSON.stringify(payload));
+      // MAXLEN ~ caps the stream so it doesn't grow unbounded — '~' makes
+      // the trim approximate (uses radix-tree node boundaries) so it stays
+      // O(1) instead of an exact trim on every XADD.
+      const id = await this.client.xadd(
+        topic,
+        'MAXLEN',
+        '~',
+        10000,
+        '*',
+        'data',
+        JSON.stringify(payload),
+      );
       this.client.publish(topic, JSON.stringify(payload)).catch(() => {});
       return !!id;
     } catch (e: any) {

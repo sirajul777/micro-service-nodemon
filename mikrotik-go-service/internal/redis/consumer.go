@@ -88,6 +88,71 @@ func (c *Consumer) loop(ctx context.Context) {
 	}
 }
 
+// claimStalePending reclaims and reprocesses messages that have been
+// sitting in another (likely dead) consumer's PEL for longer than
+// minIdle. This is what actually bounds the damage from a crash or a
+// deploy that kills a consumer mid-handler: without it, a message whose
+// original consumer died before acking would sit in the stream forever,
+// invisible to new reads (XREADGROUP only returns '>' i.e. never-delivered
+// entries), and delivery quietly stops for that message.
+func (c *Consumer) claimStalePending(ctx context.Context, stream string, minIdle time.Duration) {
+	start := "-"
+	for {
+		entries, err := c.client.XPendingExt(ctx, &redis.XPendingExtArgs{
+			Stream: stream,
+			Group:  c.group,
+			Start:  start,
+			End:    "+",
+			Count:  50,
+		}).Result()
+		if err != nil || len(entries) == 0 {
+			return
+		}
+		var ids []string
+		for _, e := range entries {
+			if e.Idle >= minIdle {
+				ids = append(ids, e.ID)
+			}
+		}
+		if len(ids) > 0 {
+			claimed, err := c.client.XClaim(ctx, &redis.XClaimArgs{
+				Stream:   stream,
+				Group:    c.group,
+				Consumer: c.consumer,
+				MinIdle:  minIdle,
+				Messages: ids,
+			}).Result()
+			if err != nil {
+				log.Printf("[mikrotik-go-service] xclaim error for %s: %v", stream, err)
+			}
+			for _, msg := range claimed {
+				var ev Event
+				raw, _ := msg.Values["data"].(string)
+				if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+					log.Printf("[mikrotik-go-service] bad reclaimed payload (msg %s): %v", msg.ID, err)
+					continue
+				}
+				var handlerErr error
+				if c.handler != nil {
+					handlerErr = c.handler(ctx, ev)
+				}
+				if handlerErr != nil {
+					log.Printf("[mikrotik-go-service] reclaimed handler error for %s (msg %s still pending): %v", ev.Type, msg.ID, handlerErr)
+					continue
+				}
+				if _, err := c.client.XAck(ctx, stream, c.group, msg.ID).Result(); err != nil {
+					log.Printf("[mikrotik-go-service] xack (reclaim) failed: %v", err)
+				}
+			}
+		}
+		// entries[] is ID-sorted; page from the id after the last one seen.
+		start = "(" + entries[len(entries)-1].ID
+		if len(entries) < 50 {
+			return
+		}
+	}
+}
+
 func (c *Consumer) consumeOnce(ctx context.Context) error {
 	if c.useStreams {
 		// Ensure consumer groups exist
@@ -99,11 +164,21 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 			}
 		}
 
+		lastRecovery := time.Now()
+		const recoveryInterval = 30 * time.Second
+		const staleAfter = 60 * time.Second
+
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
 			default:
+			}
+			if time.Since(lastRecovery) >= recoveryInterval {
+				for _, stream := range c.topics {
+					c.claimStalePending(ctx, stream, staleAfter)
+				}
+				lastRecovery = time.Now()
 			}
 			// Build streams args: stream -> '>' for new messages
 			// Use ReadGroup across all streams
@@ -140,12 +215,19 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 						log.Printf("[mikrotik-go-service] bad event payload: %v", err)
 						continue
 					}
+					// Only XAck on success. Acking unconditionally here was the
+					// bug: a failed handler (e.g. router unreachable) would
+					// still have its message marked delivered, so it was
+					// silently dropped instead of retried — the delivery
+					// guarantee streams were supposed to add over pub/sub.
+					handlerErr := error(nil)
 					if c.handler != nil {
-						if err := c.handler(ctx, ev); err != nil {
-							log.Printf("[mikrotik-go-service] handler error for %s: %v", ev.Type, err)
-						}
+						handlerErr = c.handler(ctx, ev)
 					}
-					// Acknowledge
+					if handlerErr != nil {
+						log.Printf("[mikrotik-go-service] handler error for %s (msg %s left pending for retry): %v", ev.Type, msg.ID, handlerErr)
+						continue
+					}
 					if _, err := c.client.XAck(ctx, stream.Stream, c.group, msg.ID).Result(); err != nil {
 						log.Printf("[mikrotik-go-service] xack failed: %v", err)
 					}

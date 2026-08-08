@@ -49,7 +49,17 @@ export class RedisPublisherService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) return false;
     try {
       // XADD stream entry: field 'data' contains JSON payload.
-      const id = await this.client.xadd(topic, '*', 'data', JSON.stringify(payload));
+      // MAXLEN ~ caps the stream so it doesn't grow unbounded (approximate
+      // trim, so it's O(1) rather than exact-trimming every write).
+      const id = await this.client.xadd(
+        topic,
+        'MAXLEN',
+        '~',
+        10000,
+        '*',
+        'data',
+        JSON.stringify(payload),
+      );
       // Best-effort publish for existing Pub/Sub consumers.
       this.client.publish(topic, JSON.stringify(payload)).catch(() => {});
       return !!id;
