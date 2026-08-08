@@ -24,6 +24,14 @@ const TARGETS: Record<string, Target> = {
   // Route them through the BFF so the session is enforced and the cached
   // JWT is injected, satisfying payment-service's JwtAuthGuard.
   qris: 'payment',
+  // The frontend's Sessions page calls `/api/sessions*` and
+  // `/api/mikrotik/:id/connect/test` directly (app.js: loadSessions() →
+  // req('/sessions'), testConn() → req(`/mikrotik/${id}/connect/test`)),
+  // with no `/erp/` segment. These are handled by erp-node-service's
+  // RouterSessionController — see the canonical-path branch below for how
+  // the `/sessions`/`/mikrotik` prefix is preserved when forwarding.
+  sessions: 'erp',
+  mikrotik: 'erp',
 };
 
 /**
@@ -74,6 +82,14 @@ const restPath = rest ? `/${rest}` : '';
       // /api/payment/* → downstream payment-service paths live under /api/*
       // (e.g. /api/payment/payment-config → /api/payment-config).
       canonical = `/api${restPath}`;
+    } else if (targetRaw === 'sessions') {
+      // /api/sessions[...] → erp-node-service's RouterSessionController,
+      // mounted at /sessions (not nested under /erp/).
+      canonical = `/sessions${restPath}`;
+    } else if (targetRaw === 'mikrotik') {
+      // /api/mikrotik/:id/connect/test → erp-node-service's
+      // RouterSessionController, mounted at /mikrotik/...
+      canonical = `/mikrotik${restPath}`;
     } else {
       canonical = restPath;
     }

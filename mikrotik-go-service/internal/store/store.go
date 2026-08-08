@@ -113,6 +113,64 @@ func (s *Store) List(ctx context.Context) ([]RouterSession, error) {
 	return out, rows.Err()
 }
 
+// Create inserts a new router session. Returns an error if the id already exists.
+func (s *Store) Create(ctx context.Context, rs RouterSession) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO router_sessions
+			(id, name, ip, port, "user", password, hotspot_name, dns_name,
+			 currency, reload_interval, iface, idle_to, livereport)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+	`,
+		rs.ID, rs.Name, rs.IP, rs.Port, rs.User, rs.Password,
+		rs.HotspotName, rs.DNSName, rs.Currency, rs.ReloadInterval,
+		rs.Iface, rs.IdleTo, rs.Livereport,
+	)
+	if err != nil {
+		return fmt.Errorf("create router_session: %w", err)
+	}
+	return nil
+}
+
+// Update overwrites an existing router session's fields (full replace,
+// keyed by id). Returns pgx.ErrNoRows-style behaviour via rows-affected
+// check so callers can distinguish "not found" from a DB error.
+func (s *Store) Update(ctx context.Context, rs RouterSession) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE router_sessions SET
+			name = $2, ip = $3, port = $4, "user" = $5, password = $6,
+			hotspot_name = $7, dns_name = $8, currency = $9,
+			reload_interval = $10, iface = $11, idle_to = $12, livereport = $13
+		WHERE id = $1
+	`,
+		rs.ID, rs.Name, rs.IP, rs.Port, rs.User, rs.Password,
+		rs.HotspotName, rs.DNSName, rs.Currency, rs.ReloadInterval,
+		rs.Iface, rs.IdleTo, rs.Livereport,
+	)
+	if err != nil {
+		return false, fmt.Errorf("update router_session: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// Delete removes a router session by id. Returns whether a row was deleted.
+func (s *Store) Delete(ctx context.Context, id string) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM router_sessions WHERE id = $1`, id)
+	if err != nil {
+		return false, fmt.Errorf("delete router_session: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// Exists reports whether a router session with the given id already exists.
+func (s *Store) Exists(ctx context.Context, id string) (bool, error) {
+	var exists bool
+	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM router_sessions WHERE id = $1)`, id).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check router_session exists: %w", err)
+	}
+	return exists, nil
+}
+
 // Close releases the pool.
 func (s *Store) Close() {
 	s.pool.Close()

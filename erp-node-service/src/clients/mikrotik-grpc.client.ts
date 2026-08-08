@@ -152,6 +152,133 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * List all router sessions (connection profiles). Passwords are never
+   * returned by the Go service for list/get.
+   */
+  listSessions(): Promise<{ success: boolean; sessions?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      if (!this.client) {
+        resolve({ success: false, error: 'mikrotik gRPC client not initialized' });
+        return;
+      }
+      const deadline = new Date();
+      deadline.setSeconds(deadline.getSeconds() + 15);
+      this.client.ListSessions({}, { deadline }, (err: any, resp: any) => {
+        if (err) {
+          resolve({ success: false, error: `gRPC ListSessions failed: ${err.message}` });
+          return;
+        }
+        if (!resp?.success) {
+          resolve({ success: false, error: resp?.error || 'ListSessions reported failure' });
+          return;
+        }
+        resolve({ success: true, sessions: resp.sessions || [] });
+      });
+    });
+  }
+
+  /**
+   * Get a single router session by id (no password included).
+   */
+  getSession(id: string): Promise<{ success: boolean; session?: any; error?: string }> {
+    return new Promise((resolve) => {
+      if (!this.client) {
+        resolve({ success: false, error: 'mikrotik gRPC client not initialized' });
+        return;
+      }
+      const deadline = new Date();
+      deadline.setSeconds(deadline.getSeconds() + 15);
+      this.client.GetSession({ id }, { deadline }, (err: any, resp: any) => {
+        if (err) {
+          resolve({ success: false, error: `gRPC GetSession failed: ${err.message}` });
+          return;
+        }
+        if (!resp?.success) {
+          resolve({ success: false, error: resp?.error || 'Session tidak ditemukan' });
+          return;
+        }
+        resolve({ success: true, session: resp.session });
+      });
+    });
+  }
+
+  /**
+   * Create a new router session (connection profile).
+   */
+  createSession(params: Record<string, any>): Promise<{ success: boolean; session?: any; error?: string }> {
+    return new Promise((resolve) => {
+      if (!this.client) {
+        resolve({ success: false, error: 'mikrotik gRPC client not initialized' });
+        return;
+      }
+      const deadline = new Date();
+      deadline.setSeconds(deadline.getSeconds() + 15);
+      this.client.CreateSession(params, { deadline }, (err: any, resp: any) => {
+        if (err) {
+          resolve({ success: false, error: `gRPC CreateSession failed: ${err.message}` });
+          return;
+        }
+        if (!resp?.success) {
+          resolve({ success: false, error: resp?.error || 'CreateSession reported failure' });
+          return;
+        }
+        resolve({ success: true, session: resp.session });
+      });
+    });
+  }
+
+  /**
+   * Update an existing router session. Empty/omitted `password` keeps the
+   * existing password (also honors the UI's "***" sentinel).
+   */
+  updateSession(params: Record<string, any>): Promise<{ success: boolean; session?: any; error?: string }> {
+    return new Promise((resolve) => {
+      if (!this.client) {
+        resolve({ success: false, error: 'mikrotik gRPC client not initialized' });
+        return;
+      }
+      const deadline = new Date();
+      deadline.setSeconds(deadline.getSeconds() + 15);
+      this.client.UpdateSession(params, { deadline }, (err: any, resp: any) => {
+        if (err) {
+          resolve({ success: false, error: `gRPC UpdateSession failed: ${err.message}` });
+          return;
+        }
+        if (!resp?.success) {
+          resolve({ success: false, error: resp?.error || 'UpdateSession reported failure' });
+          return;
+        }
+        resolve({ success: true, session: resp.session });
+      });
+    });
+  }
+
+  /**
+   * Delete a router session by id.
+   */
+  deleteSession(id: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      if (!this.client) {
+        resolve({ success: false, error: 'mikrotik gRPC client not initialized' });
+        return;
+      }
+      const deadline = new Date();
+      deadline.setSeconds(deadline.getSeconds() + 15);
+      this.client.DeleteSession({ id }, { deadline }, (err: any, resp: any) => {
+        if (err) {
+          resolve({ success: false, error: `gRPC DeleteSession failed: ${err.message}` });
+          return;
+        }
+        if (!resp?.success) {
+          resolve({ success: false, error: resp?.error || 'DeleteSession reported failure' });
+          return;
+        }
+        resolve({ success: true });
+      });
+    });
+  }
+
+  /**
    * List hotspot profiles on a router.
    */
   listHotspotProfiles(sessionId: string): Promise<{ success: boolean; profiles?: any[]; error?: string }> {

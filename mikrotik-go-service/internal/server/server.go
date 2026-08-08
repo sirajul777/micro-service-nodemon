@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"strings"
 
 	"github.com/mikhmon/mikrotik-go-service/internal/mikrotik"
 	"github.com/mikhmon/mikrotik-go-service/internal/store"
@@ -347,4 +348,161 @@ func (s *RouterServiceServer) GetInterfaces(ctx context.Context, req *pb.Interfa
 	}
 	resp.Success = true
 	return resp, nil
+}
+
+// ── Router sessions (CRUD) ──────────────────────────────────────────
+
+func toSessionInfo(rs *store.RouterSession) *pb.RouterSessionInfo {
+	return &pb.RouterSessionInfo{
+		Id:             rs.ID,
+		Name:           rs.Name,
+		Ip:             rs.IP,
+		Port:           int32(rs.Port),
+		User:           rs.User,
+		HotspotName:    rs.HotspotName,
+		DnsName:        rs.DNSName,
+		Currency:       rs.Currency,
+		ReloadInterval: int32(rs.ReloadInterval),
+		Iface:          rs.Iface,
+		IdleTo:         int32(rs.IdleTo),
+		Livereport:     rs.Livereport,
+	}
+}
+
+func (s *RouterServiceServer) ListSessions(ctx context.Context, req *pb.ListSessionsRequest) (*pb.ListSessionsResponse, error) {
+	sessions, err := s.store.List(ctx)
+	if err != nil {
+		return &pb.ListSessionsResponse{Success: false, Error: err.Error()}, nil
+	}
+	resp := &pb.ListSessionsResponse{Success: true}
+	for i := range sessions {
+		resp.Sessions = append(resp.Sessions, toSessionInfo(&sessions[i]))
+	}
+	return resp, nil
+}
+
+func (s *RouterServiceServer) GetSession(ctx context.Context, req *pb.GetSessionRequest) (*pb.GetSessionResponse, error) {
+	if strings.TrimSpace(req.Id) == "" {
+		return &pb.GetSessionResponse{Success: false, Error: "id wajib diisi"}, nil
+	}
+	rs, err := s.store.Get(ctx, req.Id)
+	if err != nil {
+		return &pb.GetSessionResponse{Success: false, Error: "router session tidak ditemukan"}, nil
+	}
+	return &pb.GetSessionResponse{Success: true, Session: toSessionInfo(rs)}, nil
+}
+
+func (s *RouterServiceServer) CreateSession(ctx context.Context, req *pb.CreateSessionRequest) (*pb.CreateSessionResponse, error) {
+	if strings.TrimSpace(req.Id) == "" || strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Ip) == "" {
+		return &pb.CreateSessionResponse{Success: false, Error: "id, name, dan ip wajib diisi"}, nil
+	}
+	if strings.TrimSpace(req.Password) == "" {
+		return &pb.CreateSessionResponse{Success: false, Error: "password wajib diisi"}, nil
+	}
+	if exists, err := s.store.Exists(ctx, req.Id); err != nil {
+		return &pb.CreateSessionResponse{Success: false, Error: err.Error()}, nil
+	} else if exists {
+		return &pb.CreateSessionResponse{Success: false, Error: "session id sudah digunakan"}, nil
+	}
+
+	rs := store.RouterSession{
+		ID: req.Id, Name: req.Name, IP: req.Ip, Port: int(orDefaultPort(req.Port)),
+		User: orDefault(req.User, "admin"), Password: req.Password,
+		HotspotName: req.HotspotName, DNSName: req.DnsName,
+		Currency: orDefault(req.Currency, "Rp"), ReloadInterval: orDefaultInt(int(req.ReloadInterval), 10),
+		Iface: orDefault(req.Iface, "ether1"), IdleTo: int(req.IdleTo),
+		Livereport: orDefault(req.Livereport, "enable"),
+	}
+	if err := s.store.Create(ctx, rs); err != nil {
+		return &pb.CreateSessionResponse{Success: false, Error: err.Error()}, nil
+	}
+	return &pb.CreateSessionResponse{Success: true, Session: toSessionInfo(&rs)}, nil
+}
+
+func (s *RouterServiceServer) UpdateSession(ctx context.Context, req *pb.UpdateSessionRequest) (*pb.UpdateSessionResponse, error) {
+	if strings.TrimSpace(req.Id) == "" {
+		return &pb.UpdateSessionResponse{Success: false, Error: "id wajib diisi"}, nil
+	}
+	existing, err := s.store.Get(ctx, req.Id)
+	if err != nil {
+		return &pb.UpdateSessionResponse{Success: false, Error: "router session tidak ditemukan"}, nil
+	}
+
+	password := existing.Password
+	// Sentinel "***" (sent by the UI when the password field is left blank
+	// on edit) or an empty string both mean "keep the existing password".
+	if req.Password != "" && req.Password != "***" {
+		password = req.Password
+	}
+
+	rs := store.RouterSession{
+		ID:             req.Id,
+		Name:           orDefault(req.Name, existing.Name),
+		IP:             orDefault(req.Ip, existing.IP),
+		Port:           int(orDefaultPortExisting(req.Port, existing.Port)),
+		User:           orDefault(req.User, existing.User),
+		Password:       password,
+		HotspotName:    orDefault(req.HotspotName, existing.HotspotName),
+		DNSName:        orDefault(req.DnsName, existing.DNSName),
+		Currency:       orDefault(req.Currency, existing.Currency),
+		ReloadInterval: int(orDefaultIntExisting(req.ReloadInterval, existing.ReloadInterval)),
+		Iface:          orDefault(req.Iface, existing.Iface),
+		IdleTo:         int(req.IdleTo),
+		Livereport:     orDefault(req.Livereport, existing.Livereport),
+	}
+	if ok, err := s.store.Update(ctx, rs); err != nil {
+		return &pb.UpdateSessionResponse{Success: false, Error: err.Error()}, nil
+	} else if !ok {
+		return &pb.UpdateSessionResponse{Success: false, Error: "router session tidak ditemukan"}, nil
+	}
+	return &pb.UpdateSessionResponse{Success: true, Session: toSessionInfo(&rs)}, nil
+}
+
+func (s *RouterServiceServer) DeleteSession(ctx context.Context, req *pb.DeleteSessionRequest) (*pb.DeleteSessionResponse, error) {
+	if strings.TrimSpace(req.Id) == "" {
+		return &pb.DeleteSessionResponse{Success: false, Error: "id wajib diisi"}, nil
+	}
+	ok, err := s.store.Delete(ctx, req.Id)
+	if err != nil {
+		return &pb.DeleteSessionResponse{Success: false, Error: err.Error()}, nil
+	}
+	if !ok {
+		return &pb.DeleteSessionResponse{Success: false, Error: "router session tidak ditemukan"}, nil
+	}
+	return &pb.DeleteSessionResponse{Success: true}, nil
+}
+
+func orDefault(v, def string) string {
+	if strings.TrimSpace(v) == "" {
+		return def
+	}
+	return v
+}
+
+func orDefaultPort(v int32) int32 {
+	if v == 0 {
+		return 8728
+	}
+	return v
+}
+
+func orDefaultPortExisting(v int32, existing int) int32 {
+	if v == 0 {
+		return int32(existing)
+	}
+	return v
+}
+
+func orDefaultInt(v, def int) int {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
+func orDefaultIntExisting(v int32, existing int) int32 {
+	if v == 0 {
+		return int32(existing)
+	}
+	return v
 }

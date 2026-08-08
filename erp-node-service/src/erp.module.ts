@@ -17,6 +17,7 @@ import { ProfileMetaService } from './profile-meta/profile-meta.service';
 import { ProfileMetaController } from './profile-meta/profile-meta.controller';
 import { VoucherBatchService } from './voucher-batch/voucher-batch.service';
 import { VoucherBatchController } from './voucher-batch/voucher-batch.controller';
+import { RouterSessionController } from './router-session/router-session.controller';
 
 /**
  * ERP, Voucher & Report module (Phase 4 — voucher core).
@@ -41,6 +42,7 @@ import { VoucherBatchController } from './voucher-batch/voucher-batch.controller
     VoucherTypeController,
     ProfileMetaController,
     VoucherBatchController,
+    RouterSessionController,
   ],
   providers: [
     JwtAuthGuard,
