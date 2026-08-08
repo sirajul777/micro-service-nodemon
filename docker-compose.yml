@@ -150,6 +150,7 @@ services:
       - REDIS_HOST=redis-broker
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+      - USE_REDIS_STREAMS=true
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -179,6 +180,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
       - JWT_SECRET=${JWT_SECRET:-kunci_rahasia_auth_identity_provider_999}
+      - USE_REDIS_STREAMS=true
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -208,6 +210,7 @@ services:
       - REDIS_HOST=redis-broker
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+      - USE_REDIS_STREAMS=true
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -232,6 +235,7 @@ services:
       - REDIS_HOST=redis-broker
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
+      - USE_REDIS_STREAMS=true
       - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
     depends_on:
       postgres-db:

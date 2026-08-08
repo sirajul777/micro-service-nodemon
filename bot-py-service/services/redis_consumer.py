@@ -12,6 +12,8 @@ but now driven by async events rather than in-process method calls.
 import json
 import logging
 import threading
+import os
+import time
 
 import redis
 
@@ -45,6 +47,53 @@ class RedisConsumer:
             password=REDIS_PASSWORD or None,
             decode_responses=True,
         )
+
+        use_streams = os.getenv("USE_REDIS_STREAMS", "true").lower() == "true"
+        if use_streams:
+            # Use consumer groups on Redis Streams for reliable delivery.
+            group = os.getenv("REDIS_STREAM_GROUP", "bot-group")
+            consumer = f"bot-{os.getpid()}"
+            # Ensure groups exist for each stream.
+            for stream in self.topics:
+                try:
+                    r.xgroup_create(stream, group, id="$", mkstream=True)
+                except redis.exceptions.ResponseError:
+                    # Group already exists
+                    pass
+
+            while self._running:
+                try:
+                    # Build streams args: [stream1, '>', stream2, '>']
+                    streams = []
+                    for s in self.topics:
+                        streams.append(s)
+                    # XREADGROUP requires pairs: stream, '>' per stream
+                    streams_args = []
+                    for s in streams:
+                        streams_args.append(s)
+                    # Read new messages from all streams (use '>' to get new entries)
+                    resp = r.xreadgroup(groupname=group, consumername=consumer, streams={s: '>' for s in streams}, count=10, block=5000)
+                    if not resp:
+                        continue
+                    for stream, entries in resp:
+                        for entry_id, fields in entries:
+                            raw = fields.get('data') or fields.get(b'data') or ''
+                            try:
+                                payload = json.loads(raw)
+                            except (TypeError, json.JSONDecodeError):
+                                payload = {"raw": raw}
+                            self._dispatch(stream.decode() if isinstance(stream, bytes) else stream, payload)
+                            # Acknowledge the message
+                            try:
+                                r.xack(stream, group, entry_id)
+                            except Exception:
+                                pass
+                except Exception as e:
+                    log.error(f"[redis] stream consume error: {e}")
+                    time.sleep(1)
+            return
+
+        # Fallback: legacy Pub/Sub
         pubsub = r.pubsub()
         pubsub.subscribe(*self.topics)
         for msg in pubsub.listen():

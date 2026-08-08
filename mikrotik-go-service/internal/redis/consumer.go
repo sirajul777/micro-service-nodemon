@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"os"
 	"strconv"
 	"time"
 
@@ -31,6 +32,9 @@ type Consumer struct {
 	client  *redis.Client
 	topics  []string
 	handler Handler
+	useStreams bool
+	group      string
+	consumer   string
 }
 
 // NewConsumer connects to Redis and prepares a subscription.
@@ -39,10 +43,23 @@ func NewConsumer(host string, port int, password string, topics []string, handle
 		Addr:     host + ":" + strconv.Itoa(port),
 		Password: password,
 	})
+	useStreams := false
+	if os.Getenv("USE_REDIS_STREAMS") == "true" {
+		useStreams = true
+	}
+	group := os.Getenv("REDIS_STREAM_GROUP")
+	if group == "" {
+		group = "mikrotik-group"
+	}
+	cname, _ := os.Hostname()
+	consumerName := cname + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	return &Consumer{
-		client:  rdb,
-		topics:  topics,
-		handler: handler,
+		client:     rdb,
+		topics:     topics,
+		handler:    handler,
+		useStreams: useStreams,
+		group:      group,
+		consumer:   consumerName,
 	}
 }
 
@@ -72,6 +89,75 @@ func (c *Consumer) loop(ctx context.Context) {
 }
 
 func (c *Consumer) consumeOnce(ctx context.Context) error {
+	if c.useStreams {
+		// Ensure consumer groups exist
+		for _, stream := range c.topics {
+			err := c.client.XGroupCreateMkStream(ctx, stream, c.group, "$").Err()
+			if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
+				// ignore BUSYGROUP; log others
+				log.Printf("[mikrotik-go-service] xgroup create error for %s: %v", stream, err)
+			}
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
+			// Build streams args: stream -> '>' for new messages
+			streams := make([]string, 0, len(c.topics)*2)
+			for range c.topics {
+				// placeholder, actual XReadGroup uses Streams slice format: [stream1, stream2, ...]
+			}
+			// Use ReadGroup across all streams
+			args := &redis.XReadGroupArgs{
+				Group:    c.group,
+				Consumer: c.consumer,
+				Streams:  append(append([]string{}, c.topics...), make([]string, len(c.topics))...),
+				Count:    10,
+				Block:    5 * time.Second,
+			}
+			// fill the second half with ">"
+			for i := range c.topics {
+				args.Streams[len(c.topics)+i] = ">"
+			}
+
+			resp, err := c.client.XReadGroup(ctx, args).Result()
+			if err != nil {
+				if err == redis.Nil {
+					continue
+				}
+				return err
+			}
+			for _, stream := range resp {
+				for _, msg := range stream.Messages {
+					var ev Event
+					raw, ok := msg.Values["data"].(string)
+					if !ok {
+						// try byte slice
+						if b, ok2 := msg.Values["data"].([]byte); ok2 {
+							raw = string(b)
+						}
+					}
+					if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+						log.Printf("[mikrotik-go-service] bad event payload: %v", err)
+						continue
+					}
+					if c.handler != nil {
+						if err := c.handler(ctx, ev); err != nil {
+							log.Printf("[mikrotik-go-service] handler error for %s: %v", ev.Type, err)
+						}
+					}
+					// Acknowledge
+					if _, err := c.client.XAck(ctx, stream.Stream, c.group, msg.ID).Result(); err != nil {
+						log.Printf("[mikrotik-go-service] xack failed: %v", err)
+					}
+				}
+			}
+		}
+	}
+
 	sub := c.client.Subscribe(ctx, c.topics...)
 	defer sub.Close()
 

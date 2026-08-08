@@ -41,7 +41,7 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     try {
       const packageDef = protoLoader.loadSync(this.protoPath, {
-        keepCase: true,
+        keepCase: false,
         longs: String,
         enums: String,
         defaults: true,

@@ -46,8 +46,11 @@ export class RedisPublisherService implements OnModuleInit, OnModuleDestroy {
   async publish(topic: string, payload: Record<string, any>): Promise<boolean> {
     if (!this.client) return false;
     try {
-      await this.client.publish(topic, JSON.stringify(payload));
-      return true;
+      // Write to Redis Stream (XADD) and keep Pub/Sub as a compatibility
+      // fallback for any subscribers still listening on channels.
+      const id = await this.client.xadd(topic, '*', 'data', JSON.stringify(payload));
+      this.client.publish(topic, JSON.stringify(payload)).catch(() => {});
+      return !!id;
     } catch (e: any) {
       this.logger.error(`[redis] publish ${topic} failed: ${e.message}`);
       return false;
