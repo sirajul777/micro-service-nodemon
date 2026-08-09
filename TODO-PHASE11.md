@@ -22,6 +22,10 @@ Implements full working business logic for the frontend routes that currently
 - [x] Build changed services + verify e2e (502 fixes: connect-redis + bot f-string).
       - Rebuilt `bot-py-service` + `main-node-service` + `api-gateway`; nginx config valid; BFF started cleanly.
       - `GATEWAY_PORT=80 ./scripts/verify-e2e.sh` → **Passed: 15, Failed: 0** (exit 0).
+- [x] PPPoE feature complete: Go proto + server RPCs (secrets/profiles/active) implemented &
+      regenerated; erp `mikrotik-grpc.client.ts` PPPoE methods added; `PppoeController` created
+      and registered in `erp.module.ts`; `router.proto` (with PPPoE) synced to erp/payment/bot
+      proto copies. Go build+vet → exit 0; erp `nest build` → exit 0 (dist/proto carries RPCs).
 
 ## Plan order (dependency-first)
 1. erp: hotspot ops controllers (dashboard, active, log, interfaces, traffic, users CRUD, profiles CRUD)

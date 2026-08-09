@@ -192,3 +192,10 @@
       valid; BFF started cleanly with all aliases + webhook routes mapped.
 - [x] Live: `GATEWAY_PORT=80 ./scripts/verify-e2e.sh` → **Passed: 15, Failed: 0**
       (exit 0).
+- [x] PPPoE feature complete: Go proto + server RPCs (PppSecrets/PppProfiles/
+      PppActive: List/Get/Add/Update/Delete/Enable/Disable/Disconnect/ListPppPools)
+      implemented & `router.proto`/`router.pb.go`/`router_grpc.pb.go` regenerated.
+      ERP `mikrotik-grpc.client.ts` PPPoE methods + `PppoeController` added and
+      registered in `erp.module.ts`; `router.proto` (with PPPoE) synced to
+      erp/payment/bot proto copies. Full build chain verified: Go build+vet,
+      all 4 Node `nest build`, Python `compileall` → all exit 0.

@@ -35,6 +35,26 @@ service RouterService {
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
   rpc UpdateSession(UpdateSessionRequest) returns (UpdateSessionResponse);
   rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+
+  // ── PPPoE secrets ────────────────────────────────────────────────
+  rpc ListPppSecrets(ListPppSecretsRequest) returns (ListPppSecretsResponse);
+  rpc GetPppSecret(GetPppSecretRequest) returns (GetPppSecretResponse);
+  rpc AddPppSecret(AddPppSecretRequest) returns (AddPppSecretResponse);
+  rpc UpdatePppSecret(UpdatePppSecretRequest) returns (UpdatePppSecretResponse);
+  rpc DeletePppSecret(DeletePppSecretRequest) returns (DeletePppSecretResponse);
+  rpc EnablePppSecret(EnablePppSecretRequest) returns (EnablePppSecretResponse);
+  rpc DisablePppSecret(DisablePppSecretRequest) returns (DisablePppSecretResponse);
+
+  // ── PPPoE profiles ───────────────────────────────────────────────
+  rpc ListPppProfiles(ListPppProfilesRequest) returns (ListPppProfilesResponse);
+  rpc AddPppProfile(AddPppProfileRequest) returns (AddPppProfileResponse);
+  rpc UpdatePppProfile(UpdatePppProfileRequest) returns (UpdatePppProfileResponse);
+  rpc DeletePppProfile(DeletePppProfileRequest) returns (DeletePppProfileResponse);
+
+  // ── PPPoE active conns & pools ───────────────────────────────────
+  rpc ListPppActive(ListPppActiveRequest) returns (ListPppActiveResponse);
+  rpc DisconnectPppActive(DisconnectPppActiveRequest) returns (DisconnectPppActiveResponse);
+  rpc ListPppPools(ListPppPoolsRequest) returns (ListPppPoolsResponse);
 }
 
 // ── Connection test ────────────────────────────────────────────────
@@ -281,4 +301,201 @@ message DeleteSessionRequest {
 message DeleteSessionResponse {
   bool success = 1;
   string error = 2;
+}
+
+// ── PPPoE secrets ─────────────────────────────────────────────────
+message ListPppSecretsRequest {
+  string session_id = 1;
+  string profile = 2;
+  string name = 3;
+}
+message PppSecret {
+  string id = 1;
+  string name = 2;
+  string password = 3;
+  string service = 4;
+  string profile = 5;
+  string local_address = 6;
+  string remote_address = 7;
+  string comment = 8;
+  string disabled = 9;
+}
+message ListPppSecretsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated PppSecret secrets = 3;
+}
+
+message GetPppSecretRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message GetPppSecretResponse {
+  bool success = 1;
+  string error = 2;
+  PppSecret secret = 3;
+}
+
+message AddPppSecretRequest {
+  string session_id = 1;
+  string name = 2;
+  string password = 3;
+  string service = 4;
+  string profile = 5;
+  string local_address = 6;
+  string remote_address = 7;
+  string comment = 8;
+}
+message AddPppSecretResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message UpdatePppSecretRequest {
+  string session_id = 1;
+  string name = 2;
+  string password = 3;
+  string service = 4;
+  string profile = 5;
+  string local_address = 6;
+  string remote_address = 7;
+  string comment = 8;
+}
+message UpdatePppSecretResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DeletePppSecretRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message DeletePppSecretResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message EnablePppSecretRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message EnablePppSecretResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DisablePppSecretRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message DisablePppSecretResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// ── PPPoE profiles ────────────────────────────────────────────────
+message ListPppProfilesRequest {
+  string session_id = 1;
+}
+message PppProfile {
+  string id = 1;
+  string name = 2;
+  string local_address = 3;
+  string remote_address = 4;
+  string dns = 5;
+  string rate_limit = 6;
+  string bridge = 7;
+  string only_one = 8;
+  string change_tcp_mss = 9;
+}
+message ListPppProfilesResponse {
+  bool success = 1;
+  string error = 2;
+  repeated PppProfile profiles = 3;
+}
+
+message AddPppProfileRequest {
+  string session_id = 1;
+  string name = 2;
+  string local_address = 3;
+  string remote_address = 4;
+  string dns = 5;
+  string rate_limit = 6;
+  string bridge = 7;
+  string only_one = 8;
+  string change_tcp_mss = 9;
+}
+message AddPppProfileResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message UpdatePppProfileRequest {
+  string session_id = 1;
+  string name = 2;
+  string local_address = 3;
+  string remote_address = 4;
+  string dns = 5;
+  string rate_limit = 6;
+  string bridge = 7;
+  string only_one = 8;
+  string change_tcp_mss = 9;
+}
+message UpdatePppProfileResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DeletePppProfileRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message DeletePppProfileResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// ── PPPoE active & pools ──────────────────────────────────────────
+message ListPppActiveRequest {
+  string session_id = 1;
+}
+message PppActive {
+  string id = 1;
+  string name = 2;
+  string service = 3;
+  string call_id = 4;
+  string address = 5;
+  string uptime = 6;
+  string bytes_in = 7;
+  string bytes_out = 8;
+  string profile = 9;
+}
+message ListPppActiveResponse {
+  bool success = 1;
+  string error = 2;
+  repeated PppActive connections = 3;
+}
+
+message DisconnectPppActiveRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message DisconnectPppActiveResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ListPppPoolsRequest {
+  string session_id = 1;
+}
+message PppPool {
+  string id = 1;
+  string name = 2;
+  string ranges = 3;
+  string next_pool = 4;
+}
+message ListPppPoolsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated PppPool pools = 3;
 }

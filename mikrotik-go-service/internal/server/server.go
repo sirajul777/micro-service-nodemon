@@ -472,6 +472,474 @@ func (s *RouterServiceServer) DeleteSession(ctx context.Context, req *pb.DeleteS
 	return &pb.DeleteSessionResponse{Success: true}, nil
 }
 
+// ── PPPoE secrets ──────────────────────────────────────────────────
+
+func (s *RouterServiceServer) ListPppSecrets(ctx context.Context, req *pb.ListPppSecretsRequest) (*pb.ListPppSecretsResponse, error) {
+	resp := &pb.ListPppSecretsResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	words := []string{}
+	if req.Profile != "" {
+		words = append(words, "?profile="+req.Profile)
+	}
+	if req.Name != "" {
+		words = append(words, "?name="+req.Name)
+	}
+	replies, err := c.Run("/ppp/secret/print", words...)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	for _, r := range replies {
+		resp.Secrets = append(resp.Secrets, &pb.PppSecret{
+			Id:            r[".id"],
+			Name:          r["name"],
+			Password:      r["password"],
+			Service:       r["service"],
+			Profile:       r["profile"],
+			LocalAddress:  r["local-address"],
+			RemoteAddress: r["remote-address"],
+			Comment:       r["comment"],
+			Disabled:      r["disabled"],
+		})
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) GetPppSecret(ctx context.Context, req *pb.GetPppSecretRequest) (*pb.GetPppSecretResponse, error) {
+	resp := &pb.GetPppSecretResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/secret/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Success = true
+		return resp, nil
+	}
+	r := replies[0]
+	resp.Secret = &pb.PppSecret{
+		Id:            r[".id"],
+		Name:          r["name"],
+		Password:      r["password"],
+		Service:       r["service"],
+		Profile:       r["profile"],
+		LocalAddress:  r["local-address"],
+		RemoteAddress: r["remote-address"],
+		Comment:       r["comment"],
+		Disabled:      r["disabled"],
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) AddPppSecret(ctx context.Context, req *pb.AddPppSecretRequest) (*pb.AddPppSecretResponse, error) {
+	resp := &pb.AddPppSecretResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	params := []string{"=name=" + req.Name, "=password=" + req.Password}
+	if req.Service != "" {
+		params = append(params, "=service="+req.Service)
+	}
+	if req.Profile != "" {
+		params = append(params, "=profile="+req.Profile)
+	}
+	if req.LocalAddress != "" {
+		params = append(params, "=local-address="+req.LocalAddress)
+	}
+	if req.RemoteAddress != "" {
+		params = append(params, "=remote-address="+req.RemoteAddress)
+	}
+	if req.Comment != "" {
+		params = append(params, "=comment="+req.Comment)
+	}
+	if _, err := c.Run("/ppp/secret/add", params...); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) UpdatePppSecret(ctx context.Context, req *pb.UpdatePppSecretRequest) (*pb.UpdatePppSecretResponse, error) {
+	resp := &pb.UpdatePppSecretResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/secret/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Error = "ppp secret tidak ditemukan"
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	params := []string{"=.id=" + id}
+	if req.Password != "" {
+		params = append(params, "=password="+req.Password)
+	}
+	if req.Service != "" {
+		params = append(params, "=service="+req.Service)
+	}
+	if req.Profile != "" {
+		params = append(params, "=profile="+req.Profile)
+	}
+	if req.LocalAddress != "" {
+		params = append(params, "=local-address="+req.LocalAddress)
+	}
+	if req.RemoteAddress != "" {
+		params = append(params, "=remote-address="+req.RemoteAddress)
+	}
+	if req.Comment != "" {
+		params = append(params, "=comment="+req.Comment)
+	}
+	if _, err := c.Run("/ppp/secret/set", params...); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) DeletePppSecret(ctx context.Context, req *pb.DeletePppSecretRequest) (*pb.DeletePppSecretResponse, error) {
+	resp := &pb.DeletePppSecretResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/secret/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Success = true
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ppp/secret/remove", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) EnablePppSecret(ctx context.Context, req *pb.EnablePppSecretRequest) (*pb.EnablePppSecretResponse, error) {
+	resp := &pb.EnablePppSecretResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/secret/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Error = "ppp secret tidak ditemukan"
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ppp/secret/enable", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) DisablePppSecret(ctx context.Context, req *pb.DisablePppSecretRequest) (*pb.DisablePppSecretResponse, error) {
+	resp := &pb.DisablePppSecretResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/secret/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Error = "ppp secret tidak ditemukan"
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ppp/secret/disable", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+// ── PPPoE profiles ─────────────────────────────────────────────────
+
+func (s *RouterServiceServer) ListPppProfiles(ctx context.Context, req *pb.ListPppProfilesRequest) (*pb.ListPppProfilesResponse, error) {
+	resp := &pb.ListPppProfilesResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/profile/print")
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	for _, r := range replies {
+		resp.Profiles = append(resp.Profiles, &pb.PppProfile{
+			Id:            r[".id"],
+			Name:          r["name"],
+			LocalAddress:  r["local-address"],
+			RemoteAddress: r["remote-address"],
+			Dns:           r["dns-server"],
+			RateLimit:     r["rate-limit"],
+			Bridge:        r["bridge"],
+			OnlyOne:       r["only-one"],
+			ChangeTcpMss:  r["change-tcp-mss"],
+		})
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) AddPppProfile(ctx context.Context, req *pb.AddPppProfileRequest) (*pb.AddPppProfileResponse, error) {
+	resp := &pb.AddPppProfileResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	params := []string{"=name=" + req.Name}
+	if req.LocalAddress != "" {
+		params = append(params, "=local-address="+req.LocalAddress)
+	}
+	if req.RemoteAddress != "" {
+		params = append(params, "=remote-address="+req.RemoteAddress)
+	}
+	if req.Dns != "" {
+		params = append(params, "=dns-server="+req.Dns)
+	}
+	if req.RateLimit != "" {
+		params = append(params, "=rate-limit="+req.RateLimit)
+	}
+	if req.Bridge != "" {
+		params = append(params, "=bridge="+req.Bridge)
+	}
+	if req.OnlyOne != "" {
+		params = append(params, "=only-one="+req.OnlyOne)
+	}
+	if req.ChangeTcpMss != "" {
+		params = append(params, "=change-tcp-mss="+req.ChangeTcpMss)
+	}
+	if _, err := c.Run("/ppp/profile/add", params...); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) UpdatePppProfile(ctx context.Context, req *pb.UpdatePppProfileRequest) (*pb.UpdatePppProfileResponse, error) {
+	resp := &pb.UpdatePppProfileResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/profile/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Error = "ppp profile tidak ditemukan"
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	params := []string{"=.id=" + id}
+	if req.LocalAddress != "" {
+		params = append(params, "=local-address="+req.LocalAddress)
+	}
+	if req.RemoteAddress != "" {
+		params = append(params, "=remote-address="+req.RemoteAddress)
+	}
+	if req.Dns != "" {
+		params = append(params, "=dns-server="+req.Dns)
+	}
+	if req.RateLimit != "" {
+		params = append(params, "=rate-limit="+req.RateLimit)
+	}
+	if req.Bridge != "" {
+		params = append(params, "=bridge="+req.Bridge)
+	}
+	if req.OnlyOne != "" {
+		params = append(params, "=only-one="+req.OnlyOne)
+	}
+	if req.ChangeTcpMss != "" {
+		params = append(params, "=change-tcp-mss="+req.ChangeTcpMss)
+	}
+	if _, err := c.Run("/ppp/profile/set", params...); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) DeletePppProfile(ctx context.Context, req *pb.DeletePppProfileRequest) (*pb.DeletePppProfileResponse, error) {
+	resp := &pb.DeletePppProfileResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/profile/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Success = true
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ppp/profile/remove", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+// ── PPPoE active & pools ───────────────────────────────────────────
+
+func (s *RouterServiceServer) ListPppActive(ctx context.Context, req *pb.ListPppActiveRequest) (*pb.ListPppActiveResponse, error) {
+	resp := &pb.ListPppActiveResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/active/print")
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	for _, r := range replies {
+		resp.Connections = append(resp.Connections, &pb.PppActive{
+			Id:       r[".id"],
+			Name:     r["name"],
+			Service:  r["service"],
+			CallId:   r["caller-id"],
+			Address:  r["address"],
+			Uptime:   r["uptime"],
+			BytesIn:  r["bytes-in"],
+			BytesOut: r["bytes-out"],
+			Profile:  r["profile"],
+		})
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) DisconnectPppActive(ctx context.Context, req *pb.DisconnectPppActiveRequest) (*pb.DisconnectPppActiveResponse, error) {
+	resp := &pb.DisconnectPppActiveResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ppp/active/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Success = true
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ppp/active/remove", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) ListPppPools(ctx context.Context, req *pb.ListPppPoolsRequest) (*pb.ListPppPoolsResponse, error) {
+	resp := &pb.ListPppPoolsResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ip/pool/print")
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	for _, r := range replies {
+		resp.Pools = append(resp.Pools, &pb.PppPool{
+			Id:       r[".id"],
+			Name:     r["name"],
+			Ranges:   r["ranges"],
+			NextPool: r["next-pool"],
+		})
+	}
+	resp.Success = true
+	return resp, nil
+}
+
 func orDefault(v, def string) string {
 	if strings.TrimSpace(v) == "" {
 		return def

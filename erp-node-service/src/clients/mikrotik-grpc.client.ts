@@ -532,7 +532,7 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /**
+/**
    * List router interfaces.
    */
   getInterfaces(sessionId: string): Promise<{ success: boolean; interfaces?: any[]; error?: string }> {
@@ -551,6 +551,434 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
             return;
           }
           resolve({ success: true, interfaces: resp?.interfaces || [] });
+        });
+      })();
+    });
+  }
+
+  /**
+   * List PPPoE secrets on a router, optionally filtered by profile/name.
+   */
+  listPppSecrets(sessionId: string, profile?: string, name?: string): Promise<{ success: boolean; secrets?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 30);
+        this.client.ListPppSecrets({ sessionId, profile: profile || '', name: name || '' }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC ListPppSecrets failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, secrets: resp?.secrets || [], error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Get a single PPPoE secret by name.
+   */
+  getPppSecret(sessionId: string, name: string): Promise<{ success: boolean; secret?: any; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.GetPppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC GetPppSecret failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, secret: resp?.secret, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Add a new PPPoE secret to the router.
+   */
+  addPppSecret(params: {
+    sessionId: string;
+    name: string;
+    password: string;
+    service?: string;
+    profile?: string;
+    localAddress?: string;
+    remoteAddress?: string;
+    comment?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.AddPppSecret(
+          {
+            sessionId: params.sessionId,
+            name: params.name,
+            password: params.password,
+            service: params.service || '',
+            profile: params.profile || '',
+            localAddress: params.localAddress || '',
+            remoteAddress: params.remoteAddress || '',
+            comment: params.comment || '',
+          },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              resolve({ success: false, error: `gRPC AddPppSecret failed: ${err.message}` });
+              return;
+            }
+            resolve({ success: resp?.success, error: resp?.error });
+          },
+        );
+      })();
+    });
+  }
+
+  /**
+   * Update an existing PPPoE secret on the router.
+   */
+  updatePppSecret(params: {
+    sessionId: string;
+    name: string;
+    password?: string;
+    service?: string;
+    profile?: string;
+    localAddress?: string;
+    remoteAddress?: string;
+    comment?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.UpdatePppSecret(
+          {
+            sessionId: params.sessionId,
+            name: params.name,
+            password: params.password || '',
+            service: params.service || '',
+            profile: params.profile || '',
+            localAddress: params.localAddress || '',
+            remoteAddress: params.remoteAddress || '',
+            comment: params.comment || '',
+          },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              resolve({ success: false, error: `gRPC UpdatePppSecret failed: ${err.message}` });
+              return;
+            }
+            resolve({ success: resp?.success, error: resp?.error });
+          },
+        );
+      })();
+    });
+  }
+
+  /**
+   * Delete a PPPoE secret from the router by name.
+   */
+  deletePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DeletePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC DeletePppSecret failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Enable a PPPoE secret on the router.
+   */
+  enablePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.EnablePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC EnablePppSecret failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Disable a PPPoE secret on the router.
+   */
+  disablePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DisablePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC DisablePppSecret failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * List PPPoE profiles on a router.
+   */
+  listPppProfiles(sessionId: string): Promise<{ success: boolean; profiles?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.ListPppProfiles({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC ListPppProfiles failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, profiles: resp?.profiles || [], error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Add a PPPoE profile on the router.
+   */
+  addPppProfile(params: {
+    sessionId: string;
+    name: string;
+    localAddress?: string;
+    remoteAddress?: string;
+    dns?: string;
+    rateLimit?: string;
+    bridge?: string;
+    onlyOne?: string;
+    changeTcpMss?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.AddPppProfile(
+          {
+            sessionId: params.sessionId,
+            name: params.name,
+            localAddress: params.localAddress || '',
+            remoteAddress: params.remoteAddress || '',
+            dns: params.dns || '',
+            rateLimit: params.rateLimit || '',
+            bridge: params.bridge || '',
+            onlyOne: params.onlyOne || '',
+            changeTcpMss: params.changeTcpMss || '',
+          },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              resolve({ success: false, error: `gRPC AddPppProfile failed: ${err.message}` });
+              return;
+            }
+            resolve({ success: resp?.success, error: resp?.error });
+          },
+        );
+      })();
+    });
+  }
+
+  /**
+   * Update a PPPoE profile on the router.
+   */
+  updatePppProfile(params: {
+    sessionId: string;
+    name: string;
+    localAddress?: string;
+    remoteAddress?: string;
+    dns?: string;
+    rateLimit?: string;
+    bridge?: string;
+    onlyOne?: string;
+    changeTcpMss?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.UpdatePppProfile(
+          {
+            sessionId: params.sessionId,
+            name: params.name,
+            localAddress: params.localAddress || '',
+            remoteAddress: params.remoteAddress || '',
+            dns: params.dns || '',
+            rateLimit: params.rateLimit || '',
+            bridge: params.bridge || '',
+            onlyOne: params.onlyOne || '',
+            changeTcpMss: params.changeTcpMss || '',
+          },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              resolve({ success: false, error: `gRPC UpdatePppProfile failed: ${err.message}` });
+              return;
+            }
+            resolve({ success: resp?.success, error: resp?.error });
+          },
+        );
+      })();
+    });
+  }
+
+  /**
+   * Delete a PPPoE profile from the router by name.
+   */
+  deletePppProfile(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DeletePppProfile({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC DeletePppProfile failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * List currently-active PPPoE connections on the router.
+   */
+  listPppActive(sessionId: string): Promise<{ success: boolean; connections?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.ListPppActive({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC ListPppActive failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, connections: resp?.connections || [], error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Disconnect a PPPoE active connection by name.
+   */
+  disconnectPppActive(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DisconnectPppActive({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC DisconnectPppActive failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  /**
+   * List PPPoE address pools (IP pools) on the router.
+   */
+  listPppPools(sessionId: string): Promise<{ success: boolean; pools?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.ListPppPools({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC ListPppPools failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: resp?.success, pools: resp?.pools || [], error: resp?.error });
         });
       })();
     });

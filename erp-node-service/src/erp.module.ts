@@ -21,6 +21,7 @@ import { RouterSessionController } from './router-session/router-session.control
 import { HotspotController } from './hotspot/hotspot.controller';
 import { ReportController } from './report/report.controller';
 import { VoucherGenerateController } from './voucher-generate/voucher-generate.controller';
+import { PppoeController } from './pppoe/pppoe.controller';
 
 /**
  * ERP, Voucher & Report module (Phase 4 — voucher core).
@@ -41,14 +42,15 @@ import { VoucherGenerateController } from './voucher-generate/voucher-generate.c
     ]),
     HttpModule,
   ],
-  controllers: [
+controllers: [
     VoucherTypeController,
     ProfileMetaController,
-VoucherBatchController,
+    VoucherBatchController,
     RouterSessionController,
     HotspotController,
     ReportController,
     VoucherGenerateController,
+    PppoeController,
   ],
   providers: [
     JwtAuthGuard,
