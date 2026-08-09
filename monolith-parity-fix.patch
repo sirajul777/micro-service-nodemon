@@ -1,0 +1,500 @@
+diff --git a/bot-py-service/rest_api.py b/bot-py-service/rest_api.py
+index 7520fc6..1b5dffc 100644
+--- a/bot-py-service/rest_api.py
++++ b/bot-py-service/rest_api.py
+@@ -52,12 +52,15 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-node-service:3001"
+ 
+ # ── Auth (defense in depth) ─────────────────────────────────────
+ 
+-def _validate_token(authorization: str | None) -> bool:
++def _validate_token(authorization: str | None) -> dict | None:
++    """Validate the bearer token against auth-node-service. Returns the
++    decoded JWT payload (role, permissions, ...) on success, None otherwise.
++    """
+     if not authorization or not authorization.lower().startswith("bearer "):
+-        return False
++        return None
+     token = authorization[7:].strip()
+     if not token:
+-        return False
++        return None
+     try:
+         payload = json.dumps({}).encode()
+         req = urllib.request.Request(
+@@ -68,10 +71,12 @@ def _validate_token(authorization: str | None) -> bool:
+         )
+         with urllib.request.urlopen(req, timeout=5) as resp:
+             data = json.loads(resp.read().decode() or "{}")
+-            return bool(data.get("success"))
++            if not data.get("success"):
++                return None
++            return data.get("payload") or {}
+     except Exception as e:
+         log.warning(f"[rest] token validation failed: {e}")
+-        return False
++        return None
+ 
+ 
+ # ── Helpers ─────────────────────────────────────────────────────
+@@ -97,11 +102,29 @@ def _read_body(self, max_bytes=2_000_000):
+         return {}
+ 
+ 
+-def _require_auth(self) -> bool:
+-    if _validate_token(self.headers.get("Authorization")):
+-        return True
+-    _json(self, 401, {"success": False, "message": "Unauthorized"})
+-    return False
++def _require_auth(self, permission: str | None = None) -> bool:
++    """Validate the bearer token and, if `permission` is given, enforce it
++    (admin role always passes — matches erp-node-service's JwtAuthGuard and
++    the reference monolith's PermissionsGuard).
++
++    Previously this only checked that the token was valid, with no role or
++    permission check at all — meaning any logged-in user (not just admins
++    with manageReseller/manageSystem) could create/edit/delete other
++    resellers' accounts, topup saldo, and read/edit Telegram bot tokens.
++    The monolith gates the equivalent routes with
++    @RequirePermission('manageReseller') / @RequirePermission('manageSystem')
++    at the controller level; this restores that here.
++    """
++    payload = _validate_token(self.headers.get("Authorization"))
++    if payload is None:
++        _json(self, 401, {"success": False, "message": "Unauthorized"})
++        return False
++    if permission and payload.get("role") != "admin":
++        perms = payload.get("permissions") or {}
++        if not perms.get(permission):
++            _json(self, 403, {"success": False, "message": "Anda tidak memiliki akses ke fitur ini"})
++            return False
++    return True
+ 
+ 
+ def _split_path(path: str) -> list[str]:
+@@ -128,7 +151,7 @@ def route(self):
+ 
+ 
+ def _route_resellers(self, method: str, parts: list[str]):
+-    if not _require_auth(self):
++    if not _require_auth(self, "manageReseller"):
+         return True
+     is_bot = parts[0] == "bot-resellers"
+ 
+@@ -200,7 +223,7 @@ def _route_resellers(self, method: str, parts: list[str]):
+ 
+ 
+ def _route_telegram(self, method: str, parts: list[str]):
+-    if not _require_auth(self):
++    if not _require_auth(self, "manageSystem"):
+         return True
+ 
+     # GET /telegram/config
+diff --git a/docker-compose.yml b/docker-compose.yml
+index df5c3c3..df3cfd3 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -93,7 +93,7 @@ services:
+       - AUTH_SERVICE_URL=http://auth-node-service:3001
+       - ERP_SERVICE_URL=http://erp-node-service:3003
+       - PAYMENT_SERVICE_URL=http://payment-service:3002
+-      - BOT_SERVICE_URL=http://bot-py-service:5000
++      - BOT_SERVICE_URL=http://bot-py-service:8082
+       - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
+       - SESSION_SECRET=${SESSION_SECRET:-mikhmon-session-secret}
+       # Phase 8: shared Redis session store (horizontal scaling of BFF pods).
+diff --git a/erp-node-service/src/hotspot/hotspot.controller.ts b/erp-node-service/src/hotspot/hotspot.controller.ts
+index 5f4b800..bafa21c 100644
+--- a/erp-node-service/src/hotspot/hotspot.controller.ts
++++ b/erp-node-service/src/hotspot/hotspot.controller.ts
+@@ -25,6 +25,7 @@ export class HotspotController {
+   constructor(private readonly mikrotik: MikrotikGrpcClient) {}
+ 
+   // ── Dashboard ────────────────────────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/dashboard')
+   async dashboard(@Param('session') session: string) {
+     const resp = await this.mikrotik.getDashboard(session);
+@@ -35,6 +36,7 @@ export class HotspotController {
+   }
+ 
+   // ── Active users ─────────────────────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/hotspot/active')
+   async activeUsers(@Param('session') session: string) {
+     const resp = await this.mikrotik.listActiveHotspotUsers(session, '');
+@@ -45,6 +47,7 @@ export class HotspotController {
+   }
+ 
+   // ── Users CRUD ───────────────────────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/hotspot/users')
+   async listUsers(
+     @Param('session') session: string,
+@@ -62,6 +65,7 @@ export class HotspotController {
+     return { success: true, users: resp.users || [] };
+   }
+ 
++  @RequirePermission('manageHotspot')
+   @Post(':session/hotspot/users')
+   async addUser(
+     @Param('session') session: string,
+@@ -79,12 +83,14 @@ export class HotspotController {
+     return resp;
+   }
+ 
++  @RequirePermission('manageHotspot')
+   @Delete(':session/hotspot/users/:name')
+   async removeUser(@Param('session') session: string, @Param('name') name: string) {
+     return this.mikrotik.removeHotspotUser(session, name);
+   }
+ 
+   // ── Profiles ─────────────────────────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/hotspot/profiles')
+   async listProfiles(@Param('session') session: string) {
+     const resp = await this.mikrotik.listHotspotProfiles(session);
+@@ -94,6 +100,7 @@ export class HotspotController {
+     return { success: true, profiles: resp.profiles || [] };
+   }
+ 
++  @RequirePermission('viewDashboard')
+   @Get(':session/hotspot/profiles/:name')
+   async getProfile(@Param('session') session: string, @Param('name') name: string) {
+     const resp = await this.mikrotik.getHotspotProfile(session, name);
+@@ -104,6 +111,7 @@ export class HotspotController {
+   }
+ 
+   // ── Interfaces ───────────────────────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/interfaces')
+   async interfaces(@Param('session') session: string) {
+     const resp = await this.mikrotik.getInterfaces(session);
+@@ -113,6 +121,7 @@ export class HotspotController {
+     return { success: true, interfaces: resp.interfaces || [] };
+   }
+ 
++  @RequirePermission('viewDashboard')
+   @Get(':session/interface/traffic/:ifname')
+   async traffic(@Param('session') session: string, @Param('ifname') ifname: string) {
+     const resp = await this.mikrotik.getInterfaces(session);
+@@ -131,6 +140,7 @@ export class HotspotController {
+   }
+ 
+   // ── System resource ──────────────────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/system/resource')
+   async systemResource(@Param('session') session: string) {
+     const resp = await this.mikrotik.getSystemResource(session);
+@@ -141,6 +151,7 @@ export class HotspotController {
+   }
+ 
+   // ── Best-effort placeholders (need dedicated RPCs in Go) ─────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/hotspot/log')
+   async hotspotLog(@Param('session') session: string) {
+     const active = await this.mikrotik.listActiveHotspotUsers(session, '');
+@@ -158,12 +169,14 @@ export class HotspotController {
+     };
+   }
+ 
++  @RequirePermission('viewDashboard')
+   @Get(':session/scheduler')
+   async scheduler(@Param('session') session: string) {
+     // No dedicated RPC yet — return empty list so the UI doesn't 404.
+     return { success: true, schedulers: [] };
+   }
+ 
++  @RequirePermission('viewDashboard')
+   @Get(':session/dhcp/leases')
+   async dhcpLeases(@Param('session') session: string) {
+     const active = await this.mikrotik.listActiveHotspotUsers(session, '');
+diff --git a/erp-node-service/src/pppoe/pppoe.controller.ts b/erp-node-service/src/pppoe/pppoe.controller.ts
+index 1dd6850..9201860 100644
+--- a/erp-node-service/src/pppoe/pppoe.controller.ts
++++ b/erp-node-service/src/pppoe/pppoe.controller.ts
+@@ -23,11 +23,11 @@ import { RequirePermission } from '../auth/permissions.decorator';
+  */
+ @Controller('pppoe')
+ @UseGuards(JwtAuthGuard)
+-@RequirePermission('managePppoe')
+ export class PppoeController {
+   constructor(private readonly mikrotik: MikrotikGrpcClient) {}
+ 
+   // ── Secrets list (with optional profile/name filter) ─────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/secrets')
+   async listSecrets(
+     @Param('session') session: string,
+@@ -41,6 +41,7 @@ export class PppoeController {
+     return { success: true, secrets: resp.secrets || [] };
+   }
+ 
++  @RequirePermission('viewDashboard')
+   @Get(':session/secrets/:name')
+   async getSecret(@Param('session') session: string, @Param('name') name: string) {
+     const resp = await this.mikrotik.getPppSecret(session, name);
+@@ -50,6 +51,7 @@ export class PppoeController {
+     return { success: true, secret: resp.secret };
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Post(':session/secrets')
+   async addSecret(
+     @Param('session') session: string,
+@@ -76,6 +78,7 @@ export class PppoeController {
+     });
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Put(':session/secrets/:name')
+   async updateSecret(
+     @Param('session') session: string,
+@@ -101,22 +104,26 @@ export class PppoeController {
+     });
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Delete(':session/secrets/:name')
+   async deleteSecret(@Param('session') session: string, @Param('name') name: string) {
+     return this.mikrotik.deletePppSecret(session, name);
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Patch(':session/secrets/:name/enable')
+   async enableSecret(@Param('session') session: string, @Param('name') name: string) {
+     return this.mikrotik.enablePppSecret(session, name);
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Patch(':session/secrets/:name/disable')
+   async disableSecret(@Param('session') session: string, @Param('name') name: string) {
+     return this.mikrotik.disablePppSecret(session, name);
+   }
+ 
+   // ── Profiles ─────────────────────────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/profiles')
+   async listProfiles(@Param('session') session: string) {
+     const resp = await this.mikrotik.listPppProfiles(session);
+@@ -126,6 +133,7 @@ export class PppoeController {
+     return { success: true, profiles: resp.profiles || [] };
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Post(':session/profiles')
+   async addProfile(
+     @Param('session') session: string,
+@@ -154,6 +162,7 @@ export class PppoeController {
+     });
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Put(':session/profiles/:name')
+   async updateProfile(
+     @Param('session') session: string,
+@@ -181,12 +190,14 @@ export class PppoeController {
+     });
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Delete(':session/profiles/:name')
+   async deleteProfile(@Param('session') session: string, @Param('name') name: string) {
+     return this.mikrotik.deletePppProfile(session, name);
+   }
+ 
+   // ── Active connections & pools ───────────────────────────────────
++  @RequirePermission('viewDashboard')
+   @Get(':session/active')
+   async listActive(@Param('session') session: string) {
+     const resp = await this.mikrotik.listPppActive(session);
+@@ -196,11 +207,13 @@ export class PppoeController {
+     return { success: true, connections: resp.connections || [] };
+   }
+ 
++  @RequirePermission('managePppoe')
+   @Post(':session/active/:name/disconnect')
+   async disconnect(@Param('session') session: string, @Param('name') name: string) {
+     return this.mikrotik.disconnectPppActive(session, name);
+   }
+ 
++  @RequirePermission('viewDashboard')
+   @Get(':session/pools')
+   async listPools(@Param('session') session: string) {
+     const resp = await this.mikrotik.listPppPools(session);
+diff --git a/erp-node-service/src/router-session/router-session.controller.ts b/erp-node-service/src/router-session/router-session.controller.ts
+index b42b726..bdc1474 100644
+--- a/erp-node-service/src/router-session/router-session.controller.ts
++++ b/erp-node-service/src/router-session/router-session.controller.ts
+@@ -3,15 +3,22 @@ import {
+   Body,
+   Controller,
+   Delete,
++  ForbiddenException,
+   Get,
+   Param,
+   Post,
++  Req,
+   UseGuards,
+ } from '@nestjs/common';
++import { Request } from 'express';
+ import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
+ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+ import { RequirePermission } from '../auth/permissions.decorator';
+ 
++interface RequestWithUser extends Request {
++  user?: { role?: string; allowedSessions?: string[] };
++}
++
+ /**
+  * Router session (connection profile) CRUD, backed by mikrotik-go-service's
+  * `router_sessions` table over gRPC.
+@@ -24,26 +31,56 @@ import { RequirePermission } from '../auth/permissions.decorator';
+  * Request/response shapes intentionally mirror what `app.js` already sends
+  * (loadSessions/editSessionFn/saveSession/delSession/testConn) so the
+  * existing frontend needs no changes.
++ *
++ * Access control matches the reference monolith's `config.controller.ts`
++ * exactly (compared directly against sirajul777/nodemon): GET routes only
++ * require being logged in — a non-admin reseller/collector still needs to
++ * see which routers they're allowed to operate on, filtered by their
++ * `allowedSessions` claim, so gating GET behind `manageSystem` (as this
++ * controller originally did, class-wide) would 403 every non-admin out of
++ * the page entirely instead of showing their filtered view. Only the
++ * mutating routes (POST/PUT/DELETE) require `manageSystem`.
+  */
+ @Controller()
+ @UseGuards(JwtAuthGuard)
+-@RequirePermission('manageSystem')
+ export class RouterSessionController {
+   constructor(private readonly mikrotik: MikrotikGrpcClient) {}
+ 
+-  /** GET /sessions — list all router connection profiles (no passwords). */
++  private filterForUser(sessions: any[], user?: RequestWithUser['user']) {
++    if (!user || user.role === 'admin') return sessions;
++    const allowed = user.allowedSessions || [];
++    if (!Array.isArray(allowed) || allowed.length === 0) return sessions;
++    return sessions.filter((s) => allowed.includes(s.id));
++  }
++
++  /**
++   * GET /sessions — list router connection profiles. Any authenticated user
++   * can call this (no manageSystem requirement — matches the monolith);
++   * non-admin roles get the list filtered to their allowedSessions.
++   */
+   @Get('sessions')
+-  async list() {
++  async list(@Req() req: RequestWithUser) {
+     const resp = await this.mikrotik.listSessions();
+     if (!resp.success) {
+       throw new BadRequestException(resp.error || 'Gagal memuat daftar router');
+     }
+-    return resp.sessions || [];
++    return this.filterForUser(resp.sessions || [], req.user);
+   }
+ 
+-  /** GET /sessions/:id — a single profile, for the edit form. */
++  /**
++   * GET /sessions/:id — a single profile, for the edit form. Same
++   * allowedSessions restriction as the monolith: a non-admin user without
++   * access to this specific router gets 403, not the data.
++   */
+   @Get('sessions/:id')
+-  async getOne(@Param('id') id: string) {
++  async getOne(@Param('id') id: string, @Req() req: RequestWithUser) {
++    const user = req.user;
++    if (user && user.role !== 'admin') {
++      const allowed = user.allowedSessions || [];
++      if (Array.isArray(allowed) && allowed.length > 0 && !allowed.includes(id)) {
++        throw new ForbiddenException('Anda tidak memiliki akses ke router ini');
++      }
++    }
+     const resp = await this.mikrotik.getSession(id);
+     if (!resp.success) {
+       return { error: resp.error || 'Router session tidak ditemukan' };
+@@ -58,6 +95,7 @@ export class RouterSessionController {
+    * both "Add Router" and "Edit Router".
+    */
+   @Post('sessions')
++  @RequirePermission('manageSystem')
+   async upsert(@Body() body: Record<string, any>) {
+     if (!body?.id || !body?.name || !body?.ip) {
+       throw new BadRequestException('id, name, dan ip wajib diisi');
+@@ -92,6 +130,7 @@ export class RouterSessionController {
+ 
+   /** DELETE /sessions/:id */
+   @Delete('sessions/:id')
++  @RequirePermission('manageSystem')
+   async remove(@Param('id') id: string) {
+     const resp = await this.mikrotik.deleteSession(id);
+     if (!resp.success) {
+@@ -104,9 +143,13 @@ export class RouterSessionController {
+    * GET /mikrotik/:id/connect/test — used by the "Test" button on the
+    * Sessions page (`testConn()` in app.js). Reuses the existing
+    * `TestConnect` RPC that was already implemented for other flows, just
+-   * never had a REST route in front of it.
++   * never had a REST route in front of it. Permission matches the
++   * monolith's `mikrotik.controller.ts` (`viewDashboard`, not
++   * `manageSystem` — any role that can see the dashboard can test a
++   * connection, not just system admins).
+    */
+   @Get('mikrotik/:id/connect/test')
++  @RequirePermission('viewDashboard')
+   async testConnect(@Param('id') id: string) {
+     const resp = await this.mikrotik.testConnect(id);
+     return resp;
+diff --git a/main-node-service/src/proxy/proxy.controller.ts b/main-node-service/src/proxy/proxy.controller.ts
+index 5c8ed56..7ae282e 100644
+--- a/main-node-service/src/proxy/proxy.controller.ts
++++ b/main-node-service/src/proxy/proxy.controller.ts
+@@ -185,11 +185,19 @@ export class ProxyController {
+     if (targetRaw === 'mikrotik') {
+       return `/mikrotik${restPath}`;
+     }
+-    // Phase 11 aliases pass through to their target with the same path shape:
+-    //   resellers / bot-resellers / telegram → bot-py (rest_api.py)
+-    //   pppoe / report → erp controllers mounted at /pppoe, /report
+-    //   billing → payment-service billing controllers mounted at /billing
+-    //   payments → payment-service payments controllers mounted at /payments
++    // Phase 11 aliases: the alias IS the literal path segment these
++    // downstream controllers are mounted at (@Controller('pppoe'),
++    // @Controller('report'), @Controller('billing/:session'),
++    // @Controller('payments'), and bot-py-service's rest_api.py checks
++    // parts[0] against 'resellers'/'bot-resellers'/'telegram') — so it must
++    // be put back onto the front of the path, the same way 'sessions' and
++    // 'mikrotik' are handled above. The previous `return restPath` here
++    // silently dropped the alias segment entirely: GET /api/resellers
++    // forwarded as '' (bot-py-service saw an empty path → 404 "Unknown
++    // route"), GET /api/pppoe/secrets forwarded as '/secrets' instead of
++    // '/pppoe/secrets', etc. — every one of these Phase 11 admin features
++    // (reseller bot, telegram settings, PPPoE, reports, billing, payments)
++    // was 404ing through the BFF.
+     if (
+       targetRaw === 'resellers' ||
+       targetRaw === 'bot-resellers' ||
+@@ -199,7 +207,7 @@ export class ProxyController {
+       targetRaw === 'billing' ||
+       targetRaw === 'payments'
+     ) {
+-      return restPath;
++      return `/${targetRaw}${restPath}`;
+     }
+     return restPath;
+   }
+diff --git a/main-node-service/src/router.config.ts b/main-node-service/src/router.config.ts
+index 964fef2..5e3ecbb 100644
+--- a/main-node-service/src/router.config.ts
++++ b/main-node-service/src/router.config.ts
+@@ -8,7 +8,12 @@ export const ROUTER = {
+   erp: process.env.ERP_SERVICE_URL || 'http://erp-node-service:3003',
+   payment: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3002',
+   mikrotikGrpc: process.env.MIKROTIK_GRPC_SERVER || 'mikrotik-go-service:50051',
+-  bot: process.env.BOT_SERVICE_URL || 'http://bot-py-service:5000',
++  // bot-py-service's single HTTP server (healthz + rest_api.py routes) only
++  // listens on HEALTH_PORT (default 8082 — see bot-py-service/main.py and
++  // its Dockerfile's EXPOSE 8082). Nothing in that service listens on 5000;
++  // pointing here to :5000 made every resellers/bot-resellers/telegram call
++  // fail with a connection error.
++  bot: process.env.BOT_SERVICE_URL || 'http://bot-py-service:8082',
+ };
+ 
+ export function svc(base: string, path: string): string {
