@@ -93,7 +93,7 @@ services:
       - AUTH_SERVICE_URL=http://auth-node-service:3001
       - ERP_SERVICE_URL=http://erp-node-service:3003
       - PAYMENT_SERVICE_URL=http://payment-service:3002
-      - BOT_SERVICE_URL=http://bot-py-service:5000
+      - BOT_SERVICE_URL=http://bot-py-service:8082
       - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
       - SESSION_SECRET=${SESSION_SECRET:-mikhmon-session-secret}
       # Phase 8: shared Redis session store (horizontal scaling of BFF pods).

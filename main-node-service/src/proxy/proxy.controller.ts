@@ -185,11 +185,19 @@ export class ProxyController {
     if (targetRaw === 'mikrotik') {
       return `/mikrotik${restPath}`;
     }
-    // Phase 11 aliases pass through to their target with the same path shape:
-    //   resellers / bot-resellers / telegram → bot-py (rest_api.py)
-    //   pppoe / report → erp controllers mounted at /pppoe, /report
-    //   billing → payment-service billing controllers mounted at /billing
-    //   payments → payment-service payments controllers mounted at /payments
+    // Phase 11 aliases: the alias IS the literal path segment these
+    // downstream controllers are mounted at (@Controller('pppoe'),
+    // @Controller('report'), @Controller('billing/:session'),
+    // @Controller('payments'), and bot-py-service's rest_api.py checks
+    // parts[0] against 'resellers'/'bot-resellers'/'telegram') — so it must
+    // be put back onto the front of the path, the same way 'sessions' and
+    // 'mikrotik' are handled above. The previous `return restPath` here
+    // silently dropped the alias segment entirely: GET /api/resellers
+    // forwarded as '' (bot-py-service saw an empty path → 404 "Unknown
+    // route"), GET /api/pppoe/secrets forwarded as '/secrets' instead of
+    // '/pppoe/secrets', etc. — every one of these Phase 11 admin features
+    // (reseller bot, telegram settings, PPPoE, reports, billing, payments)
+    // was 404ing through the BFF.
     if (
       targetRaw === 'resellers' ||
       targetRaw === 'bot-resellers' ||
@@ -199,7 +207,7 @@ export class ProxyController {
       targetRaw === 'billing' ||
       targetRaw === 'payments'
     ) {
-      return restPath;
+      return `/${targetRaw}${restPath}`;
     }
     return restPath;
   }
