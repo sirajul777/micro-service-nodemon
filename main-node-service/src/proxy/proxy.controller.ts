@@ -19,6 +19,21 @@ const TARGETS: Record<string, Target> = {
   erp: 'erp',
   payment: 'payment',
   bot: 'bot',
+batches: 'erp',
+  // The frontend's Voucher Settings page calls `/api/voucher-types*` (app.js:
+  // loadVoucherSettings() → req('/voucher-types'), saveVt() → post('/voucher-
+  // types'), etc). These map to erp-node-service's VoucherTypeController,
+  // mounted at /voucher/types. The frontend also calls `/api/voucher/*` for
+  // batch-profile import (app.js: initBatch() → req(`/batches/${CS}/import/
+  // profiles`) actually uses `batches`, but the monolith also exposes
+  // `/api/voucher/:cs/profiles` → erp `/voucher/batches/:cs/import/profiles`).
+  voucherTypes: 'erp',
+  'voucher-types': 'erp',
+  voucher: 'erp',
+  // The frontend's User Management page calls `/api/users*` (app.js:
+  // loadUserManagement() → req('/users'), saveUm() → post('/users'), etc).
+  // These map to auth-node-service's UserController, mounted at /api/users.
+  users: 'auth',
   // The frontend calls QRIS admin endpoints via `/api/qris/*` (see app.js:
   // req('/qris/stats') → fetch(API + '/qris/stats') = /api/qris/stats).
   // Route them through the BFF so the session is enforced and the cached
@@ -104,6 +119,26 @@ export class ProxyController {
       // /api/payment/* → downstream payment-service paths live under /api/*
       // (e.g. /api/payment/payment-config → /api/payment-config).
       canonical = `/api${restPath}`;
+} else if (targetRaw === 'batches') {
+      // /api/batches/* → downstream erp-node-service paths live under
+      // /voucher/batches/*.
+      canonical = `/voucher/batches${restPath}`;
+    } else if (targetRaw === 'voucher-types' || targetRaw === 'voucherTypes') {
+      // /api/voucher-types/* → erp-node-service VoucherTypeController,
+      // mounted at /voucher/types.
+      canonical = `/voucher/types${restPath}`;
+    } else if (targetRaw === 'voucher') {
+      // /api/voucher/* → erp-node-service, mounted at /voucher. The monolith's
+      // `/api/voucher/:cs/profiles` maps to `/voucher/batches/:cs/import/profiles`.
+      if (/^\/voucher\/([^/]+)\/profiles$/.test(restPath)) {
+        const cs = restPath.split('/')[2];
+        canonical = `/voucher/batches/${cs}/import/profiles`;
+      } else {
+        canonical = restPath;
+      }
+    } else if (targetRaw === 'users') {
+      // /api/users/* → auth-node-service UserController, mounted at /api/users.
+      canonical = `/api/users${restPath}`;
     } else if (targetRaw === 'sessions') {
       // /api/sessions[...] → erp-node-service's RouterSessionController,
       // mounted at /sessions (not nested under /erp/).

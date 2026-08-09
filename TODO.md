@@ -164,3 +164,18 @@
       remain public via a rewritten `isPublic` canonical-path check.
 - [x] Rebuild: **all 4 Node services** (`auth`, `erp`, `payment`, `main`) → EXIT 0
       with the JWT URL fix + qris BFF routing in place.
+
+## Phase 10 — Router Sessions E2E + Final Verification & Cleanup ✅
+- [x] Router session management (CRUD + test-connect) wired end-to-end:
+      Go proto (`List/Get/Create/Update/DeleteSession`) + server + store → ERP
+      `RouterSessionController` (`/sessions*`, `/mikrotik/:id/connect/test`) →
+      BFF proxy `sessions`/`mikrotik` aliases → nginx `/api/sessions`,
+      `/api/mikrotik/` locations. Fixes the long-standing `GET /api/sessions` 404.
+- [x] BFF proxy route fix: `@All(['', ':rest(.*)'])` so bare `/api/sessions`
+      matches and multi-segment paths aren't truncated.
+- [x] Build verification — all 6 services compile cleanly with the sessions
+      feature (Go build+vet, 4× Nest build, Python compileall).
+- [x] Extended `scripts/verify-e2e.sh` with a Sessions CRUD test section.
+- [x] Live run: rebuilt/recreated the 3 changed services; `verify-e2e.sh` →
+      **15/15 pass** (incl. Sessions GET/POST/GET:test/DELETE).
+- [x] Cleanup: removed `.patch` dev artifacts and `public/backup-*` files.

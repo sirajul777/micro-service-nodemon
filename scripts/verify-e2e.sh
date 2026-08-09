@@ -102,6 +102,31 @@ say "9. Normal request not rate-limited"
 code=$(curl_rc "$BASE/healthz")
 if [ "$code" = "200" ]; then ok "healthz not rate-limited → 200"; else fail "healthz → $code"; fi
 
+# 10. Router Sessions feature (Phase 10) — CRUD + test-connect through the
+#     BFF proxy. These exercise the new `sessions`/`mikrotik` target aliases
+#     in main-node-service ProxyController, the ERP RouterSessionController,
+#     and the Go ListSessions/GetSession/CreateSession/UpdateSession/DeleteSession
+#     gRPC RPCs.
+say "10. Router Sessions CRUD via BFF proxy"
+SESS_ID="e2e-test-$(date +%s)"
+# 10a. List sessions (authenticated) → 200 / array
+code=$(curl_rc -b "$COOKIE_JAR" "$BASE/api/sessions")
+if [ "$code" = "200" ]; then ok "GET /api/sessions → 200"; else fail "GET /api/sessions → $code"; fi
+# 10b. Create a session
+create_json=$(curl -s -b "$COOKIE_JAR" -H 'Content-Type: application/json' \
+  -d "{\"id\":\"${SESS_ID}\",\"name\":\"E2E Test Router\",\"ip\":\"192.0.2.1\",\"port\":8728,\"user\":\"admin\",\"password\":\"testpass\"}" \
+  "$BASE/api/sessions")
+if echo "$create_json" | grep -q '"success":true'; then ok "POST /api/sessions → created"; else fail "POST /api/sessions → $(echo "$create_json" | head -c 200)"; fi
+# 10c. Get the created session
+code=$(curl_rc -b "$COOKIE_JAR" "$BASE/api/sessions/${SESS_ID}")
+if [ "$code" = "200" ]; then ok "GET /api/sessions/:id → 200"; else fail "GET /api/sessions/:id → $code"; fi
+# 10d. Test-connect route (routed, may fail to reach a real router — must not 404/502)
+code=$(curl_rc -b "$COOKIE_JAR" "$BASE/api/mikrotik/${SESS_ID}/connect/test")
+if [ "$code" != "404" ]; then ok "GET /api/mikrotik/:id/connect/test routed → $code"; else fail "test-connect → $code (not routed)"; fi
+# 10e. Delete the created session
+del_json=$(curl -s -b "$COOKIE_JAR" -X DELETE "$BASE/api/sessions/${SESS_ID}")
+if echo "$del_json" | grep -q '"success":true'; then ok "DELETE /api/sessions/:id → deleted"; else fail "DELETE /api/sessions/:id → $(echo "$del_json" | head -c 200)"; fi
+
 say ""
 printf 'Passed: %d   Failed: %d\n' "$PASS" "$FAIL"
 rm -f "$COOKIE_JAR"

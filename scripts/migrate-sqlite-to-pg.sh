@@ -48,25 +48,74 @@ echo "▶ Migrating from: $DB"
 echo "  Output dir: $OUT"
 echo
 
+# ---------------------------------------------------------------
+# Per-table schema remapping so generated files match each service's
+# ACTUAL Postgres schema (which can differ from the SQLite source):
+#   router_sessions  → Go service creates snake_case columns.
+#   payment_config   → payment-service refactored payhook* fields.
+#   bot_topup_logs   → SQLAlchemy model TopupLog.__tablename__ = "topup_logs".
+#
+# Format: TABLE|PG_TABLE|COL1,COL2,...   (PG_TABLE = "same" if unchanged)
+#   Each entry renames the table and/or selects an explicit column list.
+# ---------------------------------------------------------------
+REMAP_ROUTER="router_sessions|same|id,name,ip,port,user,password,hotspot_name,dns_name,currency,reload_interval,iface,idle_to,livereport"
+REMAP_PAYMENT_CONFIG="payment_config|same|key,defaultProvider,midtransEnabled,midtransEnv,midtransServerKey,midtransClientKey,duitkuEnabled,duitkuEnv,duitkuMerchantCode,duitkuApiKey,duitkuCallbackUrl,duitkuReturnUrl,duitkuExpiryMinutes,payhookUniqueDigits,payhookQrisExpiryMinutes,payhookExpiredRetentionDays,payhookWaEnabled,payhookWaProvider,payhookWaToken,payhookWaDomain,payhookWalledGardenHosts,payhookStaticQris,payhookWebhookAuthType,payhookWebhookToken,payhookWebhookHeaderName,payhookWebhookSecretKey"
+REMAP_VOUCHER_ORDERS="voucher_orders|same|id,orderId,voucherTypeId,voucherName,profile,sessionId,price,uniqueCode,uniqueAmount,qrString,qrImage,customerName,phone,status,voucherUsername,voucherPassword,paidAt,expiresAt,note,createdAt,updatedAt"
+REMAP_PAYHOOK_CB="payhook_callback_logs|same|id,source,eventId,amount,status,matched,matchedOrderId,note,rawPayload,processedAt"
+REMAP_PAYMENT_OUTBOX="payment_outbox|same|id,topic,payload,key,sent,attempts,lastError,createdAt"
+REMAP_BOT_TOPUP="bot_topup_logs|topup_logs|id,reselerId,amount,type,note,by,at,balanceBefore,balanceAfter"
+
+# Resolve the remap entry for a source table ("" if none).
+remap_for() {
+  local src="$1"
+  case "$src" in
+    router_sessions)     echo "$REMAP_ROUTER" ;;
+    payment_config)      echo "$REMAP_PAYMENT_CONFIG" ;;
+    voucher_orders)      echo "$REMAP_VOUCHER_ORDERS" ;;
+    payhook_callback_logs) echo "$REMAP_PAYHOOK_CB" ;;
+    payment_outbox)      echo "$REMAP_PAYMENT_OUTBOX" ;;
+    bot_topup_logs)      echo "$REMAP_BOT_TOPUP" ;;
+    *) echo "" ;;
+  esac
+}
+
 # Helper: write a header + a row-dump of a table into $OUT/<db>.sql
 #   emit <db> <table>
 #
 # Generates a RUNNABLE Postgres COPY ... FROM STDIN block (CSV) so the
 # output files can be piped straight into psql. Column names are read from
-# the SQLite pragma table_info so the COPY header matches exactly.
+# the SQLite pragma table_info so the COPY header matches exactly, unless a
+# remap entry overrides the target table name / column list.
 emit() {
   local db="$1"; local table="$2"
   local sql="$OUT/$db.sql"
 
-  # Column list (quoted, comma-separated) from SQLite schema.
+  # Skip tables that don't exist in the source SQLite DB (e.g. payment_outbox
+  # is Postgres-only, created by payment-service; it has no SQLite source).
+  if ! sqlite3 "$DB" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='$table' LIMIT 1;" | grep -q 1; then
+    echo "  ℹ skip $table (not present in source SQLite)"
+    return
+  fi
+
+  local pg_table="$table"   # target Postgres table name
   local cols
-  cols=$(sqlite3 "$DB" "SELECT '\"' || name || '\"' FROM pragma_table_info('$table') ORDER BY cid;" | paste -sd, -)
+  local remap
+  remap=$(remap_for "$table")
+  if [ -n "$remap" ]; then
+    IFS='|' read -r _src pg_table colspec <<< "$remap"
+    if [ "$pg_table" = "same" ]; then pg_table="$table"; fi
+    # Re-quote the explicit column list.
+    cols=$(printf '%s' "$colspec" | tr ',' '\n' | sed 's/^/"/;s/$/"/' | paste -sd, -)
+  else
+    # Column list (quoted, comma-separated) from SQLite schema.
+    cols=$(sqlite3 "$DB" "SELECT '\"' || name || '\"' FROM pragma_table_info('$table') ORDER BY cid;" | paste -sd, -)
+  fi
 
   {
     echo "-- ==========================================================="
     echo "-- $table (from SQLite) — runnable COPY"
     echo "-- ==========================================================="
-    echo "COPY \"$table\" ($cols) FROM STDIN WITH (FORMAT csv, HEADER false);"
+    echo "COPY \"$pg_table\" ($cols) FROM STDIN WITH (FORMAT csv, HEADER false);"
     # SQLite's -csv NULLs become empty strings; convert empty numeric/bool
     # cells to Postgres NULL via sed (\\N). Booleans 0/1 → false/true.
     sqlite3 -csv "$DB" "SELECT * FROM \"$table\";"
@@ -90,18 +139,19 @@ emit db_erp voucher_batches
 emit db_erp profile_meta
 
 # ── db_payment ─────────────────────────────────────────────────────────────
+# NOTE: only the tables the CURRENT payment-service actually creates are
+# emitted (TypeORM entities): payment_config, voucher_orders,
+# payhook_callback_logs, payment_outbox. The legacy payment tables
+# (payhook_payment_transactions, midtrans_payment_transactions,
+# payment_transactions, billing_customers, invoices, settlements,
+# topup_requests) are no longer materialized by the service, so they are
+# omitted to keep the seed file runnable against the live schema.
 : > "$OUT/db_payment.sql"
 echo "-- db_payment migration" > "$OUT/db_payment.sql"
 emit db_payment payment_config
 emit db_payment voucher_orders
 emit db_payment payhook_callback_logs
-emit db_payment payhook_payment_transactions
-emit db_payment midtrans_payment_transactions
-emit db_payment payment_transactions
-emit db_payment billing_customers
-emit db_payment invoices
-emit db_payment settlements
-emit db_payment topup_requests
+emit db_payment payment_outbox
 
 # ── db_router ──────────────────────────────────────────────────────────────
 : > "$OUT/db_router.sql"
