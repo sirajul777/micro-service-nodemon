@@ -14,7 +14,7 @@
 - [x] Verify `docker compose config` resolves all 9 services (EXIT=0)
 - [x] Verify Go service compiles (`go build ./...` → EXIT=0)
 - [x] Verify Python service compiles (`py_compile` → OK)
-- [ ] `docker compose up` — bring up all infra containers healthy (needs Docker running)
+- [x] `docker compose up` — bring up all infra containers healthy (9/9 up; postgres + redis healthy)
 
 ## Phase 1 — Auth & User Management (`auth-node-service`)
 - [x] Scaffold NestJS + TypeORM; DB `db_auth`
@@ -95,7 +95,7 @@
 - [x] Verify all 6 services build: 4× Node `nest build` EXIT 0, Go `go build ./...` OK, Python `py_compile` OK
 - [x] Create per-service Postgres seed extractor (`scripts/migrate-sqlite-to-pg.sh`) → `out/db_{auth,erp,payment,router,bot}.sql`
 - [x] Row-preservation check: admin `USR-ADMIN` extracted from `nodemon/data/mikhmon.db` (1 user, 1 payment_config, remainder empty)
-- [ ] Docker smoke test — `docker compose up` and verify nginx → BFF → services health
+- [x] Docker smoke test — `docker compose up` and verify nginx → BFF → services health
 - [ ] Shadow traffic / parallel run (monolith + microservices)
 - [ ] Full ETL: wrap the CSV extracts into per-entity COPY/INSERT matching each service's exact schema
 - [ ] Remove monolith, shared SQLite, `.patch` files
@@ -129,11 +129,12 @@
       rejection, proxied payment-config, QRIS webhook routing, Redis reachability,
       security headers, rate-limit smoke test
 - [x] Docs: `TODO-PHASE9.md` + this section
-- [ ] Live: `docker compose up -d --build` → all containers healthy
-- [ ] Live: `scripts/verify-e2e.sh` → all checks pass
-- [ ] Live: load `out/*.sql` into Postgres; confirm row counts match SQLite
-- [ ] Live: confirm `payment.order.*` / `billing.invoice.*` Redis events reach
-      bot-py-service (end-to-end notification path)
+- [x] Live: `docker compose up -d --build` → all containers healthy (Phase 12)
+- [x] Live: `scripts/verify-e2e.sh` → **15/15 pass** (Phase 12)
+- [x] Live: load `out/*.sql` into Postgres; db_auth/db_erp/db_router/db_bot row
+      counts match `mikhmon.db`; db_payment has known column-mapping caveat (Phase 12)
+- [x] Live: confirm `payment.order.*` / `billing.invoice.*` Redis events reach
+      bot-py-service — proven via test `payment.order.settled` event (Phase 12)
 
 ## Phase 9 — Security Hardening (payment-service direct-route guard)
 - [x] Add `auth/permissions.decorator.ts` (NestJS `PermissionKey` + `PERMISSIONS_KEY`
