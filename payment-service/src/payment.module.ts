@@ -6,9 +6,15 @@ import { PaymentConfigEntity } from './entities/payment-config.entity';
 import { VoucherOrderEntity } from './entities/voucher-order.entity';
 import { PayhookCallbackLogEntity } from './entities/payhook-callback-log.entity';
 import { PaymentOutboxEntity } from './entities/payment-outbox.entity';
+import { BillingCustomerEntity } from './entities/billing-customer.entity';
+import { BillingInvoiceEntity } from './entities/billing-invoice.entity';
+import { BillingSettlementEntity } from './entities/billing-settlement.entity';
 
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentConfigController } from './payment-config.controller';
+import { PaymentsController } from './payments/payments.controller';
+import { BillingService } from './billing/billing.service';
+import { BillingController } from './billing/billing.controller';
 import { QrisService } from './qris.service';
 import { VoucherOrderService } from './voucher-order.service';
 import { VoucherOrderController } from './voucher-order.controller';
@@ -29,19 +35,23 @@ import { OutboxService } from './redis/outbox.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
+TypeOrmModule.forFeature([
       PaymentConfigEntity,
       VoucherOrderEntity,
       PayhookCallbackLogEntity,
       PaymentOutboxEntity,
+      BillingCustomerEntity,
+      BillingInvoiceEntity,
+      BillingSettlementEntity,
     ]),
     HttpModule,
   ],
-  controllers: [PaymentConfigController, VoucherOrderController],
+  controllers: [PaymentConfigController, VoucherOrderController, PaymentsController, BillingController],
   providers: [
     PaymentConfigService,
     QrisService,
     VoucherOrderService,
+    BillingService,
     PayhookNotifierService,
     PayhookSchedulerService,
     VoucherTypeClient,

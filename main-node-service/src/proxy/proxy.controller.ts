@@ -19,7 +19,7 @@ const TARGETS: Record<string, Target> = {
   erp: 'erp',
   payment: 'payment',
   bot: 'bot',
-batches: 'erp',
+  batches: 'erp',
   // The frontend's Voucher Settings page calls `/api/voucher-types*` (app.js:
   // loadVoucherSettings() → req('/voucher-types'), saveVt() → post('/voucher-
   // types'), etc). These map to erp-node-service's VoucherTypeController,
@@ -30,6 +30,8 @@ batches: 'erp',
   voucherTypes: 'erp',
   'voucher-types': 'erp',
   voucher: 'erp',
+  // The frontend's batch routes also depend on the legacy `/api/voucher/:cs/profiles`
+  // path, which gets rewritten to `/voucher/batches/:cs/import/profiles` below.
   // The frontend's User Management page calls `/api/users*` (app.js:
   // loadUserManagement() → req('/users'), saveUm() → post('/users'), etc).
   // These map to auth-node-service's UserController, mounted at /api/users.
@@ -47,6 +49,19 @@ batches: 'erp',
   // the `/sessions`/`/mikrotik` prefix is preserved when forwarding.
   sessions: 'erp',
   mikrotik: 'erp',
+  // ── Phase 11: feature areas whose backends we implemented ──────────────
+  // Resellers / bot-resellers / telegram → bot-py-service (rest_api.py).
+  resellers: 'bot',
+  'bot-resellers': 'bot',
+  telegram: 'bot',
+  // PPPoE ops → erp (which talks to Go gRPC).
+  pppoe: 'erp',
+  // Reports (selling/live/resume) → erp (aggregates from DB + Go).
+  report: 'erp',
+  // Billing (customers/invoices/settlements) → payment-service.
+  billing: 'payment',
+  // Payments stats/test/check → payment-service.
+  payments: 'payment',
 };
 
 /**
@@ -111,58 +126,9 @@ export class ProxyController {
     // Normalize both to a canonical path so the public-route checks below
     // are correct regardless of routing alias.
     const restPath = rest ? `/${rest}` : '';
-    let canonical: string;
-    if (targetRaw === 'qris') {
-      // /api/qris/* → downstream payment-service paths are /api/qris/*.
-      canonical = `/api/qris${restPath}`;
-    } else if (targetRaw === 'payment') {
-      // /api/payment/* → downstream payment-service paths live under /api/*
-      // (e.g. /api/payment/payment-config → /api/payment-config).
-      canonical = `/api${restPath}`;
-} else if (targetRaw === 'batches') {
-      // /api/batches/* → downstream erp-node-service paths live under
-      // /voucher/batches/*.
-      canonical = `/voucher/batches${restPath}`;
-    } else if (targetRaw === 'voucher-types' || targetRaw === 'voucherTypes') {
-      // /api/voucher-types/* → erp-node-service VoucherTypeController,
-      // mounted at /voucher/types.
-      canonical = `/voucher/types${restPath}`;
-    } else if (targetRaw === 'voucher') {
-      // /api/voucher/* → erp-node-service, mounted at /voucher. The monolith's
-      // `/api/voucher/:cs/profiles` maps to `/voucher/batches/:cs/import/profiles`.
-      if (/^\/voucher\/([^/]+)\/profiles$/.test(restPath)) {
-        const cs = restPath.split('/')[2];
-        canonical = `/voucher/batches/${cs}/import/profiles`;
-      } else {
-        canonical = restPath;
-      }
-    } else if (targetRaw === 'users') {
-      // /api/users/* → auth-node-service UserController, mounted at /api/users.
-      canonical = `/api/users${restPath}`;
-    } else if (targetRaw === 'sessions') {
-      // /api/sessions[...] → erp-node-service's RouterSessionController,
-      // mounted at /sessions (not nested under /erp/).
-      canonical = `/sessions${restPath}`;
-    } else if (targetRaw === 'mikrotik') {
-      // /api/mikrotik/:id/connect/test → erp-node-service's
-      // RouterSessionController, mounted at /mikrotik/...
-      canonical = `/mikrotik${restPath}`;
-    } else {
-      canonical = restPath;
-    }
+    const canonical = this.normalizeCanonicalPath(targetRaw, restPath);
 
-    // Public payment/QRIS routes that must NOT require auth:
-    //   POST /payments/payhook/app-webhook   (PayHook Android app webhook)
-    //   POST /api/qris/orders               (customer checkout — create order)
-    //   POST /api/qris/orders/:id/qr        (re-generate QR for an order)
-    //   GET  /qris/status/:orderId          (checkout polling)
-    const isPublic =
-      (target === 'payment' && canonical.startsWith('/payments/payhook/app-webhook')) ||
-      (target === 'payment' &&
-        req.method === 'POST' &&
-        (canonical === '/api/qris/orders' ||
-          /^\/api\/qris\/orders\/[^/]+\/qr$/.test(canonical))) ||
-      (target === 'payment' && canonical.startsWith('/qris/status/'));
+    const isPublic = this.isPublicRequest(target, canonical, req.method);
 
     // Enforce auth for everything else.
     if (!isPublic) {
@@ -188,5 +154,63 @@ export class ProxyController {
     const resp = await this.proxyService.forward(target, downstreamPath, method, token, body, query);
     const { status, body: data } = this.proxyService.respond(resp);
     return res.status(status).json(data);
+  }
+
+  private normalizeCanonicalPath(targetRaw: string, restPath: string): string {
+    if (targetRaw === 'qris') {
+      return `/api/qris${restPath}`;
+    }
+    if (targetRaw === 'payment') {
+      return `/api${restPath}`;
+    }
+    if (targetRaw === 'batches') {
+      return `/voucher/batches${restPath}`;
+    }
+    if (targetRaw === 'voucher-types' || targetRaw === 'voucherTypes') {
+      return `/voucher/types${restPath}`;
+    }
+    if (targetRaw === 'voucher') {
+      if (/^\/([^/]+)\/profiles$/.test(restPath)) {
+        const cs = restPath.split('/')[1];
+        return `/voucher/batches/${cs}/import/profiles`;
+      }
+      return restPath;
+    }
+    if (targetRaw === 'users') {
+      return `/api/users${restPath}`;
+    }
+    if (targetRaw === 'sessions') {
+      return `/sessions${restPath}`;
+    }
+    if (targetRaw === 'mikrotik') {
+      return `/mikrotik${restPath}`;
+    }
+    // Phase 11 aliases pass through to their target with the same path shape:
+    //   resellers / bot-resellers / telegram → bot-py (rest_api.py)
+    //   pppoe / report → erp controllers mounted at /pppoe, /report
+    //   billing → payment-service billing controllers mounted at /billing
+    //   payments → payment-service payments controllers mounted at /payments
+    if (
+      targetRaw === 'resellers' ||
+      targetRaw === 'bot-resellers' ||
+      targetRaw === 'telegram' ||
+      targetRaw === 'pppoe' ||
+      targetRaw === 'report' ||
+      targetRaw === 'billing' ||
+      targetRaw === 'payments'
+    ) {
+      return restPath;
+    }
+    return restPath;
+  }
+
+  private isPublicRequest(target: Target, canonical: string, method: string): boolean {
+    return (
+      (target === 'payment' && canonical.startsWith('/payments/payhook/app-webhook')) ||
+      (target === 'payment' &&
+        method === 'POST' &&
+        (canonical === '/api/qris/orders' || /^\/api\/qris\/orders\/[^/]+\/qr$/.test(canonical))) ||
+      (target === 'payment' && canonical.startsWith('/qris/status/'))
+    );
   }
 }

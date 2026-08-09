@@ -179,3 +179,16 @@
 - [x] Live run: rebuilt/recreated the 3 changed services; `verify-e2e.sh` →
       **15/15 pass** (incl. Sessions GET/POST/GET:test/DELETE).
 - [x] Cleanup: removed `.patch` dev artifacts and `public/backup-*` files.
+
+## Phase 11 — Missing Backend Logic for Frontend Feature Areas ✅
+- [x] bot-py REST controllers (`rest_api.py`): resellers + bot-resellers
+      (CRUD/toggle/topup/logs) and telegram config (list/get/save/delete/test/logs),
+      wired into `main.py`; Bearer-token validation against auth-service.
+- [x] BFF `ProxyController` aliases for `resellers`, `bot-resellers`, `telegram`,
+      `pppoe`, `report`, `billing`, `payments` (canonical-path pass-through).
+- [x] `nginx.conf` `location =` exact-match blocks for bare `/api/batches`,
+      `/api/voucher-types`, `/api/users`, `/api/report`, `/api/voucher`.
+- [x] Rebuilt `bot-py-service`, `main-node-service`, `api-gateway`; nginx config
+      valid; BFF started cleanly with all aliases + webhook routes mapped.
+- [x] Live: `GATEWAY_PORT=80 ./scripts/verify-e2e.sh` → **Passed: 15, Failed: 0**
+      (exit 0).

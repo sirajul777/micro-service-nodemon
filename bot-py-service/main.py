@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime
 
 import db
+import rest_api
 from services import redis_consumer, tg_bot, tg_config_service as tg_cfg
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s %(name)s: %(message)s")
@@ -49,32 +50,53 @@ def bootstrap():
 
 
 class HealthHandler(BaseHTTPRequestHandler):
+    def _healthz(self):
+        body = json.dumps({
+            "status": "ok",
+            "service": "bot-py-service",
+            "phase": 5,
+            "db": os.getenv("DB_NAME", "db_bot"),
+            "redis": f"{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}",
+            "time": datetime.now().astimezone().isoformat(),
+        }).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
-        if self.path == "/healthz":
-            body = json.dumps({
-                "status": "ok",
-                "service": "bot-py-service",
-                "phase": 5,
-                "db": os.getenv("DB_NAME", "db_bot"),
-                "redis": f"{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}",
-                "time": datetime.now().astimezone().isoformat(),
-            }).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        elif self.path == "/resellers":
-            from services import reseller_service
-            body = json.dumps(reseller_service.load_all(), default=str).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        else:
-            self.send_response(404)
-            self.end_headers()
+        if self.path == "/healthz" or self.path == "/healthz/":
+            self._healthz()
+            return
+        if rest_api.route(self):
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_POST(self):
+        if rest_api.route(self):
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_PUT(self):
+        if rest_api.route(self):
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_DELETE(self):
+        if rest_api.route(self):
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_PATCH(self):
+        if rest_api.route(self):
+            return
+        self.send_response(404)
+        self.end_headers()
 
     def log_message(self, *args):
         pass  # silence default request logging

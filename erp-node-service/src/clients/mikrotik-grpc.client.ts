@@ -366,7 +366,7 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /**
+/**
    * List hotspot profiles on a router.
    */
   listHotspotProfiles(sessionId: string): Promise<{ success: boolean; profiles?: any[]; error?: string }> {
@@ -385,6 +385,172 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
             return;
           }
           resolve({ success: true, profiles: resp?.profiles || [] });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Get a single hotspot profile by name.
+   */
+  getHotspotProfile(sessionId: string, name: string): Promise<{ success: boolean; profile?: any; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.GetHotspotProfile({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC GetHotspotProfile failed: ${err.message}` });
+            return;
+          }
+          if (!resp?.success) {
+            resolve({ success: false, error: resp?.error || 'Profile tidak ditemukan' });
+            return;
+          }
+          resolve({ success: true, profile: resp.profile });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Fetch the router dashboard summary.
+   */
+  getDashboard(sessionId: string): Promise<{ success: boolean; error?: string; [k: string]: any }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.GetDashboard({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC GetDashboard failed: ${err.message}` });
+            return;
+          }
+          resolve(resp || { success: false, error: 'empty response' });
+        });
+      })();
+    });
+  }
+
+  /**
+   * List currently-active hotspot users (sessions on the router).
+   */
+  listActiveHotspotUsers(sessionId: string, server: string): Promise<{ success: boolean; users?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.ListActiveHotspotUsers({ sessionId, server }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC ListActiveHotspotUsers failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: true, users: resp?.users || [] });
+        });
+      })();
+    });
+  }
+
+  /**
+   * Add a hotspot user to the router.
+   */
+  addHotspotUser(params: {
+    sessionId: string;
+    name: string;
+    password: string;
+    profile: string;
+    comment: string;
+    limitUptime: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.AddHotspotUser(
+          {
+            sessionId: params.sessionId,
+            name: params.name,
+            password: params.password,
+            profile: params.profile,
+            comment: params.comment,
+            limitUptime: params.limitUptime,
+          },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              resolve({ success: false, error: `gRPC AddHotspotUser failed: ${err.message}` });
+              return;
+            }
+            resolve({ success: resp?.success, error: resp?.error });
+          },
+        );
+      })();
+    });
+  }
+
+  /**
+   * Fetch the router system resource (CPU, memory, HDD, uptime).
+   */
+  getSystemResource(sessionId: string): Promise<{ success: boolean; error?: string; [k: string]: any }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.GetSystemResource({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC GetSystemResource failed: ${err.message}` });
+            return;
+          }
+          resolve(resp || { success: false, error: 'empty response' });
+        });
+      })();
+    });
+  }
+
+  /**
+   * List router interfaces.
+   */
+  getInterfaces(sessionId: string): Promise<{ success: boolean; interfaces?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.GetInterfaces({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC GetInterfaces failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: true, interfaces: resp?.interfaces || [] });
         });
       })();
     });
