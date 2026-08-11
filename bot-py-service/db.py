@@ -15,7 +15,7 @@ SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocom
 def init_db():
     """Create tables if they don't exist (dev convenience)."""
     Base.metadata.create_all(bind=engine)
-    log.info("db_bot schema ensured (bot_resellers, topup_logs, telegram_configs)")
+    log.info("db_bot schema ensured (resellers, bot_resellers, topup_logs, telegram_configs)")
 
 
 def get_session():

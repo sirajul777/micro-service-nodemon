@@ -132,14 +132,51 @@ def _route_resellers(self, method: str, parts: list[str]):
         return True
     is_bot = parts[0] == "bot-resellers"
 
-    # GET /resellers/session/:session
-    if method == "GET" and len(parts) == 3 and parts[1] == "session":
-        session = parts[2]
-        rows = [r for r in reseller_service.load_all() if r.get("sessionId") == session]
-        return _json(self, 200, rows)
+    # ── Plain /resellers: separate table from bot-resellers (see Reseller
+    # in models.py) — these must NOT be served from reseller_service's
+    # BotReseller-backed functions, or a plain reseller's phone/address
+    # silently vanish (BotReseller has no such columns) and both feature's
+    # listings get each other's rows mixed in.
+    if not is_bot:
+        # GET /resellers/session/:session
+        if method == "GET" and len(parts) == 3 and parts[1] == "session":
+            return _json(self, 200, reseller_service.load_by_router(parts[2]))
 
+        # GET /resellers (list)
+        if method == "GET" and len(parts) == 1:
+            return _json(self, 200, reseller_service.load_all_plain())
+
+        # GET /resellers/:id
+        if method == "GET" and len(parts) == 2:
+            r = reseller_service.get_plain_by_id(parts[1])
+            if not r:
+                return _json(self, 404, {"success": False, "message": "Not found"})
+            return _json(self, 200, r)
+
+        # POST /resellers (upsert)
+        if method == "POST" and len(parts) == 1:
+            body = _read_body(self)
+            r = reseller_service.upsert_plain(body)
+            return _json(self, 200, {"success": True, "reseller": r})
+
+        # PUT /resellers/:id (update)
+        if method == "PUT" and len(parts) == 2:
+            body = _read_body(self)
+            body["id"] = parts[1]
+            r = reseller_service.upsert_plain(body)
+            return _json(self, 200, {"success": True, "reseller": r})
+
+        # DELETE /resellers/:id — real delete, matching the monolith's
+        # ResellerService.delete() (a hard `DELETE FROM resellers`).
+        if method == "DELETE" and len(parts) == 2:
+            ok = reseller_service.delete_plain(parts[1])
+            return _json(self, 200, {"success": ok})
+
+        return _json(self, 404, {"success": False, "message": f"Unknown route: {self.path}"})
+
+    # ── /bot-resellers: Telegram-bot/saldo-based reseller system ───────
     # GET /bot-resellers/logs
-    if method == "GET" and is_bot and len(parts) >= 2 and parts[1] == "logs":
+    if method == "GET" and len(parts) >= 2 and parts[1] == "logs":
         # query params come through self.path
         q = self.path.split("?", 1)[1] if "?" in self.path else ""
         params = dict(re.findall(r"([^&=]+)=([^&]*)", q))
@@ -148,35 +185,38 @@ def _route_resellers(self, method: str, parts: list[str]):
         logs = reseller_service.load_logs(rid, limit)
         return _json(self, 200, logs)
 
-    # GET /resellers (list)
+    # GET /bot-resellers (list)
     if method == "GET" and len(parts) == 1:
         return _json(self, 200, reseller_service.load_all())
 
-    # GET /resellers/:id
+    # GET /bot-resellers/:id
     if method == "GET" and len(parts) == 2:
         r = reseller_service.get_by_id(parts[1])
         if not r:
             return _json(self, 404, {"success": False, "message": "Not found"})
         return _json(self, 200, r)
 
-    # POST /resellers (upsert)
+    # POST /bot-resellers (upsert)
     if method == "POST" and len(parts) == 1:
         body = _read_body(self)
         r = reseller_service.upsert(body)
         return _json(self, 200, {"success": True, "reseller": r})
 
-    # PUT /resellers/:id (update)
+    # PUT /bot-resellers/:id (update)
     if method == "PUT" and len(parts) == 2:
         body = _read_body(self)
         body["id"] = parts[1]
         r = reseller_service.upsert(body)
         return _json(self, 200, {"success": True, "reseller": r})
 
-    # DELETE /resellers/:id
+    # DELETE /bot-resellers/:id — real delete, matching the monolith's
+    # BotResellerService.delete(). Previously this soft-deleted (status=
+    # 'inactive') instead because delete() wasn't exposed in the service
+    # layer at all — a deleted reseller would keep showing up everywhere
+    # that doesn't explicitly filter status='active'.
     if method == "DELETE" and len(parts) == 2:
-        # delete not exposed in service layer; soft-delete via status inactive
-        reseller_service.upsert({"id": parts[1], "status": "inactive"})
-        return _json(self, 200, {"success": True})
+        ok = reseller_service.delete(parts[1])
+        return _json(self, 200, {"success": ok})
 
     # PATCH /bot-resellers/:id/toggle
     if method == "PATCH" and len(parts) == 3 and parts[2] == "toggle":

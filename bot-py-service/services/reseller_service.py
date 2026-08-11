@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 
 from db import get_session
-from models import BotReseller, TopupLog
+from models import BotReseller, Reseller, TopupLog
 
 log = logging.getLogger("bot-py-service.reseller")
 
@@ -164,6 +164,113 @@ def refund_saldo(telegram_id, amount, note):
             balanceBefore=before,
             balanceAfter=row.saldo,
         ))
+        s.commit()
+        return True
+    finally:
+        s.close()
+
+
+def delete(reseller_id) -> bool:
+    """Hard-delete a bot-reseller. Previously this wasn't exposed at all —
+    rest_api.py's DELETE handler fell back to soft-deleting (status=
+    'inactive') instead, which doesn't match the monolith's
+    BotResellerService.delete() (a real `DELETE FROM bot_resellers`)."""
+    s = get_session()
+    try:
+        row = s.query(BotReseller).filter(BotReseller.id == reseller_id).first()
+        if not row:
+            return False
+        s.delete(row)
+        s.commit()
+        return True
+    finally:
+        s.close()
+
+
+# ── Plain reseller (price-discount, tied to a router session) ──────
+# Separate table/model from BotReseller above — see Reseller in models.py
+# for why these must not share a data store.
+
+def _to_dict_plain(r: Reseller) -> dict:
+    return {
+        "id": r.id,
+        "name": r.name,
+        "phone": r.phone or "",
+        "address": r.address or "",
+        "discount": r.discount or 0,
+        "createdAt": r.createdAt.isoformat() if r.createdAt else "",
+        "router": r.router or "",
+    }
+
+
+def load_all_plain():
+    s = get_session()
+    try:
+        return [_to_dict_plain(r) for r in s.query(Reseller).all()]
+    finally:
+        s.close()
+
+
+def load_by_router(router: str):
+    s = get_session()
+    try:
+        rows = s.query(Reseller).filter(Reseller.router == router).all()
+        return [_to_dict_plain(r) for r in rows]
+    finally:
+        s.close()
+
+
+def get_plain_by_id(reseller_id):
+    s = get_session()
+    try:
+        r = s.query(Reseller).filter(Reseller.id == reseller_id).first()
+        return _to_dict_plain(r) if r else None
+    finally:
+        s.close()
+
+
+def upsert_plain(data: dict):
+    reseller_id = data.get("id")
+    if not reseller_id:
+        # Mirror the monolith's id-from-name convention exactly
+        # (ResellerService.save_reseller): uppercase, non-alnum -> '_',
+        # truncated to 20 chars.
+        import re as _re
+        reseller_id = _re.sub(r"[^A-Z0-9]", "_", (data.get("name") or "").upper())[:20]
+
+    s = get_session()
+    try:
+        row = s.query(Reseller).filter(Reseller.id == reseller_id).first()
+        if not row:
+            row = Reseller(
+                id=reseller_id,
+                name=data.get("name", ""),
+                phone=data.get("phone", ""),
+                address=data.get("address", ""),
+                discount=data.get("discount", 0),
+                router=data.get("router", ""),
+            )
+            s.add(row)
+        else:
+            row.name = data.get("name", row.name)
+            row.phone = data.get("phone", row.phone)
+            row.address = data.get("address", row.address)
+            row.discount = data.get("discount", row.discount)
+            row.router = data.get("router", row.router)
+        s.commit()
+        s.refresh(row)
+        return _to_dict_plain(row)
+    finally:
+        s.close()
+
+
+def delete_plain(reseller_id) -> bool:
+    s = get_session()
+    try:
+        row = s.query(Reseller).filter(Reseller.id == reseller_id).first()
+        if not row:
+            return False
+        s.delete(row)
         s.commit()
         return True
     finally:

@@ -29,6 +29,26 @@ class BotReseller(Base):
     note = Column(String, nullable=True)
 
 
+class Reseller(Base):
+    """Plain price-discount reseller, tied to a router session — distinct
+    from BotReseller (the Telegram-bot/saldo-based reseller system above).
+    Mirrors the monolith's ResellerEntity (table `resellers`) exactly.
+    These were previously (incorrectly) served from the BotReseller table,
+    which meant a plain reseller's `phone`/`address` were silently dropped
+    (BotReseller has no such columns) and the two feature's data was mixed
+    together in both listings.
+    """
+    __tablename__ = "resellers"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    discount = Column(Float, default=0)
+    createdAt = Column(DateTime, server_default=func.now())
+    router = Column(String, nullable=True)
+
+
 class TopupLog(Base):
     __tablename__ = "topup_logs"
 
