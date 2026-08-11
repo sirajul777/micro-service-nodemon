@@ -35,6 +35,25 @@ type RouterServiceClient interface {
 	// Hotspot profiles
 	ListHotspotProfiles(ctx context.Context, in *ListProfilesRequest, opts ...grpc.CallOption) (*ListProfilesResponse, error)
 	GetHotspotProfile(ctx context.Context, in *GetProfileRequest, opts ...grpc.CallOption) (*GetProfileResponse, error)
+	// Generic field-passthrough CRUD, mirroring AddPppProfile/UpdatePppProfile/
+	// DeletePppProfile below — Go doesn't understand MikHMon's on-login script
+	// metadata (price/validity/expiry mode encoded into the script text), it
+	// just writes whatever `on_login` string the caller built. That business
+	// logic lives in erp-node-service (ported from the monolith's
+	// buildOnLoginScript/parseOnLogin), not here — same "smart client, dumb
+	// server" split used for router-session management.
+	AddHotspotProfile(ctx context.Context, in *AddHotspotProfileRequest, opts ...grpc.CallOption) (*AddHotspotProfileResponse, error)
+	UpdateHotspotProfile(ctx context.Context, in *UpdateHotspotProfileRequest, opts ...grpc.CallOption) (*UpdateHotspotProfileResponse, error)
+	DeleteHotspotProfile(ctx context.Context, in *DeleteHotspotProfileRequest, opts ...grpc.CallOption) (*DeleteHotspotProfileResponse, error)
+	// Bulk-remove — just RemoveHotspotUser looped server-side so the caller
+	// makes one round-trip instead of N.
+	BulkRemoveHotspotUsers(ctx context.Context, in *BulkRemoveHotspotUsersRequest, opts ...grpc.CallOption) (*BulkRemoveHotspotUsersResponse, error)
+	// Idempotent: creates the "mikhmon-cleanup-expired" scheduler if missing,
+	// otherwise just re-confirms it (used after every profile save, matching
+	// the monolith calling this on every add/edit). The cleanup script itself
+	// is fixed/static (no customer input), so it's hardcoded here rather than
+	// sent over the wire from erp-node-service.
+	SetupExpiryScheduler(ctx context.Context, in *SetupExpirySchedulerRequest, opts ...grpc.CallOption) (*SetupExpirySchedulerResponse, error)
 	// System info
 	GetSystemResource(ctx context.Context, in *SystemResourceRequest, opts ...grpc.CallOption) (*SystemResourceResponse, error)
 	GetInterfaces(ctx context.Context, in *InterfacesRequest, opts ...grpc.CallOption) (*InterfacesResponse, error)
@@ -157,6 +176,51 @@ func (c *routerServiceClient) ListHotspotProfiles(ctx context.Context, in *ListP
 func (c *routerServiceClient) GetHotspotProfile(ctx context.Context, in *GetProfileRequest, opts ...grpc.CallOption) (*GetProfileResponse, error) {
 	out := new(GetProfileResponse)
 	err := c.cc.Invoke(ctx, "/router.RouterService/GetHotspotProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *routerServiceClient) AddHotspotProfile(ctx context.Context, in *AddHotspotProfileRequest, opts ...grpc.CallOption) (*AddHotspotProfileResponse, error) {
+	out := new(AddHotspotProfileResponse)
+	err := c.cc.Invoke(ctx, "/router.RouterService/AddHotspotProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *routerServiceClient) UpdateHotspotProfile(ctx context.Context, in *UpdateHotspotProfileRequest, opts ...grpc.CallOption) (*UpdateHotspotProfileResponse, error) {
+	out := new(UpdateHotspotProfileResponse)
+	err := c.cc.Invoke(ctx, "/router.RouterService/UpdateHotspotProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *routerServiceClient) DeleteHotspotProfile(ctx context.Context, in *DeleteHotspotProfileRequest, opts ...grpc.CallOption) (*DeleteHotspotProfileResponse, error) {
+	out := new(DeleteHotspotProfileResponse)
+	err := c.cc.Invoke(ctx, "/router.RouterService/DeleteHotspotProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *routerServiceClient) BulkRemoveHotspotUsers(ctx context.Context, in *BulkRemoveHotspotUsersRequest, opts ...grpc.CallOption) (*BulkRemoveHotspotUsersResponse, error) {
+	out := new(BulkRemoveHotspotUsersResponse)
+	err := c.cc.Invoke(ctx, "/router.RouterService/BulkRemoveHotspotUsers", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *routerServiceClient) SetupExpiryScheduler(ctx context.Context, in *SetupExpirySchedulerRequest, opts ...grpc.CallOption) (*SetupExpirySchedulerResponse, error) {
+	out := new(SetupExpirySchedulerResponse)
+	err := c.cc.Invoke(ctx, "/router.RouterService/SetupExpiryScheduler", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -374,6 +438,25 @@ type RouterServiceServer interface {
 	// Hotspot profiles
 	ListHotspotProfiles(context.Context, *ListProfilesRequest) (*ListProfilesResponse, error)
 	GetHotspotProfile(context.Context, *GetProfileRequest) (*GetProfileResponse, error)
+	// Generic field-passthrough CRUD, mirroring AddPppProfile/UpdatePppProfile/
+	// DeletePppProfile below — Go doesn't understand MikHMon's on-login script
+	// metadata (price/validity/expiry mode encoded into the script text), it
+	// just writes whatever `on_login` string the caller built. That business
+	// logic lives in erp-node-service (ported from the monolith's
+	// buildOnLoginScript/parseOnLogin), not here — same "smart client, dumb
+	// server" split used for router-session management.
+	AddHotspotProfile(context.Context, *AddHotspotProfileRequest) (*AddHotspotProfileResponse, error)
+	UpdateHotspotProfile(context.Context, *UpdateHotspotProfileRequest) (*UpdateHotspotProfileResponse, error)
+	DeleteHotspotProfile(context.Context, *DeleteHotspotProfileRequest) (*DeleteHotspotProfileResponse, error)
+	// Bulk-remove — just RemoveHotspotUser looped server-side so the caller
+	// makes one round-trip instead of N.
+	BulkRemoveHotspotUsers(context.Context, *BulkRemoveHotspotUsersRequest) (*BulkRemoveHotspotUsersResponse, error)
+	// Idempotent: creates the "mikhmon-cleanup-expired" scheduler if missing,
+	// otherwise just re-confirms it (used after every profile save, matching
+	// the monolith calling this on every add/edit). The cleanup script itself
+	// is fixed/static (no customer input), so it's hardcoded here rather than
+	// sent over the wire from erp-node-service.
+	SetupExpiryScheduler(context.Context, *SetupExpirySchedulerRequest) (*SetupExpirySchedulerResponse, error)
 	// System info
 	GetSystemResource(context.Context, *SystemResourceRequest) (*SystemResourceResponse, error)
 	GetInterfaces(context.Context, *InterfacesRequest) (*InterfacesResponse, error)
@@ -438,6 +521,21 @@ func (UnimplementedRouterServiceServer) ListHotspotProfiles(context.Context, *Li
 }
 func (UnimplementedRouterServiceServer) GetHotspotProfile(context.Context, *GetProfileRequest) (*GetProfileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHotspotProfile not implemented")
+}
+func (UnimplementedRouterServiceServer) AddHotspotProfile(context.Context, *AddHotspotProfileRequest) (*AddHotspotProfileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddHotspotProfile not implemented")
+}
+func (UnimplementedRouterServiceServer) UpdateHotspotProfile(context.Context, *UpdateHotspotProfileRequest) (*UpdateHotspotProfileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateHotspotProfile not implemented")
+}
+func (UnimplementedRouterServiceServer) DeleteHotspotProfile(context.Context, *DeleteHotspotProfileRequest) (*DeleteHotspotProfileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteHotspotProfile not implemented")
+}
+func (UnimplementedRouterServiceServer) BulkRemoveHotspotUsers(context.Context, *BulkRemoveHotspotUsersRequest) (*BulkRemoveHotspotUsersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BulkRemoveHotspotUsers not implemented")
+}
+func (UnimplementedRouterServiceServer) SetupExpiryScheduler(context.Context, *SetupExpirySchedulerRequest) (*SetupExpirySchedulerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetupExpiryScheduler not implemented")
 }
 func (UnimplementedRouterServiceServer) GetSystemResource(context.Context, *SystemResourceRequest) (*SystemResourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSystemResource not implemented")
@@ -691,6 +789,96 @@ func _RouterService_GetHotspotProfile_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RouterServiceServer).GetHotspotProfile(ctx, req.(*GetProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RouterService_AddHotspotProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddHotspotProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RouterServiceServer).AddHotspotProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/router.RouterService/AddHotspotProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RouterServiceServer).AddHotspotProfile(ctx, req.(*AddHotspotProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RouterService_UpdateHotspotProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateHotspotProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RouterServiceServer).UpdateHotspotProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/router.RouterService/UpdateHotspotProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RouterServiceServer).UpdateHotspotProfile(ctx, req.(*UpdateHotspotProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RouterService_DeleteHotspotProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteHotspotProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RouterServiceServer).DeleteHotspotProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/router.RouterService/DeleteHotspotProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RouterServiceServer).DeleteHotspotProfile(ctx, req.(*DeleteHotspotProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RouterService_BulkRemoveHotspotUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkRemoveHotspotUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RouterServiceServer).BulkRemoveHotspotUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/router.RouterService/BulkRemoveHotspotUsers",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RouterServiceServer).BulkRemoveHotspotUsers(ctx, req.(*BulkRemoveHotspotUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RouterService_SetupExpiryScheduler_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetupExpirySchedulerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RouterServiceServer).SetupExpiryScheduler(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/router.RouterService/SetupExpiryScheduler",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RouterServiceServer).SetupExpiryScheduler(ctx, req.(*SetupExpirySchedulerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1116,6 +1304,26 @@ var _RouterService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHotspotProfile",
 			Handler:    _RouterService_GetHotspotProfile_Handler,
+		},
+		{
+			MethodName: "AddHotspotProfile",
+			Handler:    _RouterService_AddHotspotProfile_Handler,
+		},
+		{
+			MethodName: "UpdateHotspotProfile",
+			Handler:    _RouterService_UpdateHotspotProfile_Handler,
+		},
+		{
+			MethodName: "DeleteHotspotProfile",
+			Handler:    _RouterService_DeleteHotspotProfile_Handler,
+		},
+		{
+			MethodName: "BulkRemoveHotspotUsers",
+			Handler:    _RouterService_BulkRemoveHotspotUsers_Handler,
+		},
+		{
+			MethodName: "SetupExpiryScheduler",
+			Handler:    _RouterService_SetupExpiryScheduler_Handler,
 		},
 		{
 			MethodName: "GetSystemResource",

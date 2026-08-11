@@ -28,6 +28,25 @@ service RouterService {
   // Hotspot profiles
   rpc ListHotspotProfiles(ListProfilesRequest) returns (ListProfilesResponse);
   rpc GetHotspotProfile(GetProfileRequest) returns (GetProfileResponse);
+  // Generic field-passthrough CRUD, mirroring AddPppProfile/UpdatePppProfile/
+  // DeletePppProfile below — Go doesn't understand MikHMon's on-login script
+  // metadata (price/validity/expiry mode encoded into the script text), it
+  // just writes whatever `on_login` string the caller built. That business
+  // logic lives in erp-node-service (ported from the monolith's
+  // buildOnLoginScript/parseOnLogin), not here — same "smart client, dumb
+  // server" split used for router-session management.
+  rpc AddHotspotProfile(AddHotspotProfileRequest) returns (AddHotspotProfileResponse);
+  rpc UpdateHotspotProfile(UpdateHotspotProfileRequest) returns (UpdateHotspotProfileResponse);
+  rpc DeleteHotspotProfile(DeleteHotspotProfileRequest) returns (DeleteHotspotProfileResponse);
+  // Bulk-remove — just RemoveHotspotUser looped server-side so the caller
+  // makes one round-trip instead of N.
+  rpc BulkRemoveHotspotUsers(BulkRemoveHotspotUsersRequest) returns (BulkRemoveHotspotUsersResponse);
+  // Idempotent: creates the "mikhmon-cleanup-expired" scheduler if missing,
+  // otherwise just re-confirms it (used after every profile save, matching
+  // the monolith calling this on every add/edit). The cleanup script itself
+  // is fixed/static (no customer input), so it's hardcoded here rather than
+  // sent over the wire from erp-node-service.
+  rpc SetupExpiryScheduler(SetupExpirySchedulerRequest) returns (SetupExpirySchedulerResponse);
 
   // System info
   rpc GetSystemResource(SystemResourceRequest) returns (SystemResourceResponse);
@@ -205,6 +224,69 @@ message GetProfileResponse {
   bool success = 1;
   string error = 2;
   HotspotProfile profile = 3;
+}
+
+message AddHotspotProfileRequest {
+  string session_id = 1;
+  string name = 2;
+  string on_login = 3;
+  string session_timeout = 4;
+  string idle_timeout = 5;
+  string rate_limit = 6;
+  string shared_users = 7;
+  string address_pool = 8;
+}
+message AddHotspotProfileResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message UpdateHotspotProfileRequest {
+  string session_id = 1;
+  string name = 2;
+  string on_login = 3;
+  // Same convention as AddPppProfile/UpdatePppProfile: empty string = leave
+  // unchanged. To actually clear a field, the caller sends RouterOS's own
+  // "no value" literal (e.g. "00:00:00" for session-timeout, "none" for
+  // address-pool) — matching what the monolith already did for this exact
+  // endpoint, so erp-node-service's port needs no new convention here.
+  string session_timeout = 4;
+  string idle_timeout = 5;
+  string rate_limit = 6;
+  string shared_users = 7;
+  string address_pool = 8;
+}
+message UpdateHotspotProfileResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DeleteHotspotProfileRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message DeleteHotspotProfileResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message BulkRemoveHotspotUsersRequest {
+  string session_id = 1;
+  repeated string names = 2;
+}
+message BulkRemoveHotspotUsersResponse {
+  bool success = 1;
+  string error = 2;
+  int32 removed = 3;
+  repeated string failed_names = 4;
+}
+
+message SetupExpirySchedulerRequest {
+  string session_id = 1;
+}
+message SetupExpirySchedulerResponse {
+  bool success = 1;
+  string error = 2;
 }
 
 // ── System ────────────────────────────────────────────────────────

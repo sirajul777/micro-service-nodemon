@@ -418,6 +418,164 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  addHotspotProfile(params: {
+    sessionId: string;
+    name: string;
+    onLogin?: string;
+    sessionTimeout?: string;
+    idleTimeout?: string;
+    rateLimit?: string;
+    sharedUsers?: string;
+    addressPool?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.AddHotspotProfile(
+          {
+            sessionId: params.sessionId,
+            name: params.name,
+            onLogin: params.onLogin || '',
+            sessionTimeout: params.sessionTimeout || '',
+            idleTimeout: params.idleTimeout || '',
+            rateLimit: params.rateLimit || '',
+            sharedUsers: params.sharedUsers || '',
+            addressPool: params.addressPool || '',
+          },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              resolve({ success: false, error: `gRPC AddHotspotProfile failed: ${err.message}` });
+              return;
+            }
+            resolve({ success: !!resp?.success, error: resp?.success ? undefined : resp?.error });
+          },
+        );
+      })();
+    });
+  }
+
+  updateHotspotProfile(params: {
+    sessionId: string;
+    name: string;
+    onLogin?: string;
+    sessionTimeout?: string;
+    idleTimeout?: string;
+    rateLimit?: string;
+    sharedUsers?: string;
+    addressPool?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.UpdateHotspotProfile(
+          {
+            sessionId: params.sessionId,
+            name: params.name,
+            onLogin: params.onLogin || '',
+            sessionTimeout: params.sessionTimeout || '',
+            idleTimeout: params.idleTimeout || '',
+            rateLimit: params.rateLimit || '',
+            sharedUsers: params.sharedUsers || '',
+            addressPool: params.addressPool || '',
+          },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              resolve({ success: false, error: `gRPC UpdateHotspotProfile failed: ${err.message}` });
+              return;
+            }
+            resolve({ success: !!resp?.success, error: resp?.success ? undefined : resp?.error });
+          },
+        );
+      })();
+    });
+  }
+
+  deleteHotspotProfile(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DeleteHotspotProfile({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC DeleteHotspotProfile failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: !!resp?.success, error: resp?.success ? undefined : resp?.error });
+        });
+      })();
+    });
+  }
+
+  bulkRemoveHotspotUsers(
+    sessionId: string,
+    names: string[],
+  ): Promise<{ success: boolean; removed?: number; failedNames?: string[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 30);
+        this.client.BulkRemoveHotspotUsers({ sessionId, names }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC BulkRemoveHotspotUsers failed: ${err.message}` });
+            return;
+          }
+          resolve({
+            success: !!resp?.success,
+            removed: resp?.removed || 0,
+            failedNames: resp?.failedNames || [],
+            error: resp?.error,
+          });
+        });
+      })();
+    });
+  }
+
+  /** Fire-and-forget-ish: caller doesn't need to block the response on this. */
+  setupExpiryScheduler(sessionId: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) {
+          resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+          return;
+        }
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.SetupExpiryScheduler({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `gRPC SetupExpiryScheduler failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: !!resp?.success, error: resp?.success ? undefined : resp?.error });
+        });
+      })();
+    });
+  }
+
   /**
    * Fetch the router dashboard summary.
    */

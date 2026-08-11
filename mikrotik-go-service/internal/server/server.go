@@ -340,6 +340,194 @@ func (s *RouterServiceServer) GetHotspotProfile(ctx context.Context, req *pb.Get
 	return resp, nil
 }
 
+// AddHotspotProfile/UpdateHotspotProfile/DeleteHotspotProfile mirror
+// AddPppProfile/UpdatePppProfile/DeletePppProfile below exactly — generic
+// field passthrough. `on_login` is whatever script text the caller built
+// (erp-node-service owns that logic, ported from the monolith's
+// buildOnLoginScript); this layer doesn't interpret it.
+func (s *RouterServiceServer) AddHotspotProfile(ctx context.Context, req *pb.AddHotspotProfileRequest) (*pb.AddHotspotProfileResponse, error) {
+	resp := &pb.AddHotspotProfileResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	params := []string{"=name=" + req.Name}
+	if req.OnLogin != "" {
+		params = append(params, "=on-login="+req.OnLogin)
+	}
+	if req.SessionTimeout != "" {
+		params = append(params, "=session-timeout="+req.SessionTimeout)
+	}
+	if req.IdleTimeout != "" {
+		params = append(params, "=idle-timeout="+req.IdleTimeout)
+	}
+	if req.RateLimit != "" {
+		params = append(params, "=rate-limit="+req.RateLimit)
+	}
+	if req.SharedUsers != "" {
+		params = append(params, "=shared-users="+req.SharedUsers)
+	}
+	if req.AddressPool != "" {
+		params = append(params, "=address-pool="+req.AddressPool)
+	}
+	if _, err := c.Run("/ip/hotspot/user/profile/add", params...); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) UpdateHotspotProfile(ctx context.Context, req *pb.UpdateHotspotProfileRequest) (*pb.UpdateHotspotProfileResponse, error) {
+	resp := &pb.UpdateHotspotProfileResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ip/hotspot/user/profile/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Error = "hotspot profile tidak ditemukan"
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	params := []string{"=.id=" + id}
+	if req.OnLogin != "" {
+		params = append(params, "=on-login="+req.OnLogin)
+	}
+	if req.SessionTimeout != "" {
+		params = append(params, "=session-timeout="+req.SessionTimeout)
+	}
+	if req.IdleTimeout != "" {
+		params = append(params, "=idle-timeout="+req.IdleTimeout)
+	}
+	if req.RateLimit != "" {
+		params = append(params, "=rate-limit="+req.RateLimit)
+	}
+	if req.SharedUsers != "" {
+		params = append(params, "=shared-users="+req.SharedUsers)
+	}
+	if req.AddressPool != "" {
+		params = append(params, "=address-pool="+req.AddressPool)
+	}
+	if _, err := c.Run("/ip/hotspot/user/profile/set", params...); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) DeleteHotspotProfile(ctx context.Context, req *pb.DeleteHotspotProfileRequest) (*pb.DeleteHotspotProfileResponse, error) {
+	resp := &pb.DeleteHotspotProfileResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ip/hotspot/user/profile/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Success = true
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ip/hotspot/user/profile/remove", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+// BulkRemoveHotspotUsers loops RemoveHotspotUser server-side over a single
+// dialed connection, so the caller (bulk-delete in the UI) makes one
+// round-trip instead of N. Best-effort: one bad name doesn't abort the
+// rest — it's collected in failed_names instead.
+func (s *RouterServiceServer) BulkRemoveHotspotUsers(ctx context.Context, req *pb.BulkRemoveHotspotUsersRequest) (*pb.BulkRemoveHotspotUsersResponse, error) {
+	resp := &pb.BulkRemoveHotspotUsersResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	for _, name := range req.Names {
+		replies, err := c.Run("/ip/hotspot/user/print", "?name="+name)
+		if err != nil || len(replies) == 0 {
+			resp.FailedNames = append(resp.FailedNames, name)
+			continue
+		}
+		id := replies[0][".id"]
+		if _, err := c.Run("/ip/hotspot/user/remove", "=.id="+id); err != nil {
+			resp.FailedNames = append(resp.FailedNames, name)
+			continue
+		}
+		resp.Removed++
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+// SetupExpiryScheduler creates (or re-confirms) the "mikhmon-cleanup-expired"
+// scheduler that removes hotspot users whose comment holds an expiry date
+// that's passed. The script itself is ported verbatim from the monolith's
+// setupExpiryScheduler() — it's fixed/static, no per-call parameters.
+func (s *RouterServiceServer) SetupExpiryScheduler(ctx context.Context, req *pb.SetupExpirySchedulerRequest) (*pb.SetupExpirySchedulerResponse, error) {
+	resp := &pb.SetupExpirySchedulerResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	const schedulerName = "mikhmon-cleanup-expired"
+	const cleanupScript = `{ :local now [/system clock get date]; :if ([:pick $now 4 5] = "-") do={ :local arraybln {"01"="jan";"02"="feb";"03"="mar";"04"="apr";"05"="may";"06"="jun";"07"="jul";"08"="aug";"09"="sep";"10"="oct";"11"="nov";"12"="dec"}; :local tgl [:pick $now 8 10]; :local bulan [:pick $now 5 7]; :local tahun [:pick $now 0 4]; :local bln ($arraybln->$bulan); :set $now ($bln."/".$tgl."/".$tahun); }; :foreach u in=[/ip hotspot user find] do={ :local comment [/ip hotspot user get $u comment]; :local ucode [:pick $comment 0 2]; :if ($ucode != "vc" and $ucode != "up" and $comment != "") do={ :local expDate [:pick $comment 0 11]; :if ($expDate < $now) do={ /ip hotspot user remove $u; }; }; }; }`
+
+	existing, err := c.Run("/system/scheduler/print", "?name="+schedulerName)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(existing) > 0 {
+		if _, err := c.Run("/system/scheduler/set", "=.id="+existing[0][".id"], "=on-event="+cleanupScript); err != nil {
+			resp.Error = err.Error()
+			return resp, nil
+		}
+	} else {
+		_, err := c.Run("/system/scheduler/add",
+			"=name="+schedulerName,
+			"=interval=2h",
+			"=start-time=00:00:00",
+			"=on-event="+cleanupScript,
+			"=comment=mikhmon-auto-cleanup",
+			"=disabled=no",
+		)
+		if err != nil {
+			resp.Error = err.Error()
+			return resp, nil
+		}
+	}
+	resp.Success = true
+	return resp, nil
+}
+
 func (s *RouterServiceServer) GetSystemResource(ctx context.Context, req *pb.SystemResourceRequest) (*pb.SystemResourceResponse, error) {
 	resp := &pb.SystemResourceResponse{}
 	c, err := s.dial(ctx, req.SessionId)

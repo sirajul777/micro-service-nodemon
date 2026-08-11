@@ -5,12 +5,15 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermission } from '../auth/permissions.decorator';
+import { ProfileMetaService } from '../profile-meta/profile-meta.service';
+import { buildOnLoginScript, buildOnLoginHeader, parseOnLogin, mergeProfile } from './on-login-script';
 
 /**
  * Hotspot operations (dashboard / active users / user CRUD / profiles /
@@ -22,7 +25,10 @@ import { RequirePermission } from '../auth/permissions.decorator';
 @Controller('mikrotik')
 @UseGuards(JwtAuthGuard)
 export class HotspotController {
-  constructor(private readonly mikrotik: MikrotikGrpcClient) {}
+  constructor(
+    private readonly mikrotik: MikrotikGrpcClient,
+    private readonly profileMeta: ProfileMetaService,
+  ) {}
 
   // ── Dashboard ────────────────────────────────────────────────────
   @Get(':session/dashboard')
@@ -84,6 +90,18 @@ export class HotspotController {
     return this.mikrotik.removeHotspotUser(session, name);
   }
 
+  @Post(':session/hotspot/users/bulk-delete')
+  @RequirePermission('manageHotspot')
+  async bulkDeleteUsers(@Param('session') session: string, @Body() body: { names?: string[] }) {
+    const names = Array.isArray(body?.names) ? body.names.filter(Boolean) : [];
+    if (names.length === 0) return { success: false, error: 'names wajib diisi (array)' };
+    const resp = await this.mikrotik.bulkRemoveHotspotUsers(session, names);
+    if (!resp.success) {
+      return { success: false, error: resp.error || 'Gagal menghapus user' };
+    }
+    return { success: true, removed: resp.removed || 0, failed: resp.failedNames || [] };
+  }
+
   // ── Profiles ─────────────────────────────────────────────────────
   @Get(':session/hotspot/profiles')
   async listProfiles(@Param('session') session: string) {
@@ -91,7 +109,9 @@ export class HotspotController {
     if (!resp.success) {
       return { success: false, error: resp.error || 'Gagal memuat profile' };
     }
-    return { success: true, profiles: resp.profiles || [] };
+    const meta = await this.profileMeta.getAllForSession('hotspot', session);
+    const profiles = (resp.profiles || []).map((p: any) => mergeProfile(p, meta[p.name]));
+    return { success: true, profiles };
   }
 
   @Get(':session/hotspot/profiles/:name')
@@ -100,7 +120,123 @@ export class HotspotController {
     if (!resp.success) {
       return { success: false, error: resp.error || 'Profile tidak ditemukan' };
     }
-    return { success: true, profile: resp.profile };
+    if (!resp.profile) return { success: true, profile: null };
+    const meta = await this.profileMeta.get('hotspot', session, name);
+    return { success: true, profile: mergeProfile(resp.profile, meta) };
+  }
+
+  @Post(':session/hotspot/profiles')
+  @RequirePermission('manageHotspot')
+  async addProfile(@Param('session') session: string, @Body() body: any) {
+    if (!body?.name) return { success: false, error: 'name wajib diisi' };
+
+    const price = parseFloat(body.price) || 0;
+    const sprice = parseFloat(body.sprice) || 0;
+    const validity = (body.validity || '').trim();
+    const expmode = body.expmode || 'remc';
+    const lockUser = body.lockUser || '';
+
+    // Detect ROS version for the correct on-login script dialect.
+    const resInfo = await this.mikrotik.getSystemResource(session);
+    const rosVer = resInfo?.version?.charAt(0) === '6' ? '6' : '7';
+
+    const onLogin = buildOnLoginScript(expmode, price, validity, sprice, lockUser, body.name, rosVer);
+
+    const resp = await this.mikrotik.addHotspotProfile({
+      sessionId: session,
+      name: body.name,
+      onLogin,
+      sessionTimeout: body['session-timeout'] || '',
+      idleTimeout: body['idle-timeout'] || '',
+      rateLimit: body['rate-limit'] || '',
+      sharedUsers: body['shared-users'] || '',
+      addressPool: body['address-pool'] || '',
+    });
+    if (!resp.success) return { success: false, error: resp.error };
+
+    await this.profileMeta.set('hotspot', session, body.name, {
+      price,
+      validity,
+      ...(body.profileColor ? { profileColor: body.profileColor } : {}),
+      ...(body.caption !== undefined ? { caption: body.caption } : {}),
+    });
+    await this.mikrotik.setupExpiryScheduler(session); // best-effort, doesn't block the response on failure
+    return { success: true };
+  }
+
+  @Put(':session/hotspot/profiles/:name')
+  @RequirePermission('manageHotspot')
+  async editProfile(
+    @Param('session') session: string,
+    @Param('name') name: string,
+    @Body() body: any,
+  ) {
+    const existing = await this.mikrotik.getHotspotProfile(session, name);
+    if (!existing.success || !existing.profile) {
+      return { success: false, error: existing.error || 'Profile not found' };
+    }
+
+    const currentMeta = parseOnLogin(existing.profile.onLogin || '');
+    const newPrice = body.price !== undefined ? parseFloat(body.price) : currentMeta.price;
+    const newSprice = body.sprice !== undefined ? parseFloat(body.sprice) : currentMeta.sprice;
+    const newValidity = body.validity !== undefined ? (body.validity || '').trim() : currentMeta.validity;
+    const newExpmode = body.expmode !== undefined ? body.expmode : currentMeta.expmode;
+    const newLockUser = body.lockUser !== undefined ? body.lockUser : currentMeta.lockUser;
+
+    const resInfo = await this.mikrotik.getSystemResource(session);
+    const rosVer = resInfo?.version?.charAt(0) === '6' ? '6' : '7';
+
+    // Only rebuild the full script if MikHMon metadata actually changed —
+    // otherwise keep the existing script body, just refresh the header.
+    const metaChanged =
+      body.price !== undefined ||
+      body.validity !== undefined ||
+      body.expmode !== undefined ||
+      body.lockUser !== undefined;
+
+    let newOnLogin: string;
+    if (metaChanged) {
+      newOnLogin = buildOnLoginScript(newExpmode, newPrice, newValidity, newSprice, newLockUser, name, rosVer);
+    } else {
+      const header = buildOnLoginHeader(newExpmode, newPrice, newValidity, newSprice, newLockUser);
+      const oldBody = (existing.profile.onLogin || '').replace(/:put\s*\("[^"]*"\);?\s*/g, '').trim();
+      newOnLogin = oldBody ? `${header} ${oldBody}` : header;
+    }
+
+    const resp = await this.mikrotik.updateHotspotProfile({
+      sessionId: session,
+      name,
+      onLogin: newOnLogin,
+      sessionTimeout: body['session-timeout'] !== undefined ? body['session-timeout'] || '00:00:00' : '',
+      idleTimeout: body['idle-timeout'] !== undefined ? body['idle-timeout'] || '00:00:00' : '',
+      rateLimit: body['rate-limit'] !== undefined ? body['rate-limit'] || '' : '',
+      sharedUsers: body['shared-users'] !== undefined ? body['shared-users'] || '1' : '',
+      addressPool: body['address-pool'] !== undefined ? body['address-pool'] || 'none' : '',
+    });
+    if (!resp.success) return { success: false, error: resp.error };
+
+    await this.profileMeta.set('hotspot', session, name, {
+      price: newPrice,
+      validity: newValidity,
+      ...(body.profileColor ? { profileColor: body.profileColor } : {}),
+      ...(body.caption !== undefined ? { caption: body.caption } : {}),
+    });
+    await this.mikrotik.setupExpiryScheduler(session);
+    return { success: true };
+  }
+
+  @Delete(':session/hotspot/profiles/:name')
+  @RequirePermission('manageHotspot')
+  async deleteProfile(@Param('session') session: string, @Param('name') name: string) {
+    const resp = await this.mikrotik.deleteHotspotProfile(session, name);
+    if (!resp.success) return { success: false, error: resp.error || 'Not found' };
+    await this.profileMeta.remove('hotspot', session, name);
+    return { success: true };
+  }
+
+  @Get(':session/hotspot/profile-meta')
+  async getProfileMeta(@Param('session') session: string) {
+    return this.profileMeta.getAllForSession('hotspot', session);
   }
 
   // ── Interfaces ───────────────────────────────────────────────────
