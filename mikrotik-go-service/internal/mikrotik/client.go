@@ -221,10 +221,12 @@ func (c *Client) readReplies(terminator string) ([]Sentence, error) {
 					break
 				}
 				if strings.HasPrefix(w, "=") {
-					eq := strings.IndexByte(w, '=')
-					key := w[1:eq]
-					val := w[eq+1:]
-					s[key] = val
+					rest := w[1:]
+					if eq := strings.IndexByte(rest, '='); eq >= 0 {
+						key := rest[:eq]
+						val := rest[eq+1:]
+						s[key] = val
+					}
 				}
 			}
 			out = append(out, s)

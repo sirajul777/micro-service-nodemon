@@ -1,0 +1,30 @@
+diff --git a/mikrotik-go-service/internal/mikrotik/client.go b/mikrotik-go-service/internal/mikrotik/client.go
+index 00176d9..9f90551 100644
+--- a/mikrotik-go-service/internal/mikrotik/client.go
++++ b/mikrotik-go-service/internal/mikrotik/client.go
+@@ -221,10 +221,21 @@ func (c *Client) readReplies(terminator string) ([]Sentence, error) {
+ 					break
+ 				}
+ 				if strings.HasPrefix(w, "=") {
+-					eq := strings.IndexByte(w, '=')
+-					key := w[1:eq]
+-					val := w[eq+1:]
+-					s[key] = val
++					// w is formatted "=key=value" (RouterOS API attribute
++					// word) — e.g. "=identity=MyRouter". The previous code
++					// searched for '=' from the start of w, which always
++					// finds the LEADING '=' itself at index 0 (since w
++					// starts with it), not the separator between key and
++					// value. That made `w[1:eq]` evaluate to `w[1:0]`,
++					// an invalid slice (low > high), panicking on every
++					// single attribute in every real "!re" reply — i.e.
++					// any router that actually responded successfully.
++					rest := w[1:]
++					if eq := strings.IndexByte(rest, '='); eq >= 0 {
++						key := rest[:eq]
++						val := rest[eq+1:]
++						s[key] = val
++					}
+ 				}
+ 			}
+ 			out = append(out, s)
