@@ -1,0 +1,281 @@
+diff --git a/bot-py-service/db.py b/bot-py-service/db.py
+index 37cb2b2..c8b032e 100644
+--- a/bot-py-service/db.py
++++ b/bot-py-service/db.py
+@@ -15,7 +15,7 @@ SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocom
+ def init_db():
+     """Create tables if they don't exist (dev convenience)."""
+     Base.metadata.create_all(bind=engine)
+-    log.info("db_bot schema ensured (bot_resellers, topup_logs, telegram_configs)")
++    log.info("db_bot schema ensured (resellers, bot_resellers, topup_logs, telegram_configs)")
+ 
+ 
+ def get_session():
+diff --git a/bot-py-service/models.py b/bot-py-service/models.py
+index e4e3261..e71a9fd 100644
+--- a/bot-py-service/models.py
++++ b/bot-py-service/models.py
+@@ -29,6 +29,26 @@ class BotReseller(Base):
+     note = Column(String, nullable=True)
+ 
+ 
++class Reseller(Base):
++    """Plain price-discount reseller, tied to a router session — distinct
++    from BotReseller (the Telegram-bot/saldo-based reseller system above).
++    Mirrors the monolith's ResellerEntity (table `resellers`) exactly.
++    These were previously (incorrectly) served from the BotReseller table,
++    which meant a plain reseller's `phone`/`address` were silently dropped
++    (BotReseller has no such columns) and the two feature's data was mixed
++    together in both listings.
++    """
++    __tablename__ = "resellers"
++
++    id = Column(String, primary_key=True)
++    name = Column(String, nullable=False)
++    phone = Column(String, nullable=True)
++    address = Column(String, nullable=True)
++    discount = Column(Float, default=0)
++    createdAt = Column(DateTime, server_default=func.now())
++    router = Column(String, nullable=True)
++
++
+ class TopupLog(Base):
+     __tablename__ = "topup_logs"
+ 
+diff --git a/bot-py-service/rest_api.py b/bot-py-service/rest_api.py
+index 7520fc6..b139d5e 100644
+--- a/bot-py-service/rest_api.py
++++ b/bot-py-service/rest_api.py
+@@ -132,14 +132,51 @@ def _route_resellers(self, method: str, parts: list[str]):
+         return True
+     is_bot = parts[0] == "bot-resellers"
+ 
+-    # GET /resellers/session/:session
+-    if method == "GET" and len(parts) == 3 and parts[1] == "session":
+-        session = parts[2]
+-        rows = [r for r in reseller_service.load_all() if r.get("sessionId") == session]
+-        return _json(self, 200, rows)
+-
++    # ── Plain /resellers: separate table from bot-resellers (see Reseller
++    # in models.py) — these must NOT be served from reseller_service's
++    # BotReseller-backed functions, or a plain reseller's phone/address
++    # silently vanish (BotReseller has no such columns) and both feature's
++    # listings get each other's rows mixed in.
++    if not is_bot:
++        # GET /resellers/session/:session
++        if method == "GET" and len(parts) == 3 and parts[1] == "session":
++            return _json(self, 200, reseller_service.load_by_router(parts[2]))
++
++        # GET /resellers (list)
++        if method == "GET" and len(parts) == 1:
++            return _json(self, 200, reseller_service.load_all_plain())
++
++        # GET /resellers/:id
++        if method == "GET" and len(parts) == 2:
++            r = reseller_service.get_plain_by_id(parts[1])
++            if not r:
++                return _json(self, 404, {"success": False, "message": "Not found"})
++            return _json(self, 200, r)
++
++        # POST /resellers (upsert)
++        if method == "POST" and len(parts) == 1:
++            body = _read_body(self)
++            r = reseller_service.upsert_plain(body)
++            return _json(self, 200, {"success": True, "reseller": r})
++
++        # PUT /resellers/:id (update)
++        if method == "PUT" and len(parts) == 2:
++            body = _read_body(self)
++            body["id"] = parts[1]
++            r = reseller_service.upsert_plain(body)
++            return _json(self, 200, {"success": True, "reseller": r})
++
++        # DELETE /resellers/:id — real delete, matching the monolith's
++        # ResellerService.delete() (a hard `DELETE FROM resellers`).
++        if method == "DELETE" and len(parts) == 2:
++            ok = reseller_service.delete_plain(parts[1])
++            return _json(self, 200, {"success": ok})
++
++        return _json(self, 404, {"success": False, "message": f"Unknown route: {self.path}"})
++
++    # ── /bot-resellers: Telegram-bot/saldo-based reseller system ───────
+     # GET /bot-resellers/logs
+-    if method == "GET" and is_bot and len(parts) >= 2 and parts[1] == "logs":
++    if method == "GET" and len(parts) >= 2 and parts[1] == "logs":
+         # query params come through self.path
+         q = self.path.split("?", 1)[1] if "?" in self.path else ""
+         params = dict(re.findall(r"([^&=]+)=([^&]*)", q))
+@@ -148,35 +185,38 @@ def _route_resellers(self, method: str, parts: list[str]):
+         logs = reseller_service.load_logs(rid, limit)
+         return _json(self, 200, logs)
+ 
+-    # GET /resellers (list)
++    # GET /bot-resellers (list)
+     if method == "GET" and len(parts) == 1:
+         return _json(self, 200, reseller_service.load_all())
+ 
+-    # GET /resellers/:id
++    # GET /bot-resellers/:id
+     if method == "GET" and len(parts) == 2:
+         r = reseller_service.get_by_id(parts[1])
+         if not r:
+             return _json(self, 404, {"success": False, "message": "Not found"})
+         return _json(self, 200, r)
+ 
+-    # POST /resellers (upsert)
++    # POST /bot-resellers (upsert)
+     if method == "POST" and len(parts) == 1:
+         body = _read_body(self)
+         r = reseller_service.upsert(body)
+         return _json(self, 200, {"success": True, "reseller": r})
+ 
+-    # PUT /resellers/:id (update)
++    # PUT /bot-resellers/:id (update)
+     if method == "PUT" and len(parts) == 2:
+         body = _read_body(self)
+         body["id"] = parts[1]
+         r = reseller_service.upsert(body)
+         return _json(self, 200, {"success": True, "reseller": r})
+ 
+-    # DELETE /resellers/:id
++    # DELETE /bot-resellers/:id — real delete, matching the monolith's
++    # BotResellerService.delete(). Previously this soft-deleted (status=
++    # 'inactive') instead because delete() wasn't exposed in the service
++    # layer at all — a deleted reseller would keep showing up everywhere
++    # that doesn't explicitly filter status='active'.
+     if method == "DELETE" and len(parts) == 2:
+-        # delete not exposed in service layer; soft-delete via status inactive
+-        reseller_service.upsert({"id": parts[1], "status": "inactive"})
+-        return _json(self, 200, {"success": True})
++        ok = reseller_service.delete(parts[1])
++        return _json(self, 200, {"success": ok})
+ 
+     # PATCH /bot-resellers/:id/toggle
+     if method == "PATCH" and len(parts) == 3 and parts[2] == "toggle":
+diff --git a/bot-py-service/services/reseller_service.py b/bot-py-service/services/reseller_service.py
+index 4083f8d..adb8645 100644
+--- a/bot-py-service/services/reseller_service.py
++++ b/bot-py-service/services/reseller_service.py
+@@ -3,7 +3,7 @@ import logging
+ from datetime import datetime
+ 
+ from db import get_session
+-from models import BotReseller, TopupLog
++from models import BotReseller, Reseller, TopupLog
+ 
+ log = logging.getLogger("bot-py-service.reseller")
+ 
+@@ -170,6 +170,113 @@ def refund_saldo(telegram_id, amount, note):
+         s.close()
+ 
+ 
++def delete(reseller_id) -> bool:
++    """Hard-delete a bot-reseller. Previously this wasn't exposed at all —
++    rest_api.py's DELETE handler fell back to soft-deleting (status=
++    'inactive') instead, which doesn't match the monolith's
++    BotResellerService.delete() (a real `DELETE FROM bot_resellers`)."""
++    s = get_session()
++    try:
++        row = s.query(BotReseller).filter(BotReseller.id == reseller_id).first()
++        if not row:
++            return False
++        s.delete(row)
++        s.commit()
++        return True
++    finally:
++        s.close()
++
++
++# ── Plain reseller (price-discount, tied to a router session) ──────
++# Separate table/model from BotReseller above — see Reseller in models.py
++# for why these must not share a data store.
++
++def _to_dict_plain(r: Reseller) -> dict:
++    return {
++        "id": r.id,
++        "name": r.name,
++        "phone": r.phone or "",
++        "address": r.address or "",
++        "discount": r.discount or 0,
++        "createdAt": r.createdAt.isoformat() if r.createdAt else "",
++        "router": r.router or "",
++    }
++
++
++def load_all_plain():
++    s = get_session()
++    try:
++        return [_to_dict_plain(r) for r in s.query(Reseller).all()]
++    finally:
++        s.close()
++
++
++def load_by_router(router: str):
++    s = get_session()
++    try:
++        rows = s.query(Reseller).filter(Reseller.router == router).all()
++        return [_to_dict_plain(r) for r in rows]
++    finally:
++        s.close()
++
++
++def get_plain_by_id(reseller_id):
++    s = get_session()
++    try:
++        r = s.query(Reseller).filter(Reseller.id == reseller_id).first()
++        return _to_dict_plain(r) if r else None
++    finally:
++        s.close()
++
++
++def upsert_plain(data: dict):
++    reseller_id = data.get("id")
++    if not reseller_id:
++        # Mirror the monolith's id-from-name convention exactly
++        # (ResellerService.save_reseller): uppercase, non-alnum -> '_',
++        # truncated to 20 chars.
++        import re as _re
++        reseller_id = _re.sub(r"[^A-Z0-9]", "_", (data.get("name") or "").upper())[:20]
++
++    s = get_session()
++    try:
++        row = s.query(Reseller).filter(Reseller.id == reseller_id).first()
++        if not row:
++            row = Reseller(
++                id=reseller_id,
++                name=data.get("name", ""),
++                phone=data.get("phone", ""),
++                address=data.get("address", ""),
++                discount=data.get("discount", 0),
++                router=data.get("router", ""),
++            )
++            s.add(row)
++        else:
++            row.name = data.get("name", row.name)
++            row.phone = data.get("phone", row.phone)
++            row.address = data.get("address", row.address)
++            row.discount = data.get("discount", row.discount)
++            row.router = data.get("router", row.router)
++        s.commit()
++        s.refresh(row)
++        return _to_dict_plain(row)
++    finally:
++        s.close()
++
++
++def delete_plain(reseller_id) -> bool:
++    s = get_session()
++    try:
++        row = s.query(Reseller).filter(Reseller.id == reseller_id).first()
++        if not row:
++            return False
++        s.delete(row)
++        s.commit()
++        return True
++    finally:
++        s.close()
++
++
+ def load_logs(reseller_id=None, limit=100):
+     s = get_session()
+     try:
