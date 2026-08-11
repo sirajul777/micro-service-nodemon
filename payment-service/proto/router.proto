@@ -18,6 +18,12 @@ service RouterService {
   rpc ListHotspotUsers(ListHotspotUsersRequest) returns (ListHotspotUsersResponse);
   rpc AddHotspotUser(AddHotspotUserRequest) returns (AddHotspotUserResponse);
   rpc RemoveHotspotUser(RemoveHotspotUserRequest) returns (RemoveHotspotUserResponse);
+  // Suspend/restore a hotspot customer without deleting their account —
+  // mirrors DisablePppSecret/EnablePppSecret below. Needed by
+  // payment-service's billing overdue-suspension flow (billing customers
+  // whose `type` is 'hotspot' rather than 'pppoe').
+  rpc DisableHotspotUser(DisableHotspotUserRequest) returns (DisableHotspotUserResponse);
+  rpc EnableHotspotUser(EnableHotspotUserRequest) returns (EnableHotspotUserResponse);
 
   // Hotspot profiles
   rpc ListHotspotProfiles(ListProfilesRequest) returns (ListProfilesResponse);
@@ -150,6 +156,23 @@ message RemoveHotspotUserRequest {
   string name = 2;
 }
 message RemoveHotspotUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DisableHotspotUserRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message DisableHotspotUserResponse {
+  bool success = 1;
+  string error = 2;
+}
+message EnableHotspotUserRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message EnableHotspotUserResponse {
   bool success = 1;
   string error = 2;
 }

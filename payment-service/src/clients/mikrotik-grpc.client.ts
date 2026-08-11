@@ -119,4 +119,52 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
       );
     });
   }
+
+  // ── Billing suspension (overdue → suspend, paid/re-enable → restore) ──
+  // Used by BillingController's run-overdue / re-enable endpoints. Two
+  // variants because a billing customer's `type` determines which RouterOS
+  // subsystem they live under (hotspot user vs ppp secret) — same split
+  // the monolith's billing.controller.ts made.
+
+  private callSimple(
+    method: string,
+    sessionId: string,
+    name: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      if (!this.client) {
+        resolve({ success: false, error: 'mikrotik gRPC client not initialized' });
+        return;
+      }
+      const deadline = new Date();
+      deadline.setSeconds(deadline.getSeconds() + 15);
+      this.client[method](
+        { sessionId, name },
+        { deadline },
+        (err: any, resp: any) => {
+          if (err) {
+            resolve({ success: false, error: `mikrotik gRPC ${method} failed: ${err.message}` });
+            return;
+          }
+          resolve({ success: !!resp?.success, error: resp?.success ? undefined : resp?.error });
+        },
+      );
+    });
+  }
+
+  disableHotspotUser(sessionId: string, name: string) {
+    return this.callSimple('DisableHotspotUser', sessionId, name);
+  }
+
+  enableHotspotUser(sessionId: string, name: string) {
+    return this.callSimple('EnableHotspotUser', sessionId, name);
+  }
+
+  disablePppSecret(sessionId: string, name: string) {
+    return this.callSimple('DisablePppSecret', sessionId, name);
+  }
+
+  enablePppSecret(sessionId: string, name: string) {
+    return this.callSimple('EnablePppSecret', sessionId, name);
+  }
 }

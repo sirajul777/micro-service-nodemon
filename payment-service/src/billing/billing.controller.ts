@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { BillingService } from './billing.service';
+import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermission } from '../auth/permissions.decorator';
 
@@ -26,7 +27,10 @@ import { RequirePermission } from '../auth/permissions.decorator';
 @UseGuards(JwtAuthGuard)
 @RequirePermission('manageBilling')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly mikrotikGrpc: MikrotikGrpcClient,
+  ) {}
 
   // ── Stats ────────────────────────────────────────────────────────
 
@@ -113,21 +117,51 @@ export class BillingController {
 
   // ── Overdue / re-enable ──────────────────────────────────────────
 
-@Post('run-overdue')
+  @Post('run-overdue')
   async runOverdue(@Param('session') session: string) {
-    const flagged = await this.billingService.flagOverdueInvoices(session);
+    const { count, customers } = await this.billingService.flagOverdueInvoices(session);
+
+    let disabled = 0;
+    const errors: string[] = [];
+    for (const cust of customers) {
+      if (cust.status === 'suspended' || !cust.mikrotikUser) continue; // already suspended / nothing to disable
+      const result =
+        cust.type === 'pppoe'
+          ? await this.mikrotikGrpc.disablePppSecret(session, cust.mikrotikUser)
+          : await this.mikrotikGrpc.disableHotspotUser(session, cust.mikrotikUser);
+      if (result.success) {
+        cust.status = 'suspended';
+        await this.billingService.saveCustomer(cust);
+        disabled++;
+      } else {
+        errors.push(`${cust.name || cust.mikrotikUser}: ${result.error || 'unknown error'}`);
+      }
+    }
+
     return {
       success: true,
-      total: flagged,
-      disabled: 0,
-      message: `${flagged} overdue invoice(s) flagged. Router suspension requires the Go service.`,
+      total: count,
+      disabled,
+      errors: errors.length ? errors : undefined,
+      message: `${count} overdue invoice(s) flagged, ${disabled} customer(s) suspended on the router.`,
     };
   }
 
   @Post('customers/:id/re-enable')
-  async reEnable(@Param('id') id: string) {
+  async reEnable(@Param('session') session: string, @Param('id') id: string) {
     const cust = await this.billingService.getCustomer(id);
     if (!cust) return { error: 'Not found' };
+
+    if (cust.mikrotikUser) {
+      const result =
+        cust.type === 'pppoe'
+          ? await this.mikrotikGrpc.enablePppSecret(session, cust.mikrotikUser)
+          : await this.mikrotikGrpc.enableHotspotUser(session, cust.mikrotikUser);
+      if (!result.success) {
+        return { error: result.error || 'Gagal mengaktifkan kembali akses di router' };
+      }
+    }
+
     cust.status = 'active';
     await this.billingService.saveCustomer(cust);
     return { success: true };

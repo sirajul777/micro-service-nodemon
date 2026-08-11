@@ -27,3 +27,8 @@ __pycache__/
 # IDE
 .idea/
 .vscode/
+
+# TypeScript incremental build cache (must never be committed — a stale
+# cache can trick `tsc --incremental` into emitting ZERO output files on a
+# fresh clone, silently, with exit code 0).
+*.tsbuildinfo

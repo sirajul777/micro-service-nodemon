@@ -243,11 +243,27 @@ async verifySettlement(id: string): Promise<boolean> {
   }
 
   /** Flag all unpaid, past-due invoices as 'overdue'. Returns the count. */
-  async flagOverdueInvoices(sessionId: string): Promise<number> {
+  /**
+   * Flag unpaid-and-past-due invoices as 'overdue'. Returns the affected
+   * customers too (deduplicated) so the caller (BillingController) can
+   * actually suspend their router access — this service layer intentionally
+   * doesn't touch the router itself; it has no MikrotikGrpcClient, and
+   * mixing router I/O into invoice bookkeeping would make this method much
+   * harder to test/reason about.
+   */
+  async flagOverdueInvoices(
+    sessionId: string,
+  ): Promise<{ count: number; customers: BillingCustomerEntity[] }> {
     const overdue = await this.getOverdueCustomers(sessionId);
-    for (const { invoice } of overdue) {
+    const seen = new Set<string>();
+    const customers: BillingCustomerEntity[] = [];
+    for (const { invoice, customer } of overdue) {
       await this.invoiceRepo.update({ id: invoice.id }, { status: 'overdue' });
+      if (!seen.has(customer.id)) {
+        seen.add(customer.id);
+        customers.push(customer);
+      }
     }
-    return overdue.length;
+    return { count: overdue.length, customers };
   }
 }

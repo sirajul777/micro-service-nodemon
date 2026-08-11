@@ -219,6 +219,63 @@ func (s *RouterServiceServer) RemoveHotspotUser(ctx context.Context, req *pb.Rem
 	return resp, nil
 }
 
+// DisableHotspotUser and EnableHotspotUser suspend/restore a customer
+// without deleting their voucher — used by payment-service's billing
+// overdue-suspension flow. Mirrors DisablePppSecret/EnablePppSecret below.
+func (s *RouterServiceServer) DisableHotspotUser(ctx context.Context, req *pb.DisableHotspotUserRequest) (*pb.DisableHotspotUserResponse, error) {
+	resp := &pb.DisableHotspotUserResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ip/hotspot/user/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Error = "hotspot user tidak ditemukan"
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ip/hotspot/user/disable", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
+func (s *RouterServiceServer) EnableHotspotUser(ctx context.Context, req *pb.EnableHotspotUserRequest) (*pb.EnableHotspotUserResponse, error) {
+	resp := &pb.EnableHotspotUserResponse{}
+	c, err := s.dial(ctx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	replies, err := c.Run("/ip/hotspot/user/print", "?name="+req.Name)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	if len(replies) == 0 {
+		resp.Error = "hotspot user tidak ditemukan"
+		return resp, nil
+	}
+	id := replies[0][".id"]
+	if _, err := c.Run("/ip/hotspot/user/enable", "=.id="+id); err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	resp.Success = true
+	return resp, nil
+}
+
 func (s *RouterServiceServer) ListHotspotProfiles(ctx context.Context, req *pb.ListProfilesRequest) (*pb.ListProfilesResponse, error) {
 	resp := &pb.ListProfilesResponse{}
 	c, err := s.dial(ctx, req.SessionId)
