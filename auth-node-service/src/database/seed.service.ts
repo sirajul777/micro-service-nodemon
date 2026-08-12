@@ -2,8 +2,23 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { UserEntity } from '../entities/user.entity';
 import { AppConfigEntity } from '../entities/app-config.entity';
+
+const CIPHER_KEY = (process.env.CIPHER_KEY || 'mikhmon16bytekey').padEnd(16).slice(0, 16);
+
+/** Same AES-128-CBC scheme as config.service.ts's encrypt() — duplicated
+ * here (rather than injecting ConfigService) to avoid a circular module
+ * dependency at bootstrap time. Keep these two in sync if the cipher ever
+ * changes. */
+function encryptAdminPass(text: string): string {
+  const iv = crypto.randomBytes(16);
+  const key = Buffer.from(CIPHER_KEY);
+  const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
+  const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+  return iv.toString('base64') + ':' + encrypted.toString('base64');
+}
 
 /**
  * Seeds the default admin user (mikhmon/1234) and the legacy admin config
@@ -61,7 +76,13 @@ export class SeedService implements OnModuleInit {
       this.configRepo.create({
         key: 'default',
         adminUser: 'mikhmon',
-        adminPass: '1234',
+        // Must match config.service.ts's own encrypted-at-rest convention —
+        // this previously stored the plaintext '1234' directly. It happened
+        // to still authenticate correctly (ConfigService.decrypt() falls
+        // back to returning its input verbatim when it can't parse the
+        // iv:ciphertext format), but the admin password sat in the
+        // database completely unencrypted until the first password change.
+        adminPass: encryptAdminPass('1234'),
         currency: 'Rp',
       }),
     );
