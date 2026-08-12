@@ -63,7 +63,7 @@ export class AuthService {
       username: user.username,
       name: user.name,
       role: user.role,
-      permissions: user.permissions || {},
+      permissions: user.permissions ? { ...user.permissions } as Record<string, boolean> : {},
       allowedSessions: user.allowedSessions || [],
     };
     const token = await this.jwtService.signAsync(payload);
@@ -105,7 +105,7 @@ export class AuthService {
       username: user.username,
       name: user.name,
       role: user.role,
-      permissions: user.permissions || {},
+      permissions: user.permissions ? { ...user.permissions } as Record<string, boolean> : {},
       allowedSessions: user.allowedSessions || [],
     };
   }
