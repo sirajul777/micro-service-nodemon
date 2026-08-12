@@ -69,37 +69,38 @@ func handleVoucherBatchCreated(ctx context.Context, routerServer *server.RouterS
 		return fmt.Errorf("voucher.batch.created missing batchId")
 	}
 
+	// Read the router once. The previous implementation queried the complete
+	// hotspot user list for every voucher, turning a batch of N vouchers into
+	// N router round-trips (and O(N²) comparisons). A single snapshot is both
+	// faster and less likely to overload the router.
+	users, err := routerServer.ListHotspotUsers(ctx, &pb.ListHotspotUsersRequest{SessionId: batch.SessionID})
+	if err != nil {
+		return fmt.Errorf("list router users for batch %s: %w", batch.BatchID, err)
+	}
+	if !users.Success {
+		return fmt.Errorf("list router users for batch %s: %s", batch.BatchID, users.Error)
+	}
+
+	existingByName := make(map[string]*pb.HotspotUser, len(users.Users))
+	for _, user := range users.Users {
+		if user.Name != "" {
+			existingByName[user.Name] = user
+		}
+	}
+
 	for _, voucher := range batch.Vouchers {
 		if voucher.Username == "" || voucher.Profile == "" {
 			return fmt.Errorf("batch %s contains voucher with missing username/profile", batch.BatchID)
 		}
 
-		// Redis Streams can redeliver a message after a crash. Check the router
-		// before creating the user so replay is idempotent.
-		users, err := routerServer.ListHotspotUsers(ctx, &pb.ListHotspotUsersRequest{
-			SessionId: batch.SessionID,
-		})
-		if err != nil {
-			return fmt.Errorf("list router users for %s: %w", voucher.Username, err)
-		}
-		if !users.Success {
-			return fmt.Errorf("list router users for %s: %s", voucher.Username, users.Error)
-		}
-
-		exists := false
-		for _, existing := range users.Users {
-			if existing.Name != voucher.Username {
-				continue
-			}
-			exists = true
-			// Do not overwrite an existing RouterOS account that has a
-			// different profile/password. Treat that as a real conflict.
+		if existing, ok := existingByName[voucher.Username]; ok {
+			// Redis Streams can redeliver a message after a crash. If the same
+			// account is already configured, treat the replay as successful.
+			// Never overwrite an existing account with a different password or
+			// profile because it may belong to another batch/customer.
 			if existing.Profile != voucher.Profile || existing.Password != voucher.Password {
 				return fmt.Errorf("router user %q already exists with different configuration", voucher.Username)
 			}
-			break
-		}
-		if exists {
 			continue
 		}
 
@@ -115,6 +116,15 @@ func handleVoucherBatchCreated(ctx context.Context, routerServer *server.RouterS
 		}
 		if !res.Success {
 			return fmt.Errorf("add hotspot user %s: %s", voucher.Username, res.Error)
+		}
+
+		// Keep the in-memory snapshot consistent if the event contains the
+		// same username more than once. A duplicate within one event is still
+		// treated as a conflict on the next iteration.
+		existingByName[voucher.Username] = &pb.HotspotUser{
+			Name:     voucher.Username,
+			Password: voucher.Password,
+			Profile:  voucher.Profile,
 		}
 	}
 
