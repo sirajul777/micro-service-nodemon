@@ -1,6 +1,7 @@
 package mikrotik
 
 import (
+	"bufio"
 	"context"
 	"net"
 	"strconv"
@@ -40,9 +41,8 @@ func DialContext(ctx context.Context, host, user, password string, opts ...Optio
 		w:    bufio.NewWriter(conn),
 	}
 
-	// Close the socket as soon as the caller's context is cancelled. This is
-	// required because bufio.Reader/Writer operations do not otherwise know
-	// about context cancellation.
+	// RouterOS API reads/writes are blocking. Close the socket when the
+	// request context is cancelled so the blocked operation is interrupted.
 	done := make(chan struct{})
 	go func() {
 		select {
@@ -58,8 +58,5 @@ func DialContext(ctx context.Context, host, user, password string, opts ...Optio
 		return nil, err
 	}
 
-	// Keep the watcher alive until the client is explicitly closed. The
-	// existing Client.Close method closes the socket, which is sufficient for
-	// unblocking any active operation.
 	return c, nil
 }
