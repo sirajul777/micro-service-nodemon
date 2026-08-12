@@ -1,14 +1,10 @@
 // Package redis implements the Redis event consumer for the MikroTik service.
-//
-// It subscribes to stream/topic events published by other services and reacts
-// to them. In Phase 2 the primary consumer is `voucher.batch.created` — when
-// the ERP service creates a voucher batch, this service pushes the hotspot
-// users onto the router.
 package redis
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -17,58 +13,53 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Event is a decodable broker event.
 type Event struct {
 	Type      string          `json:"type"`
 	SessionID string          `json:"sessionId"`
 	Data      json.RawMessage `json:"data"`
 }
 
-// Handler processes a decoded event.
-type Handler func(ctx context.Context, ev Event) error
+type Handler func(context.Context, Event) error
 
-// Consumer subscribes to Redis pub/sub topics.
 type Consumer struct {
-	client     *redis.Client
-	topics     []string
-	handler    Handler
-	useStreams bool
-	group      string
-	consumer   string
+	client        *redis.Client
+	topics        []string
+	handler       Handler
+	useStreams    bool
+	group         string
+	consumer      string
+	maxDeliveries int64
+	dlqSuffix     string
 }
 
-// NewConsumer connects to Redis and prepares a subscription.
 func NewConsumer(host string, port int, password string, topics []string, handler Handler) *Consumer {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     host + ":" + strconv.Itoa(port),
-		Password: password,
-	})
-	useStreams := false
-	if os.Getenv("USE_REDIS_STREAMS") == "true" {
-		useStreams = true
-	}
-	group := os.Getenv("REDIS_STREAM_GROUP")
-	if group == "" {
-		group = "mikrotik-group"
+	rdb := redis.NewClient(&redis.Options{Addr: host + ":" + strconv.Itoa(port), Password: password})
+	maxDeliveries := int64(5)
+	if n, err := strconv.ParseInt(envOrDefault("REDIS_MAX_DELIVERIES", "5"), 10, 64); err == nil && n > 0 {
+		maxDeliveries = n
 	}
 	cname, _ := os.Hostname()
-	consumerName := cname + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	return &Consumer{
-		client:     rdb,
-		topics:     topics,
-		handler:    handler,
-		useStreams: useStreams,
-		group:      group,
-		consumer:   consumerName,
+		client:        rdb,
+		topics:        topics,
+		handler:       handler,
+		useStreams:    os.Getenv("USE_REDIS_STREAMS") == "true",
+		group:         envOrDefault("REDIS_STREAM_GROUP", "mikrotik-group"),
+		consumer:      cname + "-" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		maxDeliveries: maxDeliveries,
+		dlqSuffix:     envOrDefault("REDIS_DLQ_SUFFIX", ".dlq"),
 	}
 }
 
-// Start begins consuming from the configured topics in the background.
-func (c *Consumer) Start(ctx context.Context) {
-	go c.loop(ctx)
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
-// loop re-connects and consumes until ctx is cancelled.
+func (c *Consumer) Start(ctx context.Context) { go c.loop(ctx) }
+
 func (c *Consumer) loop(ctx context.Context) {
 	for {
 		select {
@@ -76,8 +67,7 @@ func (c *Consumer) loop(ctx context.Context) {
 			return
 		default:
 		}
-		err := c.consumeOnce(ctx)
-		if err != nil {
+		if err := c.consumeOnce(ctx); err != nil {
 			log.Printf("[mikrotik-go-service] redis consume error: %v (retrying in 3s)", err)
 			select {
 			case <-ctx.Done():
@@ -88,65 +78,131 @@ func (c *Consumer) loop(ctx context.Context) {
 	}
 }
 
-// claimStalePending reclaims and reprocesses messages that have been
-// sitting in another (likely dead) consumer's PEL for longer than
-// minIdle. This is what actually bounds the damage from a crash or a
-// deploy that kills a consumer mid-handler: without it, a message whose
-// original consumer died before acking would sit in the stream forever,
-// invisible to new reads (XREADGROUP only returns '>' i.e. never-delivered
-// entries), and delivery quietly stops for that message.
+func (c *Consumer) deadLetter(ctx context.Context, stream, messageID, reason string, payload any, attempts int64) error {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal dlq payload: %w", err)
+	}
+	_, err = c.client.XAdd(ctx, &redis.XAddArgs{
+		Stream: stream + c.dlqSuffix,
+		Values: map[string]any{
+			"originalStream":   stream,
+			"originalMessageId": messageID,
+			"reason":            reason,
+			"attempts":          attempts,
+			"failedAt":          time.Now().UTC().Format(time.RFC3339Nano),
+			"payload":           string(raw),
+		},
+	}).Result()
+	if err != nil {
+		return fmt.Errorf("write dlq: %w", err)
+	}
+	return nil
+}
+
+func (c *Consumer) ack(ctx context.Context, stream, id string) error {
+	_, err := c.client.XAck(ctx, stream, c.group, id).Result()
+	return err
+}
+
+func (c *Consumer) handleStreamMessage(ctx context.Context, stream string, msg redis.XMessage, attempts int64) {
+	raw, ok := msg.Values["data"].(string)
+	if !ok {
+		if b, ok2 := msg.Values["data"].([]byte); ok2 {
+			raw = string(b)
+		}
+	}
+	if raw == "" {
+		if err := c.deadLetter(ctx, stream, msg.ID, "missing data field", msg.Values, attempts); err != nil {
+			log.Printf("[mikrotik-go-service] DLQ failed for %s: %v", msg.ID, err)
+			return
+		}
+		if err := c.ack(ctx, stream, msg.ID); err != nil {
+			log.Printf("[mikrotik-go-service] xack after DLQ failed: %v", err)
+		}
+		return
+	}
+
+	var ev Event
+	if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+		if dlqErr := c.deadLetter(ctx, stream, msg.ID, "invalid JSON event", raw, attempts); dlqErr != nil {
+			log.Printf("[mikrotik-go-service] DLQ failed for malformed message %s: %v", msg.ID, dlqErr)
+			return
+		}
+		if err := c.ack(ctx, stream, msg.ID); err != nil {
+			log.Printf("[mikrotik-go-service] xack after malformed DLQ failed: %v", err)
+		}
+		return
+	}
+	if ev.Type == "" || ev.SessionID == "" || len(ev.Data) == 0 {
+		reason := "missing event data"
+		if ev.Type == "" {
+			reason = "missing event type"
+		} else if ev.SessionID == "" {
+			reason = "missing sessionId"
+		}
+		if dlqErr := c.deadLetter(ctx, stream, msg.ID, reason, ev, attempts); dlqErr != nil {
+			log.Printf("[mikrotik-go-service] DLQ failed for %s: %v", msg.ID, dlqErr)
+			return
+		}
+		if err := c.ack(ctx, stream, msg.ID); err != nil {
+			log.Printf("[mikrotik-go-service] xack after envelope DLQ failed: %v", err)
+		}
+		return
+	}
+
+	if c.handler != nil {
+		if err := c.handler(ctx, ev); err != nil {
+			if attempts >= c.maxDeliveries {
+				if dlqErr := c.deadLetter(ctx, stream, msg.ID, err.Error(), ev, attempts); dlqErr != nil {
+					log.Printf("[mikrotik-go-service] DLQ failed after %d attempts for %s: %v", attempts, msg.ID, dlqErr)
+					return
+				}
+				if ackErr := c.ack(ctx, stream, msg.ID); ackErr != nil {
+					log.Printf("[mikrotik-go-service] xack after retry exhaustion failed: %v", ackErr)
+				}
+				log.Printf("[mikrotik-go-service] message %s moved to DLQ after %d attempts: %v", msg.ID, attempts, err)
+				return
+			}
+			log.Printf("[mikrotik-go-service] handler error for %s (msg %s left pending, attempt %d/%d): %v", ev.Type, msg.ID, attempts, c.maxDeliveries, err)
+			return
+		}
+	}
+	if err := c.ack(ctx, stream, msg.ID); err != nil {
+		log.Printf("[mikrotik-go-service] xack failed: %v", err)
+	}
+}
+
 func (c *Consumer) claimStalePending(ctx context.Context, stream string, minIdle time.Duration) {
 	start := "-"
 	for {
-		entries, err := c.client.XPendingExt(ctx, &redis.XPendingExtArgs{
-			Stream: stream,
-			Group:  c.group,
-			Start:  start,
-			End:    "+",
-			Count:  50,
-		}).Result()
+		entries, err := c.client.XPendingExt(ctx, &redis.XPendingExtArgs{Stream: stream, Group: c.group, Start: start, End: "+", Count: 50}).Result()
 		if err != nil || len(entries) == 0 {
 			return
 		}
 		var ids []string
+		attemptsByID := make(map[string]int64, len(entries))
 		for _, e := range entries {
 			if e.Idle >= minIdle {
-				ids = append(ids, e.ID)
+				ids = append(ids, e.Id)
+				attemptsByID[e.Id] = e.RetryCount
 			}
 		}
 		if len(ids) > 0 {
-			claimed, err := c.client.XClaim(ctx, &redis.XClaimArgs{
-				Stream:   stream,
-				Group:    c.group,
-				Consumer: c.consumer,
-				MinIdle:  minIdle,
-				Messages: ids,
-			}).Result()
+			claimed, err := c.client.XClaim(ctx, &redis.XClaimArgs{Stream: stream, Group: c.group, Consumer: c.consumer, MinIdle: minIdle, Messages: ids}).Result()
 			if err != nil {
 				log.Printf("[mikrotik-go-service] xclaim error for %s: %v", stream, err)
-			}
-			for _, msg := range claimed {
-				var ev Event
-				raw, _ := msg.Values["data"].(string)
-				if err := json.Unmarshal([]byte(raw), &ev); err != nil {
-					log.Printf("[mikrotik-go-service] bad reclaimed payload (msg %s): %v", msg.ID, err)
-					continue
-				}
-				var handlerErr error
-				if c.handler != nil {
-					handlerErr = c.handler(ctx, ev)
-				}
-				if handlerErr != nil {
-					log.Printf("[mikrotik-go-service] reclaimed handler error for %s (msg %s still pending): %v", ev.Type, msg.ID, handlerErr)
-					continue
-				}
-				if _, err := c.client.XAck(ctx, stream, c.group, msg.ID).Result(); err != nil {
-					log.Printf("[mikrotik-go-service] xack (reclaim) failed: %v", err)
+			} else {
+				for _, msg := range claimed {
+					attempts := attemptsByID[msg.ID]
+					if attempts < 1 {
+						attempts = 1
+					}
+					c.handleStreamMessage(ctx, stream, msg, attempts)
 				}
 			}
 		}
-		// entries[] is ID-sorted; page from the id after the last one seen.
-		start = "(" + entries[len(entries)-1].ID
+		start = "(" + entries[len(entries)-1].Id
 		if len(entries) < 50 {
 			return
 		}
@@ -154,115 +210,71 @@ func (c *Consumer) claimStalePending(ctx context.Context, stream string, minIdle
 }
 
 func (c *Consumer) consumeOnce(ctx context.Context) error {
-	if c.useStreams {
-		// Ensure consumer groups exist
-		for _, stream := range c.topics {
-			err := c.client.XGroupCreateMkStream(ctx, stream, c.group, "$").Err()
-			if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
-				// ignore BUSYGROUP; log others
-				log.Printf("[mikrotik-go-service] xgroup create error for %s: %v", stream, err)
-			}
-		}
-
-		lastRecovery := time.Now()
-		const recoveryInterval = 30 * time.Second
-		const staleAfter = 60 * time.Second
-
+	if !c.useStreams {
+		sub := c.client.Subscribe(ctx, c.topics...)
+		defer sub.Close()
+		ch := sub.Channel()
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
-			default:
-			}
-			if time.Since(lastRecovery) >= recoveryInterval {
-				for _, stream := range c.topics {
-					c.claimStalePending(ctx, stream, staleAfter)
+			case msg, ok := <-ch:
+				if !ok {
+					return nil
 				}
-				lastRecovery = time.Now()
-			}
-			// Build streams args: stream -> '>' for new messages
-			// Use ReadGroup across all streams
-			args := &redis.XReadGroupArgs{
-				Group:    c.group,
-				Consumer: c.consumer,
-				Streams:  append(append([]string{}, c.topics...), make([]string, len(c.topics))...),
-				Count:    10,
-				Block:    5 * time.Second,
-			}
-			// fill the second half with ">"
-			for i := range c.topics {
-				args.Streams[len(c.topics)+i] = ">"
-			}
-
-			resp, err := c.client.XReadGroup(ctx, args).Result()
-			if err != nil {
-				if err == redis.Nil {
+				var ev Event
+				if err := json.Unmarshal([]byte(msg.Payload), &ev); err != nil {
+					log.Printf("[mikrotik-go-service] bad pubsub event payload: %v", err)
 					continue
 				}
-				return err
-			}
-			for _, stream := range resp {
-				for _, msg := range stream.Messages {
-					var ev Event
-					raw, ok := msg.Values["data"].(string)
-					if !ok {
-						// try byte slice
-						if b, ok2 := msg.Values["data"].([]byte); ok2 {
-							raw = string(b)
-						}
-					}
-					if err := json.Unmarshal([]byte(raw), &ev); err != nil {
-						log.Printf("[mikrotik-go-service] bad event payload: %v", err)
-						continue
-					}
-					// Only XAck on success. Acking unconditionally here was the
-					// bug: a failed handler (e.g. router unreachable) would
-					// still have its message marked delivered, so it was
-					// silently dropped instead of retried — the delivery
-					// guarantee streams were supposed to add over pub/sub.
-					handlerErr := error(nil)
-					if c.handler != nil {
-						handlerErr = c.handler(ctx, ev)
-					}
-					if handlerErr != nil {
-						log.Printf("[mikrotik-go-service] handler error for %s (msg %s left pending for retry): %v", ev.Type, msg.ID, handlerErr)
-						continue
-					}
-					if _, err := c.client.XAck(ctx, stream.Stream, c.group, msg.ID).Result(); err != nil {
-						log.Printf("[mikrotik-go-service] xack failed: %v", err)
+				if c.handler != nil {
+					if err := c.handler(ctx, ev); err != nil {
+						log.Printf("[mikrotik-go-service] handler error for %s: %v", ev.Type, err)
 					}
 				}
 			}
 		}
 	}
 
-	sub := c.client.Subscribe(ctx, c.topics...)
-	defer sub.Close()
+	for _, stream := range c.topics {
+		err := c.client.XGroupCreateMkStream(ctx, stream, c.group, "$").Err()
+		if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
+			log.Printf("[mikrotik-go-service] xgroup create error for %s: %v", stream, err)
+		}
+	}
 
-	ch := sub.Channel()
+	lastRecovery := time.Now()
+	const recoveryInterval = 30 * time.Second
+	const staleAfter = 60 * time.Second
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case msg, ok := <-ch:
-			if !ok {
-				return nil
+		default:
+		}
+		if time.Since(lastRecovery) >= recoveryInterval {
+			for _, stream := range c.topics {
+				c.claimStalePending(ctx, stream, staleAfter)
 			}
-			var ev Event
-			if err := json.Unmarshal([]byte(msg.Payload), &ev); err != nil {
-				log.Printf("[mikrotik-go-service] bad event payload: %v", err)
+			lastRecovery = time.Now()
+		}
+		args := &redis.XReadGroupArgs{Group: c.group, Consumer: c.consumer, Streams: append(append([]string{}, c.topics...), make([]string, len(c.topics))...), Count: 10, Block: 5 * time.Second}
+		for i := range c.topics {
+			args.Streams[len(c.topics)+i] = ">"
+		}
+		resp, err := c.client.XReadGroup(ctx, args).Result()
+		if err != nil {
+			if err == redis.Nil {
 				continue
 			}
-			if c.handler != nil {
-				if err := c.handler(ctx, ev); err != nil {
-					log.Printf("[mikrotik-go-service] handler error for %s: %v", ev.Type, err)
-				}
+			return err
+		}
+		for _, stream := range resp {
+			for _, msg := range stream.Messages {
+				c.handleStreamMessage(ctx, stream.Stream, msg, 1)
 			}
 		}
 	}
 }
 
-// Close closes the Redis client.
-func (c *Consumer) Close() error {
-	return c.client.Close()
-}
+func (c *Consumer) Close() error { return c.client.Close() }
