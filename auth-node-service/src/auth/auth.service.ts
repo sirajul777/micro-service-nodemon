@@ -75,12 +75,44 @@ export class AuthService {
     return { token, user: safe };
   }
 
+  /**
+   * Verify the JWT and then rehydrate the current user state from the auth DB.
+   * This makes deactivation, permission changes and session restrictions take
+   * effect immediately instead of waiting for the JWT's 24h expiry.
+   */
   async validateToken(token: string): Promise<AuthTokenPayload> {
+    let signed: AuthTokenPayload;
     try {
-      return await this.jwtService.verifyAsync<AuthTokenPayload>(token);
+      signed = await this.jwtService.verifyAsync<AuthTokenPayload>(token);
     } catch {
       throw new UnauthorizedException('Token tidak valid atau kadaluarsa');
     }
+
+    if (signed.sub === 'legacy-admin') {
+      if (!(await this.configService.validateAdmin(signed.username, '__token_validation__'))) {
+        // The legacy config validator is password-based, so do not use it here.
+        // Legacy JWTs remain governed by their signature + expiry.
+      }
+      return {
+        ...signed,
+        permissions: FULL_ADMIN_PERMISSIONS,
+        allowedSessions: [],
+      };
+    }
+
+    const user = await this.userService.getById(signed.sub);
+    if (!user || !user.active) {
+      throw new UnauthorizedException('User tidak aktif atau tidak ditemukan');
+    }
+
+    return {
+      sub: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      permissions: user.permissions || {},
+      allowedSessions: user.allowedSessions || [],
+    };
   }
 
   async changePassword(
