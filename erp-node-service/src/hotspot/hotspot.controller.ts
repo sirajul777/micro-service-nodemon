@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -19,7 +20,7 @@ import { buildOnLoginScript, buildOnLoginHeader, parseOnLogin, mergeProfile } fr
  * Hotspot operations (dashboard / active users / user CRUD / profiles /
  * interfaces / system resource). Backed by mikrotik-go-service over gRPC.
  *
- * The BFF routes `/api/mikrotik/:session/*` → erp `/mikrotik/:session/*`
+ * The BFF routes `/api/mikrotik/:session/*` ? erp `/mikrotik/:session/*`
  * (see `mikrotik` target alias in main-node-service proxy.controller.ts).
  */
 @Controller('mikrotik')
@@ -30,28 +31,72 @@ export class HotspotController {
     private readonly profileMeta: ProfileMetaService,
   ) {}
 
-  // ── Dashboard ────────────────────────────────────────────────────
+  // ?? Dashboard ????????????????????????????????????????????????????
+  // Response shape is intentionally reshaped to match the reference
+  // monolith's dashboard() handler exactly (compared directly against
+  // sirajul777/nodemon's mikrotik.controller.ts) -- the frontend's
+  // loadDashboard() reads dash.resource['cpu-load'], dash.hotspot.active,
+  // dash.identity, etc. Previously this just spread the raw gRPC response
+  // flat ({success, identity, cpuLoad, activeHotspotUsers, ...}), so the
+  // fetch always succeeded but every one of those lookups came back
+  // undefined and the dashboard rendered blank -- the request never
+  // errored, so nothing in the UI signaled anything was wrong either.
+  //
+  // Note: mikrotik-go-service's GetDashboard RPC doesn't carry
+  // routerboard/clock/health (the monolith calls those as separate RouterOS
+  // API commands the Go service doesn't yet expose), so those come back
+  // empty here rather than populated -- the frontend already handles that
+  // gracefully via `?.` / `|| ''` fallbacks, it just won't show clock/board
+  // info until the Go RPC is extended to fetch them.
   @Get(':session/dashboard')
+  @RequirePermission('viewDashboard')
   async dashboard(@Param('session') session: string) {
     const resp = await this.mikrotik.getDashboard(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat dashboard' };
+      throw new BadRequestException(resp.error || 'Gagal memuat dashboard');
     }
-    return { success: true, ...resp };
+    return {
+      identity: resp.identity,
+      rosVersion: resp.rosVersion || resp.version?.charAt(0) || '7',
+      resource: {
+        version: resp.version,
+        uptime: resp.uptime,
+        'cpu-load': resp.cpuLoad,
+        'free-memory': resp.freeMemory,
+        'total-memory': resp.totalMemory,
+        'free-hdd-space': resp.freeHdd,
+        'total-hdd-space': resp.totalHdd,
+      },
+      routerboard: {},
+      clock: {},
+      health: [],
+      hotspot: {
+        active: resp.activeHotspotUsers ?? 0,
+        total: resp.totalHotspotUsers ?? 0,
+      },
+    };
   }
 
-  // ── Active users ─────────────────────────────────────────────────
+  // ?? Active users ?????????????????????????????????????????????????
+  // Raw array, matching the monolith's `this.mikrotikService.run(...)`
+  // passthrough -- app.js's loadHsActive() does `(await req(...)) || []`
+  // then `.length` / assigns directly to the pagination data source. The
+  // previous `{success, users:[...]}` wrapper meant `d.length` was always
+  // `undefined` and the table silently rendered empty (fetch succeeded,
+  // nothing displayed) -- same root cause across every endpoint below.
   @Get(':session/hotspot/active')
+  @RequirePermission('viewDashboard')
   async activeUsers(@Param('session') session: string) {
     const resp = await this.mikrotik.listActiveHotspotUsers(session, '');
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat user aktif' };
+      throw new BadRequestException(resp.error || 'Gagal memuat user aktif');
     }
-    return { success: true, users: resp.users || [] };
+    return resp.users || [];
   }
 
-  // ── Users CRUD ───────────────────────────────────────────────────
+  // ?? Users CRUD ???????????????????????????????????????????????????
   @Get(':session/hotspot/users')
+  @RequirePermission('viewDashboard')
   async listUsers(
     @Param('session') session: string,
     @Query('profile') profile?: string,
@@ -63,12 +108,13 @@ export class HotspotController {
       comment: comment || '',
     });
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat user' };
+      throw new BadRequestException(resp.error || 'Gagal memuat user');
     }
-    return { success: true, users: resp.users || [] };
+    return resp.users || [];
   }
 
   @Post(':session/hotspot/users')
+  @RequirePermission('manageHotspot')
   async addUser(
     @Param('session') session: string,
     @Body() body: { name: string; password?: string; profile?: string; comment?: string; limitUptime?: string },
@@ -86,6 +132,7 @@ export class HotspotController {
   }
 
   @Delete(':session/hotspot/users/:name')
+  @RequirePermission('manageHotspot')
   async removeUser(@Param('session') session: string, @Param('name') name: string) {
     return this.mikrotik.removeHotspotUser(session, name);
   }
@@ -102,27 +149,32 @@ export class HotspotController {
     return { success: true, removed: resp.removed || 0, failed: resp.failedNames || [] };
   }
 
-  // ── Profiles ─────────────────────────────────────────────────────
+  // ?? Profiles ?????????????????????????????????????????????????????
+  // Raw array -- app.js's loadHsProfiles()/saveHsProfile() etc. call
+  // `.length` and `.forEach` directly on the response.
   @Get(':session/hotspot/profiles')
+  @RequirePermission('viewDashboard')
   async listProfiles(@Param('session') session: string) {
     const resp = await this.mikrotik.listHotspotProfiles(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat profile' };
+      throw new BadRequestException(resp.error || 'Gagal memuat profile');
     }
     const meta = await this.profileMeta.getAllForSession('hotspot', session);
-    const profiles = (resp.profiles || []).map((p: any) => mergeProfile(p, meta[p.name]));
-    return { success: true, profiles };
+    return (resp.profiles || []).map((p: any) => mergeProfile(p, meta[p.name]));
   }
 
+  // Raw object (or null if not found) -- app.js's editHsProfileFn() passes
+  // the response straight into openHsProfileModal(p).
   @Get(':session/hotspot/profiles/:name')
+  @RequirePermission('viewDashboard')
   async getProfile(@Param('session') session: string, @Param('name') name: string) {
     const resp = await this.mikrotik.getHotspotProfile(session, name);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Profile tidak ditemukan' };
+      throw new BadRequestException(resp.error || 'Profile tidak ditemukan');
     }
-    if (!resp.profile) return { success: true, profile: null };
+    if (!resp.profile) return null;
     const meta = await this.profileMeta.get('hotspot', session, name);
-    return { success: true, profile: mergeProfile(resp.profile, meta) };
+    return mergeProfile(resp.profile, meta);
   }
 
   @Post(':session/hotspot/profiles')
@@ -186,7 +238,7 @@ export class HotspotController {
     const resInfo = await this.mikrotik.getSystemResource(session);
     const rosVer = resInfo?.version?.charAt(0) === '6' ? '6' : '7';
 
-    // Only rebuild the full script if MikHMon metadata actually changed —
+    // Only rebuild the full script if MikHMon metadata actually changed --
     // otherwise keep the existing script body, just refresh the header.
     const metaChanged =
       body.price !== undefined ||
@@ -235,83 +287,88 @@ export class HotspotController {
   }
 
   @Get(':session/hotspot/profile-meta')
+  @RequirePermission('viewDashboard')
   async getProfileMeta(@Param('session') session: string) {
     return this.profileMeta.getAllForSession('hotspot', session);
   }
 
-  // ── Interfaces ───────────────────────────────────────────────────
+  // ?? Interfaces ???????????????????????????????????????????????????
+  // Raw array -- app.js calls `.sort(...)` directly on the response.
   @Get(':session/interfaces')
+  @RequirePermission('viewDashboard')
   async interfaces(@Param('session') session: string) {
     const resp = await this.mikrotik.getInterfaces(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat interface' };
+      throw new BadRequestException(resp.error || 'Gagal memuat interface');
     }
-    return { success: true, interfaces: resp.interfaces || [] };
+    return resp.interfaces || [];
   }
 
   @Get(':session/interface/traffic/:ifname')
+  @RequirePermission('viewDashboard')
   async traffic(@Param('session') session: string, @Param('ifname') ifname: string) {
     const resp = await this.mikrotik.getInterfaces(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat interface' };
+      throw new BadRequestException(resp.error || 'Gagal memuat interface');
     }
     const ifc = (resp.interfaces || []).find(
       (i: any) => i.name === ifname || i.id === ifname,
     );
     return {
-      success: true,
       interface: ifc || null,
       tx: ifc?.tx || '',
       rx: ifc?.rx || '',
     };
   }
 
-  // ── System resource ──────────────────────────────────────────────
+  // ?? System resource ??????????????????????????????????????????????
   @Get(':session/system/resource')
+  @RequirePermission('viewDashboard')
   async systemResource(@Param('session') session: string) {
     const resp = await this.mikrotik.getSystemResource(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat resource' };
+      throw new BadRequestException(resp.error || 'Gagal memuat resource');
     }
-    return { success: true, ...resp };
+    const { success, error, ...rest } = resp;
+    return rest;
   }
 
-  // ── Best-effort placeholders (need dedicated RPCs in Go) ─────────
+  // ?? Best-effort placeholders (need dedicated RPCs in Go) ?????????
+  // Raw array -- app.js's loadDashboard() does `(hsLogs || []).slice(...)`.
   @Get(':session/hotspot/log')
+  @RequirePermission('viewDashboard')
   async hotspotLog(@Param('session') session: string) {
     const active = await this.mikrotik.listActiveHotspotUsers(session, '');
-    return {
-      success: active.success,
-      logs: (active.users || []).map((u: any) => ({
-        id: u.id,
-        user: u.user,
-        address: u.address,
-        uptime: u.uptime,
-        bytesIn: u.bytes_in,
-        bytesOut: u.bytes_out,
-        time: new Date().toISOString(),
-      })),
-    };
+    if (!active.success) return [];
+    return (active.users || []).map((u: any) => ({
+      id: u.id,
+      user: u.user,
+      address: u.address,
+      uptime: u.uptime,
+      bytesIn: u.bytes_in,
+      bytesOut: u.bytes_out,
+      time: new Date().toISOString(),
+    }));
   }
 
   @Get(':session/scheduler')
+  @RequirePermission('viewDashboard')
   async scheduler(@Param('session') session: string) {
-    // No dedicated RPC yet — return empty list so the UI doesn't 404.
-    return { success: true, schedulers: [] };
+    // No dedicated RPC yet -- return empty list so the UI doesn't 404.
+    return [];
   }
 
   @Get(':session/dhcp/leases')
+  @RequirePermission('viewDashboard')
   async dhcpLeases(@Param('session') session: string) {
     const active = await this.mikrotik.listActiveHotspotUsers(session, '');
-    return {
-      success: active.success,
-      leases: (active.users || []).map((u: any) => ({
-        id: u.id,
-        address: u.address,
-        macAddress: u.mac_address,
-        hostName: u.user,
-        status: 'bound',
-      })),
-    };
+    if (!active.success) return [];
+    return (active.users || []).map((u: any) => ({
+      id: u.id,
+      address: u.address,
+      macAddress: u.mac_address,
+      hostName: u.user,
+      status: 'bound',
+    }));
   }
 }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -18,17 +19,34 @@ import { RequirePermission } from '../auth/permissions.decorator';
  * PPPoE operations (secrets CRUD, profiles CRUD, active connections, pools).
  * Backed by mikrotik-go-service over gRPC.
  *
- * The BFF routes `/api/pppoe/:session/*` → erp `/pppoe/:session/*`
+ * The BFF routes `/api/pppoe/:session/*` ? erp `/pppoe/:session/*`
  * (see `pppoe` target alias in main-node-service proxy.controller.ts).
+ *
+ * Two things fixed here, both found by comparing directly against the
+ * reference monolith (sirajul777/nodemon's pppoe.controller.ts):
+ *
+ * 1. Permission scope: GET routes only need `viewDashboard` in the
+ *    monolith (any role that can see the dashboard can view PPPoE data);
+ *    only mutations need `managePppoe`. This previously had
+ *    `managePppoe` class-wide, blocking view-only roles from the page
+ *    entirely.
+ * 2. Response shape: GET routes return the raw array/object directly in
+ *    the monolith (`this.mikrotikService.run(...)` passthrough) -- app.js
+ *    calls `.length`/`.forEach`/`.sort()` straight on the response. This
+ *    previously wrapped everything as `{success, secrets:[...]}` etc.,
+ *    which isn't an array, so those calls silently failed (or produced
+ *    `undefined`) and the page rendered blank even though the request
+ *    itself succeeded (200 OK, valid JSON) -- this is the "data fetched,
+ *    not rendered" symptom.
  */
 @Controller('pppoe')
 @UseGuards(JwtAuthGuard)
-@RequirePermission('managePppoe')
 export class PppoeController {
   constructor(private readonly mikrotik: MikrotikGrpcClient) {}
 
-  // ── Secrets list (with optional profile/name filter) ─────────────
+  // ?? Secrets list (with optional profile/name filter) ?????????????
   @Get(':session/secrets')
+  @RequirePermission('viewDashboard')
   async listSecrets(
     @Param('session') session: string,
     @Query('profile') profile?: string,
@@ -36,21 +54,23 @@ export class PppoeController {
   ) {
     const resp = await this.mikrotik.listPppSecrets(session, profile, name);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat secret' };
+      throw new BadRequestException(resp.error || 'Gagal memuat secret');
     }
-    return { success: true, secrets: resp.secrets || [] };
+    return resp.secrets || [];
   }
 
   @Get(':session/secrets/:name')
+  @RequirePermission('viewDashboard')
   async getSecret(@Param('session') session: string, @Param('name') name: string) {
     const resp = await this.mikrotik.getPppSecret(session, name);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Secret tidak ditemukan' };
+      throw new BadRequestException(resp.error || 'Secret tidak ditemukan');
     }
-    return { success: true, secret: resp.secret };
+    return resp.secret || null;
   }
 
   @Post(':session/secrets')
+  @RequirePermission('managePppoe')
   async addSecret(
     @Param('session') session: string,
     @Body() body: {
@@ -77,6 +97,7 @@ export class PppoeController {
   }
 
   @Put(':session/secrets/:name')
+  @RequirePermission('managePppoe')
   async updateSecret(
     @Param('session') session: string,
     @Param('name') name: string,
@@ -102,31 +123,36 @@ export class PppoeController {
   }
 
   @Delete(':session/secrets/:name')
+  @RequirePermission('managePppoe')
   async deleteSecret(@Param('session') session: string, @Param('name') name: string) {
     return this.mikrotik.deletePppSecret(session, name);
   }
 
   @Patch(':session/secrets/:name/enable')
+  @RequirePermission('managePppoe')
   async enableSecret(@Param('session') session: string, @Param('name') name: string) {
     return this.mikrotik.enablePppSecret(session, name);
   }
 
   @Patch(':session/secrets/:name/disable')
+  @RequirePermission('managePppoe')
   async disableSecret(@Param('session') session: string, @Param('name') name: string) {
     return this.mikrotik.disablePppSecret(session, name);
   }
 
-  // ── Profiles ─────────────────────────────────────────────────────
+  // ?? Profiles ?????????????????????????????????????????????????????
   @Get(':session/profiles')
+  @RequirePermission('viewDashboard')
   async listProfiles(@Param('session') session: string) {
     const resp = await this.mikrotik.listPppProfiles(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat profile' };
+      throw new BadRequestException(resp.error || 'Gagal memuat profile');
     }
-    return { success: true, profiles: resp.profiles || [] };
+    return resp.profiles || [];
   }
 
   @Post(':session/profiles')
+  @RequirePermission('managePppoe')
   async addProfile(
     @Param('session') session: string,
     @Body() body: {
@@ -155,6 +181,7 @@ export class PppoeController {
   }
 
   @Put(':session/profiles/:name')
+  @RequirePermission('managePppoe')
   async updateProfile(
     @Param('session') session: string,
     @Param('name') name: string,
@@ -182,31 +209,35 @@ export class PppoeController {
   }
 
   @Delete(':session/profiles/:name')
+  @RequirePermission('managePppoe')
   async deleteProfile(@Param('session') session: string, @Param('name') name: string) {
     return this.mikrotik.deletePppProfile(session, name);
   }
 
-  // ── Active connections & pools ───────────────────────────────────
+  // ?? Active connections & pools ???????????????????????????????????
   @Get(':session/active')
+  @RequirePermission('viewDashboard')
   async listActive(@Param('session') session: string) {
     const resp = await this.mikrotik.listPppActive(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat koneksi aktif' };
+      throw new BadRequestException(resp.error || 'Gagal memuat koneksi aktif');
     }
-    return { success: true, connections: resp.connections || [] };
+    return resp.connections || [];
   }
 
   @Post(':session/active/:name/disconnect')
+  @RequirePermission('managePppoe')
   async disconnect(@Param('session') session: string, @Param('name') name: string) {
     return this.mikrotik.disconnectPppActive(session, name);
   }
 
   @Get(':session/pools')
+  @RequirePermission('viewDashboard')
   async listPools(@Param('session') session: string) {
     const resp = await this.mikrotik.listPppPools(session);
     if (!resp.success) {
-      return { success: false, error: resp.error || 'Gagal memuat pool' };
+      throw new BadRequestException(resp.error || 'Gagal memuat pool');
     }
-    return { success: true, pools: resp.pools || [] };
+    return resp.pools || [];
   }
 }
