@@ -15,8 +15,9 @@ import { PERMISSIONS_KEY, PermissionKey } from './permissions.decorator';
  * JWT guard for the payment service.
  *
  * Validates the Bearer token against auth-node-service, then enforces feature
- * permissions and router-session tenancy. This protects direct access that
- * bypasses the BFF as well as normal BFF traffic.
+ * permissions and router-session tenancy. Admins may access all sessions;
+ * non-admin users must have an explicit allowedSessions entry for a
+ * /:session/* route.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -63,30 +64,22 @@ export class JwtAuthGuard implements CanActivate {
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (required && required.length > 0) {
-      if (payload.role === 'admin') {
-        // Admin bypasses feature permissions, preserving existing semantics.
-      } else {
-        const perms = payload.permissions || {};
-        const allowed = required.some((p) => perms[p] === true);
-        if (!allowed) {
-          throw new ForbiddenException('Anda tidak memiliki akses ke fitur ini');
-        }
+    if (required && required.length > 0 && payload.role !== 'admin') {
+      const perms = payload.permissions || {};
+      const allowed = required.some((p) => perms[p] === true);
+      if (!allowed) {
+        throw new ForbiddenException('Anda tidak memiliki akses ke fitur ini');
       }
     }
 
-    // Payment routes such as /billing/:session/* are tenant-scoped. An empty
-    // allowedSessions list means unrestricted, preserving admin behavior.
     const session = req.params?.session;
-    const allowedSessions = Array.isArray(payload.allowedSessions)
-      ? payload.allowedSessions
-      : [];
-    if (
-      session &&
-      allowedSessions.length > 0 &&
-      !allowedSessions.includes(String(session))
-    ) {
-      throw new ForbiddenException('Anda tidak memiliki akses ke router session ini');
+    if (session && payload.role !== 'admin') {
+      const allowedSessions = Array.isArray(payload.allowedSessions)
+        ? payload.allowedSessions.map(String)
+        : [];
+      if (!allowedSessions.includes(String(session))) {
+        throw new ForbiddenException('Anda tidak memiliki akses ke router session ini');
+      }
     }
 
     return true;
