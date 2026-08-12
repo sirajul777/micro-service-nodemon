@@ -74,9 +74,8 @@ func handleVoucherBatchCreated(ctx context.Context, routerServer *server.RouterS
 			return fmt.Errorf("batch %s contains voucher with missing username/profile", batch.BatchID)
 		}
 
-		// AddHotspotUser is made idempotent at the event boundary by checking
-		// the router first. A replayed Redis event therefore does not create a
-		// duplicate RouterOS user.
+		// Redis Streams can redeliver a message after a crash. Check the router
+		// before creating the user so replay is idempotent.
 		users, err := routerServer.ListHotspotUsers(ctx, &pb.ListHotspotUsersRequest{
 			SessionId: batch.SessionID,
 		})
@@ -93,12 +92,9 @@ func handleVoucherBatchCreated(ctx context.Context, routerServer *server.RouterS
 				continue
 			}
 			exists = true
-			// If the exact user already exists, this is a successful replay.
-			// If it differs, fail loudly rather than silently mutating an
-			// existing account that may belong to another batch.
-			if existing.Profile != voucher.Profile ||
-				existing.Password != voucher.Password ||
-				existing.Comment != "" && existing.Comment != "" {
+			// Do not overwrite an existing RouterOS account that has a
+			// different profile/password. Treat that as a real conflict.
+			if existing.Profile != voucher.Profile || existing.Password != voucher.Password {
 				return fmt.Errorf("router user %q already exists with different configuration", voucher.Username)
 			}
 			break
