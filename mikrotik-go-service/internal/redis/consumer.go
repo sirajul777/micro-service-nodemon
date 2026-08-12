@@ -14,6 +14,7 @@ import (
 )
 
 type Event struct {
+	EventID   string          `json:"eventId,omitempty"`
 	Type      string          `json:"type"`
 	SessionID string          `json:"sessionId"`
 	Data      json.RawMessage `json:"data"`
@@ -86,12 +87,12 @@ func (c *Consumer) deadLetter(ctx context.Context, stream, messageID, reason str
 	_, err = c.client.XAdd(ctx, &redis.XAddArgs{
 		Stream: stream + c.dlqSuffix,
 		Values: map[string]any{
-			"originalStream":   stream,
+			"originalStream":    stream,
 			"originalMessageId": messageID,
-			"reason":            reason,
-			"attempts":          attempts,
-			"failedAt":          time.Now().UTC().Format(time.RFC3339Nano),
-			"payload":           string(raw),
+			"reason":             reason,
+			"attempts":           attempts,
+			"failedAt":           time.Now().UTC().Format(time.RFC3339Nano),
+			"payload":             string(raw),
 		},
 	}).Result()
 	if err != nil {
@@ -161,15 +162,15 @@ func (c *Consumer) handleStreamMessage(ctx context.Context, stream string, msg r
 				if ackErr := c.ack(ctx, stream, msg.ID); ackErr != nil {
 					log.Printf("[mikrotik-go-service] xack after retry exhaustion failed: %v", ackErr)
 				}
-				log.Printf("[mikrotik-go-service] message %s moved to DLQ after %d attempts: %v", msg.ID, attempts, err)
+				log.Printf("[mikrotik-go-service] message %s (event %s) moved to DLQ after %d attempts: %v", msg.ID, ev.EventID, attempts, err)
 				return
 			}
-			log.Printf("[mikrotik-go-service] handler error for %s (msg %s left pending, attempt %d/%d): %v", ev.Type, msg.ID, attempts, c.maxDeliveries, err)
+			log.Printf("[mikrotik-go-service] handler error for %s (event %s, msg %s left pending, attempt %d/%d): %v", ev.Type, ev.EventID, msg.ID, attempts, c.maxDeliveries, err)
 			return
 		}
 	}
 	if err := c.ack(ctx, stream, msg.ID); err != nil {
-		log.Printf("[mikrotik-go-service] xack failed: %v", err)
+		log.Printf("[mikrotik-go-service] xack failed for event %s: %v", ev.EventID, err)
 	}
 }
 
@@ -229,7 +230,7 @@ func (c *Consumer) consumeOnce(ctx context.Context) error {
 				}
 				if c.handler != nil {
 					if err := c.handler(ctx, ev); err != nil {
-						log.Printf("[mikrotik-go-service] handler error for %s: %v", ev.Type, err)
+						log.Printf("[mikrotik-go-service] handler error for %s (event %s): %v", ev.Type, ev.EventID, err)
 					}
 				}
 			}
