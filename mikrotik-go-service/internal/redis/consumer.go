@@ -89,10 +89,10 @@ func (c *Consumer) deadLetter(ctx context.Context, stream, messageID, reason str
 		Values: map[string]any{
 			"originalStream":    stream,
 			"originalMessageId": messageID,
-			"reason":             reason,
-			"attempts":           attempts,
-			"failedAt":           time.Now().UTC().Format(time.RFC3339Nano),
-			"payload":             string(raw),
+			"reason":            reason,
+			"attempts":          attempts,
+			"failedAt":          time.Now().UTC().Format(time.RFC3339Nano),
+			"payload":           string(raw),
 		},
 	}).Result()
 	if err != nil {
@@ -185,8 +185,8 @@ func (c *Consumer) claimStalePending(ctx context.Context, stream string, minIdle
 		attemptsByID := make(map[string]int64, len(entries))
 		for _, e := range entries {
 			if e.Idle >= minIdle {
-				ids = append(ids, e.Id)
-				attemptsByID[e.Id] = e.RetryCount
+				ids = append(ids, e.ID)
+				attemptsByID[e.ID] = e.RetryCount
 			}
 		}
 		if len(ids) > 0 {
@@ -203,7 +203,7 @@ func (c *Consumer) claimStalePending(ctx context.Context, stream string, minIdle
 				}
 			}
 		}
-		start = "(" + entries[len(entries)-1].Id
+		start = "(" + entries[len(entries)-1].ID
 		if len(entries) < 50 {
 			return
 		}
