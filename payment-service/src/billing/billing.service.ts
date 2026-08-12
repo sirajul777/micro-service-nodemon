@@ -179,6 +179,28 @@ export class BillingService {
     return result;
   }
 
+  async flagOverdueInvoices(
+    sessionId: string,
+  ): Promise<{ count: number; customers: BillingCustomerEntity[] }> {
+    const overdue = await this.getOverdueCustomers(sessionId);
+    const seen = new Set<string>();
+    const customers: BillingCustomerEntity[] = [];
+    for (const { invoice, customer } of overdue) {
+      // getOverdueCustomers already marks the invoice overdue; keep this
+      // method responsible only for the controller-facing aggregate contract.
+      if (!seen.has(customer.id)) {
+        seen.add(customer.id);
+        customers.push(customer);
+      }
+      // Keep the explicit update for compatibility if the implementation of
+      // getOverdueCustomers changes later.
+      if (invoice.status !== 'overdue') {
+        await this.invoiceRepo.update({ id: invoice.id }, { status: 'overdue' });
+      }
+    }
+    return { count: overdue.length, customers };
+  }
+
   /** Find unpaid invoices whose configured reminder day has arrived. */
   async getRemindableInvoices(
     sessionId: string,
