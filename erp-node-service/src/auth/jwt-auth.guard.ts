@@ -12,11 +12,10 @@ import { firstValueFrom } from 'rxjs';
 import { PERMISSIONS_KEY, PermissionKey } from './permissions.decorator';
 
 /**
- * JWT guard for the ERP service. Validates the bearer token by calling
- * auth-node-service's `POST /auth/validate-token` endpoint.
- *
- * Ported from auth-node-service's JwtAuthGuard, but validates via HTTP
- * rather than a shared JWT secret (no @nestjs/jwt dependency needed here).
+ * JWT guard for the ERP service. Validates the bearer token against
+ * auth-node-service and enforces both feature permissions and router-session
+ * tenancy. An empty allowedSessions list means all sessions (admin/legacy
+ * behavior); otherwise the route's :session must be explicitly allowed.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -39,8 +38,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Bearer token diperlukan');
     }
 
-    // Validate the token against auth-node-service.
-let payload: any;
+    let payload: any;
     try {
       const res = await firstValueFrom(
         this.http.post(
@@ -60,19 +58,36 @@ let payload: any;
 
     req.user = payload;
 
-    // Permission enforcement (admin always passes).
     const required = this.reflector.getAllAndOverride<PermissionKey[]>(
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
     if (required && required.length > 0) {
-      if (payload.role === 'admin') return true;
-      const perms = payload.permissions || {};
-      const allowed = required.some((p) => perms[p] === true);
-      if (!allowed) {
-        throw new ForbiddenException('Anda tidak memiliki akses ke fitur ini');
+      if (payload.role === 'admin') {
+        // Admin bypasses feature permissions, as before.
+      } else {
+        const perms = payload.permissions || {};
+        const allowed = required.some((p) => perms[p] === true);
+        if (!allowed) {
+          throw new ForbiddenException('Anda tidak memiliki akses ke fitur ini');
+        }
       }
     }
+
+    // Enforce router-session tenancy whenever the route declares :session.
+    // Empty means unrestricted to preserve the existing admin semantics.
+    const session = req.params?.session;
+    const allowedSessions = Array.isArray(payload.allowedSessions)
+      ? payload.allowedSessions
+      : [];
+    if (
+      session &&
+      allowedSessions.length > 0 &&
+      !allowedSessions.includes(String(session))
+    ) {
+      throw new ForbiddenException('Anda tidak memiliki akses ke router session ini');
+    }
+
     return true;
   }
 }
