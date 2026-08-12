@@ -11,12 +11,15 @@ import (
 )
 
 // ServiceAuthInterceptor protects the internal RouterService API with a
-// service-to-service token. User JWT authorization remains in the Node
-// services; this boundary only establishes that the caller is trusted.
+// service-to-service token. When expectedToken is empty, authentication is
+// intentionally disabled to support a rolling deployment. Set
+// GRPC_SERVICE_TOKEN on the Go service to enforce authentication; callers can
+// then be migrated to send x-service-token before removing the compatibility
+// mode.
 func ServiceAuthInterceptor(expectedToken string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if expectedToken == "" {
-			return nil, status.Error(codes.Unauthenticated, "gRPC service token is not configured")
+			return handler(ctx, req)
 		}
 
 		md, ok := metadata.FromIncomingContext(ctx)
