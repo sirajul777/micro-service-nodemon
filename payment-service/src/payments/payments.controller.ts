@@ -43,6 +43,10 @@ export class PaymentsController {
       transactions: orders.map((o) => ({
         id: o.id,
         orderId: o.orderId,
+        gateway: 'payhook',
+        purpose: 'voucher_purchase',
+        referenceId: o.id,
+        method: 'QRIS',
         voucherName: o.voucherName,
         profile: o.profile,
         amount: o.uniqueAmount,
@@ -104,7 +108,16 @@ export class PaymentsController {
   async detail(@Param('orderId') orderId: string) {
     const order = await this.orderService.getOrder(orderId);
     if (!order) return { success: false, error: 'Transaction not found' };
-    return { success: true, transaction: order };
+    return {
+      success: true,
+      transaction: {
+        ...order,
+        gateway: 'payhook',
+        purpose: 'voucher_purchase',
+        referenceId: order.id,
+        method: 'QRIS',
+      },
+    };
   }
 
   /** POST /payments/:orderId/check — force-check / re-verify an order. */

@@ -167,6 +167,26 @@ export class BillingController {
     return { success: true };
   }
 
+  /** Suspend one customer from the billing table without processing all overdue accounts. */
+  @Post('customers/:id/suspend')
+  async suspendCustomer(@Param('session') session: string, @Param('id') id: string) {
+    const cust = await this.billingService.getCustomer(id);
+    if (!cust) return { success: false, error: 'Not found' };
+    if (!cust.mikrotikUser) return { success: false, error: 'Username MikroTik belum diatur' };
+
+    const result =
+      cust.type === 'pppoe'
+        ? await this.mikrotikGrpc.disablePppSecret(session, cust.mikrotikUser)
+        : await this.mikrotikGrpc.disableHotspotUser(session, cust.mikrotikUser);
+    if (!result.success) {
+      return { success: false, error: result.error || 'Gagal memblokir akses di router' };
+    }
+
+    cust.status = 'suspended';
+    await this.billingService.saveCustomer(cust);
+    return { success: true };
+  }
+
   // ── Import users ─────────────────────────────────────────────────
 
   @Get('import-users/:type')

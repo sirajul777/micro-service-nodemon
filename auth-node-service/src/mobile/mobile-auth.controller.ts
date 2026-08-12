@@ -1,6 +1,8 @@
-import { Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { MobileTokenService } from './mobile-token.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RequirePermission } from '../auth/permissions.decorator';
 
 /**
  * Mobile API auth: validates credentials, then issues a long-lived mobile
@@ -28,6 +30,13 @@ export class MobileAuthController {
       user.allowedSessions || [],
     );
     return { success: true, token };
+  }
+
+  @Get('tokens')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('manageSystem')
+  async tokens() {
+    return { success: true, tokens: await this.tokenService.loadAll() };
   }
 
   @Post('logout')

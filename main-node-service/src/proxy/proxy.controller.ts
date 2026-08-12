@@ -36,6 +36,7 @@ const TARGETS: Record<string, Target> = {
   // loadUserManagement() → req('/users'), saveUm() → post('/users'), etc).
   // These map to auth-node-service's UserController, mounted at /api/users.
   users: 'auth',
+  mobile: 'auth',
   // The frontend calls QRIS admin endpoints via `/api/qris/*` (see app.js:
   // req('/qris/stats') → fetch(API + '/qris/stats') = /api/qris/stats).
   // Route them through the BFF so the session is enforced and the cached
@@ -178,6 +179,9 @@ export class ProxyController {
     }
     if (targetRaw === 'users') {
       return `/api/users${restPath}`;
+    }
+    if (targetRaw === 'mobile') {
+      return `/api/mobile-auth${restPath}`;
     }
     if (targetRaw === 'sessions') {
       return `/sessions${restPath}`;

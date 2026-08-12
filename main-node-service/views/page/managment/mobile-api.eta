@@ -12,8 +12,8 @@
             margin-bottom: 10px;
             "
         >
-            API ini digunakan untuk aplikasi mobile reseller. Reseller
-            login dengan <b>Telegram ID</b> mereka dan mendapatkan Bearer
+            API ini digunakan untuk aplikasi mobile reseller. Pengguna
+            login dengan <b>username dan password</b> lalu mendapatkan Bearer
             Token.
         </p>
         <div
@@ -81,12 +81,15 @@
             <i class="fa fa-key"></i> Test Login API
             </div>
             <div class="fg">
-            <label>Telegram ID Reseller</label
+            <label>Username</label
             ><input
-                id="api-test-tid"
-                placeholder="123456789"
-                type="number"
+                id="api-test-username"
+                placeholder="reseller01"
             />
+            </div>
+            <div class="fg">
+            <label>Password</label
+            ><input id="api-test-password" type="password" placeholder="Password" />
             </div>
             <button
             class="btn b-p"
@@ -133,7 +136,7 @@
         <thead>
             <tr>
             <th>Reseller</th>
-            <th>Telegram ID</th>
+            <th>Username</th>
             <th>Session</th>
             <th>Dibuat</th>
             <th>Expired</th>

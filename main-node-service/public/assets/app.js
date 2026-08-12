@@ -62,6 +62,19 @@ window.PG = window.PG || {
 };
 const PG = window.PG;
 
+// Endpoint baru di service domain mengembalikan payload terbungkus, misalnya
+// `{ success: true, users: [...] }`. UI lama sebagian masih mengasumsikan
+// respons array langsung. Selalu ambil array secara eksplisit agar respons
+// sukses tidak berhenti di renderer/pagination.
+function listFrom(payload, key) {
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload?.[key]) ? payload[key] : [];
+}
+
+function valueFrom(payload, key) {
+  return payload?.[key] ?? payload;
+}
+
 /**
  * Render a paginated table.
  * @param {string} tid - table id / key in PG
@@ -325,18 +338,19 @@ async function doLogin() {
   }).then((r) => r.json());
 
   if (d.success) {
+    const user = d.user || {};
     document.getElementById("ls").classList.add("hide");
     document.getElementById("le").textContent = "";
-    const dispName = d.username || "Admin";
+    const dispName = user.username || "Admin";
     document.getElementById("tb-un").textContent = dispName;
     document.getElementById("tb-av").textContent = dispName[0].toUpperCase();
-    applyRoleNav(d.role, d.permissions);
+    applyRoleNav(user.role, user.permissions);
 
     await loadSessions();
     const lastPg =
-      d.role === "collector"
+      user.role === "collector"
         ? "billing"
-        : d.role === "reseller"
+        : user.role === "reseller"
           ? "batch"
           : "dashboard";
     go(lastPg);
@@ -721,21 +735,24 @@ async function loadDashboard() {
     if (!dash) return;
 
     // Stat bar
-    const isIndo = live?.isIndo;
+    const isIndo = live?.isIndo ?? true;
+    const currency = live?.currency || "Rp";
     const fmt = (n) =>
       isIndo
-        ? live?.currency + " " + Math.round(n).toLocaleString("id-ID")
-        : live?.currency + " " + Number(n).toFixed(2);
+        ? currency + " " + Math.round(n).toLocaleString("id-ID")
+        : currency + " " + Number(n).toFixed(2);
+    const liveToday = live?.today || { income: live?.income, vouchers: live?.vouchersSold };
+    const liveMonth = live?.month || liveToday;
     document.getElementById("db-today-inc").textContent = fmt(
-      live?.today?.income || 0
+      liveToday.income || 0
     );
     document.getElementById("db-month-inc").textContent = fmt(
-      live?.month?.income || 0
+      liveMonth.income || 0
     );
     document.getElementById("db-today-vcr").textContent =
-      live?.today?.vouchers ?? "—";
+      liveToday.vouchers ?? "—";
     document.getElementById("db-month-vcr").textContent =
-      live?.month?.vouchers ?? "—";
+      liveMonth.vouchers ?? "—";
     // document.getElementById('db-hs-online').textContent = dash.hotspot?.active ?? '—';
     // document.getElementById('db-ppp-online').textContent = (pppActive||[]).length;
 
@@ -744,11 +761,13 @@ async function loadDashboard() {
       dash.hotspot?.total ?? "—";
     document.getElementById("db-hs-active2").textContent =
       dash.hotspot?.active ?? "—";
-    document.getElementById("db-ppp-total").textContent = (
-      pppSecrets || []
+    document.getElementById("db-ppp-total").textContent = listFrom(
+      pppSecrets,
+      "secrets"
     ).length;
-    document.getElementById("db-ppp-active2").textContent = (
-      pppActive || []
+    document.getElementById("db-ppp-active2").textContent = listFrom(
+      pppActive,
+      "connections"
     ).length;
 
     // Status NAS
@@ -786,7 +805,7 @@ async function loadDashboard() {
       </div>`;
 
     // Process Logs
-    dashLogs = (hsLogs || []).slice(0, 100).map((l) => {
+    dashLogs = listFrom(hsLogs, "logs").slice(0, 100).map((l) => {
       const m = l.message || "";
       let type = "hs";
       if (m.includes("ppp") || m.includes("pppoe")) type = "ppp";
@@ -870,7 +889,10 @@ async function loadHsActive(isPg = false) {
   registerReload("t-ha", loadHsActive);
   if (!isPg) {
     showL();
-    const d = (await req(`/mikrotik/${CS}/hotspot/active`)) || [];
+    const d = listFrom(
+      await req(`/mikrotik/${CS}/hotspot/active`),
+      "users"
+    );
     document.getElementById("ha-ct").textContent = `(${d.length})`;
     PG["t-ha"].data = d;
     PG["t-ha"].page = 1;
@@ -902,10 +924,12 @@ async function loadHsUsers(isPg = false) {
   if (!isPg) {
     showL();
     const prof = document.getElementById("uprof")?.value || "all";
-    const [users, profs] = await Promise.all([
+    const [usersResponse, profilesResponse] = await Promise.all([
       req(`/mikrotik/${CS}/hotspot/users?profile=${prof}`),
       req(`/mikrotik/${CS}/hotspot/profiles`)
     ]);
+    const users = listFrom(usersResponse, "users");
+    const profs = listFrom(profilesResponse, "profiles");
     const psel = document.getElementById("uprof");
     const cur = psel.value;
     psel.innerHTML = '<option value="all">All Profiles</option>';
@@ -1004,10 +1028,11 @@ async function bulkDelHs() {
 async function loadHsProfiles() {
   if (!CS) return;
   showL();
-  const d = await req(`/mikrotik/${CS}/hotspot/profiles`);
+  const response = await req(`/mikrotik/${CS}/hotspot/profiles`);
+  const d = listFrom(response, "profiles");
   hideL();
-  if (!d || d.error) {
-    toast("Gagal load: " + (d?.error || "error"), true);
+  if (!response?.success && !Array.isArray(response)) {
+    toast("Gagal load: " + (response?.error || "error"), true);
     return;
   }
   se(
@@ -1062,7 +1087,10 @@ function openHsProfileModal(data = null) {
 }
 async function editHsProfileFn(name) {
   showL();
-  const p = await req(`/mikrotik/${CS}/hotspot/profiles/${name}`);
+  const p = valueFrom(
+    await req(`/mikrotik/${CS}/hotspot/profiles/${name}`),
+    "profile"
+  );
   hideL();
   if (p) openHsProfileModal(p);
 }
@@ -1124,7 +1152,7 @@ async function loadPppActive(isPg = false) {
   registerReload("t-pa", loadPppActive);
   if (!isPg) {
     showL();
-    const d = (await req(`/pppoe/${CS}/active`)) || [];
+    const d = listFrom(await req(`/pppoe/${CS}/active`), "connections");
     document.getElementById("pa-ct").textContent = `(${d.length})`;
     PG["t-pa"].data = d;
     PG["t-pa"].page = 1;
@@ -1153,10 +1181,9 @@ function renderPppActive(subset) {
 async function disconnectPpp(id) {
   if (!confirm("Disconnect?")) return;
   showL();
-  await del(`/pppoe/${CS}/active/${id}`);
+  const d = await post(`/pppoe/${CS}/active/${encodeURIComponent(id)}/disconnect`, {});
   hideL();
-  toast("Disconnected");
-  loadPppActive();
+  d?.success ? (toast("Disconnected"), loadPppActive()) : toast(d?.error || "Gagal disconnect", true);
 }
 
 async function loadPppUsers(isPg = false) {
@@ -1165,10 +1192,12 @@ async function loadPppUsers(isPg = false) {
   if (!isPg) {
     showL();
     const prof = document.getElementById("ppp-prof-filter")?.value || "all";
-    const [users, profs] = await Promise.all([
+    const [usersResponse, profilesResponse] = await Promise.all([
       req(`/pppoe/${CS}/secrets${prof !== "all" ? "?profile=" + prof : ""}`),
       req(`/pppoe/${CS}/profiles`)
     ]);
+    const users = listFrom(usersResponse, "secrets");
+    const profs = listFrom(profilesResponse, "profiles");
     const psel = document.getElementById("ppp-prof-filter");
     const cur = psel.value;
     psel.innerHTML = '<option value="all">All Profiles</option>';
@@ -1215,7 +1244,7 @@ async function openPppUserModal(data = null) {
   document.getElementById("mpu-ra").value = data?.["remote-address"] || "";
   document.getElementById("mpu-cm").value = data?.comment || "";
 
-  const profs = (await req(`/pppoe/${CS}/profiles`)) || [];
+  const profs = listFrom(await req(`/pppoe/${CS}/profiles`), "profiles");
   const psel = document.getElementById("mpu-pr");
   psel.innerHTML = "";
 
@@ -1230,7 +1259,7 @@ async function openPppUserModal(data = null) {
 }
 async function editPppUserFn(name) {
   showL();
-  const u = await req(`/pppoe/${CS}/secrets/${name}`);
+  const u = valueFrom(await req(`/pppoe/${CS}/secrets/${name}`), "secret");
   hideL();
   if (u) openPppUserModal(u);
 }
@@ -1249,8 +1278,8 @@ async function savePppUser() {
     name: nm,
     profile: v("mpu-pr"),
     service: v("mpu-sv"),
-    "local-address": v("mpu-la"),
-    "remote-address": v("mpu-ra"),
+    localAddress: v("mpu-la"),
+    remoteAddress: v("mpu-ra"),
     comment: v("mpu-cm")
   };
   if (pw) body.password = pw;
@@ -1272,12 +1301,12 @@ async function savePppUser() {
 }
 async function togglePppUser(name, disable) {
   showL();
-  await fetch(
+  const d = await fetch(
     `${API}/pppoe/${CS}/secrets/${name}/${disable ? "disable" : "enable"}`,
-    { method: "POST", credentials: "include" }
-  );
+    { method: "PATCH", credentials: "include" }
+  ).then((r) => r.json());
   hideL();
-  loadPppUsers();
+  d?.success ? loadPppUsers() : toast(d?.error || "Gagal mengubah status user", true);
 }
 async function delPppUser(name) {
   if (!confirm(`Hapus "${name}"?`)) return;
@@ -1291,7 +1320,7 @@ async function delPppUser(name) {
 async function loadPppProfiles() {
   if (!CS) return;
   showL();
-  const d = (await req(`/pppoe/${CS}/profiles`)) || [];
+  const d = listFrom(await req(`/pppoe/${CS}/profiles`), "profiles");
   se(
     "t-pp",
     d.length
@@ -1327,7 +1356,9 @@ function openPppProfileModal(data = null) {
 }
 async function editPppProfileFn(name) {
   showL();
-  const p = await req(`/pppoe/${CS}/profiles/${name}`);
+  const p = listFrom(await req(`/pppoe/${CS}/profiles`), "profiles").find(
+    (profile) => profile.name === name
+  );
   hideL();
   if (p) openPppProfileModal(p);
 }
@@ -1339,14 +1370,10 @@ async function savePppProfile() {
   }
   const body = {
     name: nm,
-    "rate-limit": v("mhp-rl"),
-    "address-pool": v("mpp-ap"),
-    "local-address": v("mpp-la"),
-    "session-timeout": v("mpp-st"),
-    "idle-timeout": v("mpp-it"),
-    "only-one": v("mpp-oo"),
-    comment: v("mpp-cm"),
-    active: v("mpp-act") === "true"
+    rateLimit: v("mpp-rl"),
+    remoteAddress: v("mpp-ap"),
+    localAddress: v("mpp-la"),
+    onlyOne: v("mpp-oo")
   };
   showL();
   const d = editPppProf
@@ -1440,7 +1467,7 @@ async function saveReseller() {
     router: v("mrs-rt")
   };
   const d = await post("/resellers", body);
-  if (d?.id) {
+  if (d?.success && d.reseller?.id) {
     closeM("m-rs");
     loadResellers();
     toast(editRs ? "Reseller diupdate!" : "Reseller ditambahkan!");
@@ -1458,10 +1485,11 @@ async function delRs(id) {
 // ════════════════════════════════════════════════
 async function initBatch() {
   if (!CS) return;
-  const [profs, rs] = await Promise.all([
+  const [profilesResponse, rs] = await Promise.all([
     req(`/batches/${CS}/import/profiles`),
     req(`/resellers/session/${CS}`)
   ]);
+  const profs = listFrom(profilesResponse, "profiles");
   const psel = document.getElementById("bv-prof");
   psel.innerHTML =
     (profs || [])
@@ -1579,13 +1607,16 @@ async function generateVouchers(asCsv = false) {
   const charType = v("bv-char");
 
   const body = {
+    session: CS,
     sessionId: CS,
     profile: profileName,
+    count: qty,
     quantity: qty,
     usernameLength: parseInt(v("bv-ulen")) || 5,
     prefix: v("bv-pfx") || undefined,
     userType,
     charType,
+    validity: limitUptime,
     limitUptime,
     resellerId: rsId || undefined,
     resellerName: reseller?.name || undefined
@@ -1661,8 +1692,7 @@ async function generateVouchers(asCsv = false) {
 
     toast(`${genVcr.length} voucher digenerate!`);
 
-    // Save batch (use rawVcr — has original username + password)
-    await saveBatchToServer(rawVcr, body, pmeta, reseller);
+    // Generator ERP sudah menyimpan dan mempublikasikan batch ke router.
   } catch (e) {
     se("bv-err", "Error: " + e.message);
     console.error("generateVouchers error:", e);
@@ -1720,7 +1750,10 @@ async function openVtModal(data = null) {
 
   if (CS) {
     // Selalu ambil data terbaru dari MikroTik agar sinkron
-    const profs = (await req(`/mikrotik/${CS}/hotspot/profiles`)) || [];
+    const profs = listFrom(
+      await req(`/mikrotik/${CS}/hotspot/profiles`),
+      "profiles"
+    );
     psel.innerHTML = '<option value="">Pilih profile...</option>';
     profs.forEach((p) => {
       const isSel = p.name === data?.profile;
@@ -1840,9 +1873,33 @@ async function loadSelling(isPg = false) {
     let p = day ? `idhr=${mon}/${day}/${yr}` : `idbl=${mon}${yr}`;
     if (rs) p += `&reseller=${rs}`;
     const data = (await req(`/report/${CS}/selling?${p}`)) || {};
-    selData = data.records || [];
-    rslGrps = data.resellerGroups || [];
-    s = data.summary || {};
+    const records = data.records || [];
+    selData = records.map((record) => {
+      const usedAt = record.usedAt || "";
+      const [date = "—", time = ""] = usedAt.split(", ");
+      return {
+        ...record,
+        date: record.date || date,
+        time: record.time || time,
+        resellerTag: record.resellerTag || record.reseller || "—",
+        price: Number(record.price) || 0
+      };
+    });
+    const groups = new Map();
+    selData.forEach((record) => {
+      const tag = record.resellerTag || "—";
+      const group = groups.get(tag) || { tag, vouchers: 0, total: 0 };
+      group.vouchers += 1;
+      group.total += record.price;
+      groups.set(tag, group);
+    });
+    rslGrps = data.resellerGroups || [...groups.values()];
+    s = data.summary || {
+      totalVouchers: selData.length,
+      totalIncome: selData.reduce((total, record) => total + record.price, 0),
+      currency: "Rp",
+      isIndo: true
+    };
     document.getElementById("sr-vcr").textContent = s.totalVouchers || 0;
     document.getElementById("sr-inc").textContent = fmtC(
       s.totalIncome || 0,
@@ -1947,8 +2004,13 @@ async function loadResume() {
   showL();
   const data =
     (await req(`/report/${CS}/resume?idbl=${v("rr-m")}${v("rr-y")}`)) || {};
-  const daily = data.daily || [],
-    s = data.summary || {};
+  const daily = data.daily || data.days || [];
+  const s = data.summary || {
+    totalVouchers: daily.reduce((total, day) => total + (day.vouchers || 0), 0),
+    totalIncome: daily.reduce((total, day) => total + (day.income || 0), 0),
+    currency: "Rp",
+    isIndo: true
+  };
   document.getElementById("rr-v").textContent = s.totalVouchers || 0;
   document.getElementById("rr-i").textContent = fmtC(
     s.totalIncome || 0,
@@ -1963,7 +2025,7 @@ async function loadResume() {
       datasets: [
         {
           label: "Income",
-          data: daily.map((d) => d.total),
+          data: daily.map((d) => d.total ?? d.income ?? 0),
           borderColor: "#388bfd",
           backgroundColor: "#388bfd18",
           fill: true,
@@ -1992,15 +2054,19 @@ async function loadLive() {
   if (!CS) return;
   showL();
   const d = (await req(`/report/${CS}/live`)) || {};
-  document.getElementById("lr-tv").textContent = d.today?.vouchers ?? "—";
+  // Report service saat ini memberi agregat periode aktif sebagai
+  // `vouchersSold`/`income`; gunakan juga bentuk lama bila tersedia.
+  const vouchers = d.today?.vouchers ?? d.vouchersSold ?? 0;
+  const income = d.today?.income ?? d.income ?? 0;
+  document.getElementById("lr-tv").textContent = vouchers;
   document.getElementById("lr-ti").textContent = fmtC(
-    d.today?.income || 0,
+    income,
     d.currency,
     d.isIndo
   );
-  document.getElementById("lr-mv").textContent = d.month?.vouchers ?? "—";
+  document.getElementById("lr-mv").textContent = d.month?.vouchers ?? vouchers;
   document.getElementById("lr-mi").textContent = fmtC(
-    d.month?.income || 0,
+    d.month?.income ?? income,
     d.currency,
     d.isIndo
   );
@@ -3186,7 +3252,7 @@ async function saveRb() {
       }).then((r) => r.json());
   hideL();
 
-  if (d?.id || d?.name) {
+  if (d?.success && d.reseller?.id) {
     closeM("m-rb");
     loadResellerBot();
     toast(editRbId ? "Reseller diupdate!" : "Reseller ditambahkan!");
@@ -3204,7 +3270,7 @@ async function toggleRb(id) {
   if (d?.success) {
     loadResellerBot();
     toast(
-      d.status === "active" ? "Reseller diaktifkan" : "Reseller dinonaktifkan"
+      d.active ? "Reseller diaktifkan" : "Reseller dinonaktifkan"
     );
   }
 }
@@ -3848,7 +3914,7 @@ async function loadApiTokens() {
   const tb = document.getElementById("t-api-tokens");
   if (!tb) return;
   // Read token file via API (we need an admin endpoint)
-  const tokens = await req("/mobile/v1/admin/tokens").catch(() => null);
+  const tokens = await req("/mobile/tokens").catch(() => null);
   if (!tokens?.success) {
     tb.innerHTML =
       '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:12px">Gunakan endpoint admin untuk melihat token aktif</td></tr>';
@@ -3858,8 +3924,8 @@ async function loadApiTokens() {
     ? (tokens.tokens || [])
         .map(
           (t) => `<tr>
-        <td><b>${t.resellerName}</b></td>
-        <td><code style="font-size:.78rem">${t.telegramId}</code></td>
+        <td><b>${t.name || "—"}</b></td>
+        <td><code style="font-size:.78rem">${t.username || "—"}</code></td>
         <td><span class="badge b-bl">${t.sessionId}</span></td>
         <td style="font-size:.75rem;color:var(--muted)">${new Date(t.createdAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}</td>
         <td style="font-size:.75rem;color:var(--muted)">${new Date(t.expiresAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}</td>
@@ -3872,9 +3938,10 @@ async function loadApiTokens() {
 }
 
 async function testMobileLogin() {
-  const tid = document.getElementById("api-test-tid").value.trim();
-  if (!tid) {
-    toast("Masukkan Telegram ID", true);
+  const username = document.getElementById("api-test-username").value.trim();
+  const password = document.getElementById("api-test-password").value;
+  if (!username || !password) {
+    toast("Masukkan username dan password", true);
     return;
   }
   const resultEl = document.getElementById("api-test-result");
@@ -3882,14 +3949,15 @@ async function testMobileLogin() {
   resultEl.style.display = "block";
   jsonEl.textContent = "Loading...";
   try {
-    const d = await fetch(`/mobile/v1/auth/login`, {
+    const d = await fetch(`${API}/mobile/login`, {
+      credentials: "include",
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telegramId: tid })
+      body: JSON.stringify({ username, password })
     }).then((r) => r.json());
     jsonEl.textContent = JSON.stringify(d, null, 2);
     jsonEl.style.color = d.success ? "var(--green)" : "var(--red)";
-    if (d.success) toast(`✓ Login berhasil: ${d.reseller?.name}`);
+    if (d.success) toast("✓ Login berhasil; token telah dibuat");
     else toast("Login gagal: " + d.error, true);
   } catch (e) {
     jsonEl.textContent = "Error: " + e.message;
@@ -4021,7 +4089,10 @@ async function loadBillUsers(selectedUser = "") {
   const psel = document.getElementById("mb-user");
   psel.innerHTML = '<option value="">Loading...</option>';
   if (!CS) return;
-  const users = (await req(`/billing/${CS}/import-users/${type}`)) || [];
+  const users = listFrom(
+    await req(`/billing/${CS}/import-users/${type}`),
+    "users"
+  );
   psel.innerHTML = '<option value="">Pilih user...</option>';
   users.forEach(
     (u) =>
@@ -4113,8 +4184,10 @@ async function reEnable(id) {
 
 async function suspendCustomer(id) {
   if (!confirm("Blokir akses pelanggan ini di MikroTik?")) return;
-  const d = await req(`/billing/${CS}/run-overdue`);
-  loadBilling();
+  const d = await post(`/billing/${CS}/customers/${id}/suspend`, {});
+  d?.success
+    ? (loadBilling(), toast("Pelanggan diblokir"))
+    : toast(d?.error || "Gagal memblokir pelanggan", true);
 }
 
 async function runOverdue() {
@@ -4452,7 +4525,7 @@ async function saveBrs() {
       }).then((r) => r.json())
     : await post("/bot-resellers", body);
   hideL();
-  if (d?.id) {
+  if (d?.success && d.reseller?.id) {
     closeM("m-brs");
     loadBotResellers();
     toast(editBrsId ? "Agen diupdate!" : "Agen ditambahkan!");
@@ -4466,7 +4539,7 @@ async function toggleBrs(id) {
   }).then((r) => r.json());
   if (d?.success) {
     loadBotResellers();
-    toast(d.status === "active" ? "Agen diaktifkan" : "Agen dinonaktifkan");
+    toast(d.active ? "Agen diaktifkan" : "Agen dinonaktifkan");
   }
 }
 
@@ -4543,7 +4616,8 @@ async function showBrsLog(id, name) {
   document
     .getElementById("brs-log-card")
     .scrollIntoView({ behavior: "smooth" });
-  const logs = (await req("/bot-resellers/logs/" + id)) || [];
+  const logs =
+    (await req("/bot-resellers/logs?resellerId=" + encodeURIComponent(id))) || [];
   const TYPE_LABEL = {
     topup: "Topup",
     deduct: "Potong",
@@ -5040,7 +5114,10 @@ async function initTrafficPanel() {
 
   // Load interface list
   try {
-    const ifaces = await req(`/mikrotik/${CS}/interfaces`).catch(() => []);
+    const ifaces = listFrom(
+      await req(`/mikrotik/${CS}/interfaces`).catch(() => []),
+      "interfaces"
+    );
     const sel = document.getElementById("traffic-iface-sel");
     sel.innerHTML = '<option value="">— Pilih Interface —</option>';
 
@@ -5952,7 +6029,7 @@ const gwBadge =
 
 async function showPaymentDetail(gateway, orderId) {
   currentPayment = { gateway, orderId };
-  const d = await req(`/payments/${gateway}/${orderId}`);
+  const d = await req(`/payments/${orderId}`);
   if (!d?.success || !d.transaction) {
     toast("Transaksi tidak ditemukan", true);
     return;
@@ -5991,7 +6068,7 @@ async function checkPaymentStatusNow() {
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Checking...';
   }
   const d = await fetch(
-    `${API}/payments/${currentPayment.gateway}/${currentPayment.orderId}/check`,
+    `${API}/payments/${currentPayment.orderId}/check`,
     { method: "POST", credentials: "include" }
   ).then((r) => r.json());
   if (btn) {
