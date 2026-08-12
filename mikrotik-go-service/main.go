@@ -69,10 +69,6 @@ func handleVoucherBatchCreated(ctx context.Context, routerServer *server.RouterS
 		return fmt.Errorf("voucher.batch.created missing batchId")
 	}
 
-	// Read the router once. The previous implementation queried the complete
-	// hotspot user list for every voucher, turning a batch of N vouchers into
-	// N router round-trips (and O(N²) comparisons). A single snapshot is both
-	// faster and less likely to overload the router.
 	users, err := routerServer.ListHotspotUsers(ctx, &pb.ListHotspotUsersRequest{SessionId: batch.SessionID})
 	if err != nil {
 		return fmt.Errorf("list router users for batch %s: %w", batch.BatchID, err)
@@ -94,10 +90,6 @@ func handleVoucherBatchCreated(ctx context.Context, routerServer *server.RouterS
 		}
 
 		if existing, ok := existingByName[voucher.Username]; ok {
-			// Redis Streams can redeliver a message after a crash. If the same
-			// account is already configured, treat the replay as successful.
-			// Never overwrite an existing account with a different password or
-			// profile because it may belong to another batch/customer.
 			if existing.Profile != voucher.Profile || existing.Password != voucher.Password {
 				return fmt.Errorf("router user %q already exists with different configuration", voucher.Username)
 			}
@@ -118,9 +110,6 @@ func handleVoucherBatchCreated(ctx context.Context, routerServer *server.RouterS
 			return fmt.Errorf("add hotspot user %s: %s", voucher.Username, res.Error)
 		}
 
-		// Keep the in-memory snapshot consistent if the event contains the
-		// same username more than once. A duplicate within one event is still
-		// treated as a conflict on the next iteration.
 		existingByName[voucher.Username] = &pb.HotspotUser{
 			Name:     voucher.Username,
 			Password: voucher.Password,
@@ -174,7 +163,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("[mikrotik-go-service] failed to listen on %s: %v", grpcAddr, err)
 	}
-	gs := grpc.NewServer()
+	serviceToken := os.Getenv("GRPC_SERVICE_TOKEN")
+	if serviceToken == "" {
+		log.Fatal("[mikrotik-go-service] GRPC_SERVICE_TOKEN is required")
+	}
+	gs := grpc.NewServer(grpc.UnaryInterceptor(server.ServiceAuthInterceptor(serviceToken)))
 	pb.RegisterRouterServiceServer(gs, routerServer)
 
 	log.Printf("[mikrotik-go-service] gRPC listener ready on %s", grpcAddr)
