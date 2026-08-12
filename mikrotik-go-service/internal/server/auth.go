@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"crypto/subtle"
-	"status"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
