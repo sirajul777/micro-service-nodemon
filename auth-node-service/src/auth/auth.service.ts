@@ -31,10 +31,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  /**
-   * Validate against the multi-user system first, then fall back to the
-   * legacy single admin in app_config. Returns the safe user object.
-   */
   async validateUserFull(
     username: string,
     password: string,
@@ -88,11 +84,10 @@ export class AuthService {
       throw new UnauthorizedException('Token tidak valid atau kadaluarsa');
     }
 
+    // The legacy single-admin identity is stored in app_config rather than
+    // the users table, so preserve its signed JWT context. New multi-users
+    // are always rehydrated from the authoritative users table below.
     if (signed.sub === 'legacy-admin') {
-      if (!(await this.configService.validateAdmin(signed.username, '__token_validation__'))) {
-        // The legacy config validator is password-based, so do not use it here.
-        // Legacy JWTs remain governed by their signature + expiry.
-      }
       return {
         ...signed,
         permissions: FULL_ADMIN_PERMISSIONS,
