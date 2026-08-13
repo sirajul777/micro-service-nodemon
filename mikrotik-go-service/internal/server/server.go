@@ -498,7 +498,15 @@ func (s *RouterServiceServer) SetupExpiryScheduler(ctx context.Context, req *pb.
 	defer c.Close()
 
 	const schedulerName = "mikhmon-cleanup-expired"
-	const cleanupScript = `{ :local now [/system clock get date]; :if ([:pick $now 4 5] = "-") do={ :local arraybln {"01"="jan";"02"="feb";"03"="mar";"04"="apr";"05"="may";"06"="jun";"07"="jul";"08"="aug";"09"="sep";"10"="oct";"11"="nov";"12"="dec"}; :local tgl [:pick $now 8 10]; :local bulan [:pick $now 5 7]; :local tahun [:pick $now 0 4]; :local bln ($arraybln->$bulan); :set $now ($bln."/".$tgl."/".$tahun); }; :foreach u in=[/ip hotspot user find] do={ :local comment [/ip hotspot user get $u comment]; :local ucode [:pick $comment 0 2]; :if ($ucode != "vc" and $ucode != "up" and $comment != "") do={ :local expDate [:pick $comment 0 11]; :if ($expDate < $now) do={ /ip hotspot user remove $u; }; }; }; }`
+	cleanupScript := cleanupScriptROS6
+
+	replies, err := c.Run("/system/resource/print")
+	if err == nil && len(replies) > 0 {
+			version := replies[0]["version"]
+			if strings.HasPrefix(version, "7.") {
+					cleanupScript = cleanupScriptROS7
+			}
+	}
 
 	existing, err := c.Run("/system/scheduler/print", "?name="+schedulerName)
 	if err != nil {
