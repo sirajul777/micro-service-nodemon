@@ -1,166 +1,183 @@
-import {
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { VoucherBatchEntity } from '../entities/voucher-batch.entity';
+import { Controller, Delete, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermission } from '../auth/permissions.decorator';
 import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
+import { ReportRouterClient, ReportScript } from './report-router.client';
 
 const INDO_CURRENCIES = ['RP', 'Rp', 'rp', 'IDR', 'idr', 'RP.', 'Rp.', 'rp.', 'IDR.', 'idr.'];
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
-/** Parses the "D/M/YYYY, HH.MM.SS" format written by
- * `new Date().toLocaleString('id-ID')` (see voucher-batch.service.ts /
- * voucher-batch.controller.ts, where `usedAt` is set) -- `new Date(str)`
- * can't parse this locale format at all (always Invalid Date), which
- * silently made month-based filtering here return zero every time. */
-function parseIdDate(s: string): { month: number; year: number } | null {
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s || '');
-  if (!m) return null;
-  return { month: parseInt(m[2], 10) - 1, year: parseInt(m[3], 10) };
+function parseScriptName(name: string) {
+  const parts = String(name || '').split('-|-');
+  return {
+    date: parts[0] || '',
+    time: parts[1] || '',
+    username: parts[2] || '',
+    price: Number.parseFloat(parts[3] || '0') || 0,
+    profile: parts[7] || '',
+    comment: parts[8] || '',
+    raw: parts,
+  };
 }
 
-/**
- * Selling / live / resume reports, aggregated from the voucher_batches rows
- * in db_erp (the only transactional data this service owns).
- *
- * The BFF routes `/api/report/:session/*` ? erp `/report/:session/*`
- * (see `report` target alias in main-node-service proxy.controller.ts).
- */
+function resellerTag(comment: string): string {
+  if (!comment) return '(no comment)';
+  const match = comment.match(/^up-\d+-[\d.]+-(.+)$/i);
+  return match ? match[1].toUpperCase() : comment.toUpperCase();
+}
+
+function currentIdbl(date = new Date()): string {
+  return `${MONTHS[date.getMonth()]}${date.getFullYear()}`;
+}
+
+function currentIdhr(date = new Date()): string {
+  return `${MONTHS[date.getMonth()]}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
 @Controller('report')
 @UseGuards(JwtAuthGuard)
 @RequirePermission('viewReport')
 export class ReportController {
-  constructor(
-    @InjectRepository(VoucherBatchEntity)
-    private readonly batchRepo: Repository<VoucherBatchEntity>,
-    private readonly mikrotik: MikrotikGrpcClient,
-  ) {}
+  private readonly reportRouter = new ReportRouterClient();
 
-  /** GET /report/:session/selling -- selling records (voucher usage). */
+  constructor(private readonly mikrotik: MikrotikGrpcClient) {}
+
   @Get(':session/selling')
   async selling(
     @Param('session') session: string,
+    @Query('idhr') idhr?: string,
+    @Query('idbl') idbl?: string,
+    @Query('prefix') prefix?: string,
+    @Query('datacomments') datacomments?: string,
+    @Query('dataprofile') dataprofile?: string,
     @Query('reseller') reseller?: string,
   ) {
-    const rows = await this.batchRepo.find({ where: { sessionId: session } });
-    const records: any[] = [];
-    for (const b of rows) {
-      for (const v of b.vouchers || []) {
-        if (v.status !== 'used') continue;
-        if (reseller && b.resellerName !== reseller) continue;
-        records.push({
-          id: `${b.id}-${v.username}`,
-          username: v.username,
-          profile: v.profile || b.profileName,
-          price: v.price ?? b.price,
-          comment: v.comment || '',
-          usedBy: v.usedBy || '',
-          usedAt: v.usedAt || b.createdAt,
-          reseller: b.resellerName || '',
-          batchId: b.id,
-        });
-      }
+    const scripts = await this.reportRouter.listScripts(session, { idhr, idbl });
+    let records = scripts.map((script: ReportScript) => {
+      const parsed = parseScriptName(script.name);
+      return {
+        ...parsed,
+        resellerTag: resellerTag(parsed.comment),
+      };
+    });
+
+    if (prefix) records = records.filter((r) => r.username.startsWith(prefix));
+    if (datacomments) records = records.filter((r) => r.comment === datacomments);
+    if (dataprofile) records = records.filter((r) => r.profile === dataprofile);
+    if (reseller) records = records.filter((r) => r.resellerTag === reseller.toUpperCase());
+
+    const totalVouchers = records.length;
+    const totalIncome = records.reduce((sum, r) => sum + r.price, 0);
+    const sessionResp = await this.mikrotik.getSession(session).catch(() => null);
+    const currency = sessionResp?.session?.currency || 'Rp';
+
+    const resellerMap: Record<string, { tag: string; vouchers: number; total: number }> = {};
+    for (const record of records) {
+      const tag = record.resellerTag;
+      if (!resellerMap[tag]) resellerMap[tag] = { tag, vouchers: 0, total: 0 };
+      resellerMap[tag].vouchers++;
+      resellerMap[tag].total += record.price;
     }
-    return { success: true, records };
+
+    return {
+      records,
+      summary: {
+        totalVouchers,
+        totalIncome,
+        currency,
+        isIndo: INDO_CURRENCIES.includes(currency),
+      },
+      resellerGroups: Object.values(resellerMap).sort((a, b) => b.total - a.total),
+      filter: { idhr, idbl, prefix, datacomments, dataprofile, reseller },
+    };
   }
 
-  /**
-   * GET /report/:session/live -- live report (today + this month's income).
-   * Response shape matches the reference monolith's `getLiveReport()`
-   * exactly (compared directly against sirajul777/nodemon's
-   * report.service.ts) -- main-node-service's app.js loadDashboard() reads
-   * `live.today.income`, `live.month.income`, `live.currency`,
-   * `live.isIndo` directly off this. The previous
-   * `{success, income, vouchersSold, records}` shape had none of those
-   * keys, so the dashboard's income/voucher stat cards always rendered
-   * blank/"undefined" even though the request itself succeeded.
-   */
   @Get(':session/live')
   async live(@Param('session') session: string) {
-    const rows = await this.batchRepo.find({ where: { sessionId: session } });
     const now = new Date();
-    const todayStr = now.toLocaleDateString('id-ID');
-    const curMonth = now.getMonth();
-    const curYear = now.getFullYear();
+    const idhr = currentIdhr(now);
+    const scripts = await this.reportRouter.listScripts(session, { idbl: currentIdbl(now) });
 
-    let todayIncome = 0;
     let todayVouchers = 0;
+    let todayIncome = 0;
     let monthIncome = 0;
-    let monthVouchers = 0;
-    for (const b of rows) {
-      for (const v of b.vouchers || []) {
-        if (v.status !== 'used') continue;
-        const usedAt = v.usedAt || b.createdAt;
-        const price = v.price ?? b.price ?? 0;
-        const usedDate = parseIdDate(usedAt);
-        if (usedDate && usedDate.month === curMonth && usedDate.year === curYear) {
-          monthIncome += price;
-          monthVouchers++;
-        }
-        if (usedAt.includes(todayStr)) {
-          todayIncome += price;
-          todayVouchers++;
-        }
+    for (const script of scripts) {
+      const parsed = parseScriptName(script.name);
+      monthIncome += parsed.price;
+      if (parsed.date === idhr) {
+        todayVouchers++;
+        todayIncome += parsed.price;
       }
     }
 
-    const session_ = await this.mikrotik.getSession(session).catch(() => null);
-    const currency = session_?.session?.currency || 'Rp';
+    const sessionResp = await this.mikrotik.getSession(session).catch(() => null);
+    const currency = sessionResp?.session?.currency || 'Rp';
 
     return {
       today: { vouchers: todayVouchers, income: todayIncome },
-      month: { vouchers: monthVouchers, income: monthIncome },
+      month: { vouchers: scripts.length, income: monthIncome },
       currency,
       isIndo: INDO_CURRENCIES.includes(currency),
     };
   }
 
-  /** GET /report/:session/resume -- daily income summary. */
   @Get(':session/resume')
   async resume(@Param('session') session: string, @Query('idbl') idbl?: string) {
-    const rows = await this.batchRepo.find({ where: { sessionId: session } });
-    const byDate: Record<string, { income: number; vouchers: number }> = {};
-    for (const b of rows) {
-      for (const v of b.vouchers || []) {
-        if (v.status !== 'used') continue;
-        const usedAt = v.usedAt || b.createdAt;
-        const dateKey = usedAt.split(',')[0] || usedAt.slice(0, 10);
-        const price = v.price ?? b.price;
-        byDate[dateKey] = byDate[dateKey] || { income: 0, vouchers: 0 };
-        byDate[dateKey].income += price;
-        byDate[dateKey].vouchers++;
+    const monthId = idbl || currentIdbl();
+    const scripts = await this.reportRouter.listScripts(session, { idbl: monthId });
+    const mm = monthId.slice(0, 3).toLowerCase();
+    const yyyy = monthId.slice(3);
+    const monthNums: Record<string, number> = {
+      jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+      jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+    };
+    const monthNum = monthNums[mm] || new Date().getMonth() + 1;
+    const yearNum = Number.parseInt(yyyy, 10) || new Date().getFullYear();
+    const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+    const now = new Date();
+    const isCurrentMonth = monthNum === now.getMonth() + 1 && yearNum === now.getFullYear();
+    const maxDay = isCurrentMonth ? now.getDate() : daysInMonth;
+
+    const dailyMap: Record<string, { date: string; vouchers: number; total: number }> = {};
+    for (let d = 1; d <= maxDay; d++) {
+      const dd = String(d).padStart(2, '0');
+      dailyMap[`${mm}/${dd}/${yearNum}`] = { date: dd, vouchers: 0, total: 0 };
+    }
+
+    let totalIncome = 0;
+    for (const script of scripts) {
+      const parsed = parseScriptName(script.name);
+      totalIncome += parsed.price;
+      const day = dailyMap[parsed.date];
+      if (day) {
+        day.vouchers++;
+        day.total += parsed.price;
       }
     }
-    const days = Object.entries(byDate)
-      .map(([date, d]) => ({ date, ...d }))
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
-    return { success: true, days };
+
+    const sessionResp = await this.mikrotik.getSession(session).catch(() => null);
+    const currency = sessionResp?.session?.currency || 'Rp';
+
+    return {
+      daily: Object.values(dailyMap),
+      summary: {
+        totalVouchers: scripts.length,
+        totalIncome,
+        currency,
+        isIndo: INDO_CURRENCIES.includes(currency),
+        month: mm,
+        year: yyyy,
+      },
+    };
   }
 
-  /** DELETE /report/:session/selling -- clear report data. */
   @Delete(':session/selling')
-  async clear(@Param('session') session: string) {
-    // Mark all used vouchers as available again (best-effort "clear report").
-    const rows = await this.batchRepo.find({ where: { sessionId: session } });
-    for (const b of rows) {
-      let changed = false;
-      for (const v of b.vouchers || []) {
-        if (v.status === 'used') {
-          v.status = 'available';
-          v.usedBy = '';
-          v.usedAt = '';
-          changed = true;
-        }
-      }
-      if (changed) await this.batchRepo.save(b);
-    }
+  async clear(
+    @Param('session') session: string,
+    @Query('idhr') idhr?: string,
+    @Query('idbl') idbl?: string,
+  ) {
+    await this.reportRouter.deleteScripts(session, { idhr, idbl });
     return { success: true };
   }
 }

@@ -170,7 +170,7 @@ func main() {
 	// configured with the token, set it here and the boundary becomes enforced.
 	serviceToken := os.Getenv("GRPC_SERVICE_TOKEN")
 	gs := grpc.NewServer(grpc.UnaryInterceptor(server.ServiceAuthInterceptor(serviceToken)))
-	pb.RegisterRouterServiceServer(gs, routerServer)
+	pb.RegisterRouterServiceServer(gs, server.NewReportRouterServiceServer(routerServer))
 
 	log.Printf("[mikrotik-go-service] gRPC listener ready on %s (service auth: %t)", grpcAddr, serviceToken != "")
 	go func() {
