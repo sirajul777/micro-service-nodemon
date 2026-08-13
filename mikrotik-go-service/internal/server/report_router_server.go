@@ -60,6 +60,11 @@ func (s *ReportRouterServiceServer) sellingScripts(ctx context.Context, sessionI
 		ros7 = false
 	}
 
+	toMaps := func(rows []map[string]string) []map[string]string {
+		return rows
+	}
+	_ = toMaps
+
 	if idhr != "" {
 		parts := strings.Split(idhr, "/")
 		if len(parts) >= 3 {
@@ -78,25 +83,57 @@ func (s *ReportRouterServiceServer) sellingScripts(ctx context.Context, sessionI
 					date = name[:i]
 				}
 				if date == idhr {
-					filtered = append(filtered, row)
+					filtered = append(filtered, map[string]string(row))
 				}
 			}
 			return filtered, nil
 		}
-		return c.Run("/system/script/print", "?source="+idhr)
+		rows, err := c.Run("/system/script/print", "?source="+idhr)
+		if err != nil {
+			return nil, err
+		}
+		filtered := make([]map[string]string, 0, len(rows))
+		for _, row := range rows {
+			filtered = append(filtered, map[string]string(row))
+		}
+		return filtered, nil
 	}
 
 	if idbl != "" {
-		return c.Run("/system/script/print", "?owner="+idbl)
+		rows, err := c.Run("/system/script/print", "?owner="+idbl)
+		if err != nil {
+			return nil, err
+		}
+		filtered := make([]map[string]string, 0, len(rows))
+		for _, row := range rows {
+			filtered = append(filtered, map[string]string(row))
+		}
+		return filtered, nil
 	}
 
 	now := time.Now()
 	months := [...]string{"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"}
 	idbl = months[now.Month()-1] + formatYear(now.Year())
 	if ros7 {
-		return c.Run("/system/script/print", "?owner="+idbl)
+		rows, err := c.Run("/system/script/print", "?owner="+idbl)
+		if err != nil {
+			return nil, err
+		}
+		filtered := make([]map[string]string, 0, len(rows))
+		for _, row := range rows {
+			filtered = append(filtered, map[string]string(row))
+		}
+		return filtered, nil
 	}
-	return c.Run("/system/script/print", "?comment=mikhmon")
+	rows, err := c.Run("/system/script/print", "?comment=mikhmon")
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]map[string]string, 0, len(rows))
+	for _, row := range rows {
+		filtered = append(filtered, map[string]string(row))
+	}
+	return filtered, nil
 }
 
 func formatYear(year int) string {
