@@ -1,5 +1,3 @@
-syntax = "proto3";
-
 package router;
 
 option go_package = "github.com/mikhmon/mikrotik-go-service/proto";
@@ -24,6 +22,7 @@ service RouterService {
   rpc ListSchedulers(ListSchedulersRequest) returns (ListSchedulersResponse);
   rpc AddScheduler(AddSchedulerRequest) returns (AddSchedulerResponse);
   rpc UpdateScheduler(UpdateSchedulerRequest) returns (UpdateSchedulerResponse);
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse);
   rpc ListSellingScripts(ListSellingScriptsRequest) returns (ListSellingScriptsResponse);
   rpc GetSystemResource(SystemResourceRequest) returns (SystemResourceResponse);
   rpc GetInterfaces(InterfacesRequest) returns (InterfacesResponse);
@@ -48,10 +47,6 @@ service RouterService {
   rpc ListPppPools(ListPppPoolsRequest) returns (ListPppPoolsResponse);
 }
 
-message ListSchedulersRequest { string session_id = 1; }
-message Scheduler { string id = 1; string name = 2; string start_date = 3; string start_time = 4; string interval = 5; string on_event = 6; string disabled = 7; string comment = 8; }
-message ListSchedulersResponse { bool success = 1; string error = 2; repeated Scheduler schedulers = 3; }
-message AddSchedulerRequest { string session_id = 1; string name = 2; string start_date = 3; string start_time = 4; string interval = 5; string on_event = 6; string disabled = 7; string comment = 8; }
-message AddSchedulerResponse { bool success = 1; string error = 2; }
-message UpdateSchedulerRequest { string session_id = 1; string name = 2; string on_event = 3; string disabled = 4; string comment = 5; }
-message UpdateSchedulerResponse { bool success = 1; string error = 2; }
+message ListLogsRequest { string session_id = 1; string topics = 2; }
+message LogEntry { string id = 1; string time = 2; string topics = 3; string message = 4; }
+message ListLogsResponse { bool success = 1; string error = 2; repeated LogEntry logs = 3; }
