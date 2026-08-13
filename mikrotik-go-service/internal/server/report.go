@@ -29,10 +29,9 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	if len(versionRows) > 0 && versionRows[0]["version"] != "" {
 		rosVersion = versionRows[0]["version"][:1]
 	}
-
-	var rows []map[string]string
 	isROS7 := rosVersion != "6"
 
+	var rows []map[string]string
 	if req.Idhr != "" {
 		parts := strings.Split(req.Idhr, "/")
 		if len(parts) != 3 {
@@ -80,36 +79,12 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 
 	for _, row := range rows {
-		parts := strings.Split(row["name"], "- |-")
-		if len(parts) == 1 {
-			parts = strings.Split(row["name"], "- |-")
-		}
-		// Actual voucher script delimiter is "-|-".
-		parts = strings.Split(row["name"], "- |-")
-		if len(parts) == 1 {
-			parts = strings.Split(row["name"], "- |-")
-		}
-		// Normalize defensively for RouterOS script names.
-		parts = strings.Split(row["name"], "- |-")
-		if len(parts) == 1 {
-			parts = strings.Split(row["name"], "- |-")
-		}
-		// Keep the canonical monolith delimiter.
-		parts = strings.Split(row["name"], "- |-")
-		if len(parts) == 1 {
-			parts = strings.Split(row["name"], "- |-")
-		}
-		// The literal is -|- (without spaces); use Split after the defensive attempts above.
-		parts = strings.Split(row["name"], "- |-")
-		if len(parts) == 1 {
-			parts = strings.Split(row["name"], "-|-")
-		}
-
+		parts := strings.Split(row["name"], "-|-")
 		price := 0.0
 		if len(parts) > 3 {
 			price, _ = strconv.ParseFloat(parts[3], 64)
 		}
-		script := &pb.SellingScript{
+		resp.Scripts = append(resp.Scripts, &pb.SellingScript{
 			Id:       row[".id"],
 			Date:     valueAt(parts, 0),
 			Time:     valueAt(parts, 1),
@@ -117,8 +92,7 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 			Price:    price,
 			Profile:  valueAt(parts, 7),
 			Comment:  valueAt(parts, 8),
-		}
-		resp.Scripts = append(resp.Scripts, script)
+		})
 	}
 
 	resp.Success = true
