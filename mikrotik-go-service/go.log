@@ -1,0 +1,2 @@
+2026/08/12 22:15:04 [mikrotik-go-service] store init failed: migrate router_sessions: failed to connect to `host=localhost user=admin_mikrotik database=db_router`: server error (FATAL: role "admin_mikrotik" does not exist (SQLSTATE 28000))
+exit status 1

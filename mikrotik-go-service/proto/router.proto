@@ -48,6 +48,9 @@ service RouterService {
   // sent over the wire from erp-node-service.
   rpc SetupExpiryScheduler(SetupExpirySchedulerRequest) returns (SetupExpirySchedulerResponse);
 
+  // Selling/report data from MikroTik /system/script/print
+  rpc ListSellingScripts(ListSellingScriptsRequest) returns (ListSellingScriptsResponse);
+
   // System info
   rpc GetSystemResource(SystemResourceRequest) returns (SystemResourceResponse);
   rpc GetInterfaces(InterfacesRequest) returns (InterfacesResponse);
@@ -604,3 +607,27 @@ message ListPppPoolsResponse {
   string error = 2;
   repeated PppPool pools = 3;
 }
+
+// ── Selling / report scripts ─────────────────────────────────────
+message ListSellingScriptsRequest {
+  string session_id = 1;
+  string idhr = 2;
+  string idbl = 3;
+}
+
+message SellingScript {
+  string id = 1;
+  string date = 2;
+  string time = 3;
+  string username = 4;
+  double price = 5;
+  string profile = 6;
+  string comment = 7;
+}
+
+message ListSellingScriptsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated SellingScript scripts = 3;
+}
+
