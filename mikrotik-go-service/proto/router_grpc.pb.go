@@ -37,7 +37,6 @@ const (
 	RouterService_UpdateScheduler_FullMethodName = "/router.RouterService/UpdateScheduler"
 	RouterService_ListLogs_FullMethodName = "/router.RouterService/ListLogs"
 	RouterService_ListSellingScripts_FullMethodName = "/router.RouterService/ListSellingScripts"
-	RouterService_DeleteSellingScripts_FullMethodName = "/router.RouterService/DeleteSellingScripts"
 	RouterService_GetSystemResource_FullMethodName = "/router.RouterService/GetSystemResource"
 	RouterService_GetInterfaces_FullMethodName = "/router.RouterService/GetInterfaces"
 	RouterService_ListSessions_FullMethodName = "/router.RouterService/ListSessions"
@@ -62,101 +61,96 @@ const (
 )
 
 type RouterServiceClient interface {
-	TestConnect(context.Context, *TestConnectRequest, ...grpc.CallOption) (*TestConnectResponse, error)
-	GetDashboard(context.Context, *GetDashboardRequest, ...grpc.CallOption) (*GetDashboardResponse, error)
-	ListActiveHotspotUsers(context.Context, *ListActiveRequest, ...grpc.CallOption) (*ListActiveResponse, error)
-	ListHotspotUsers(context.Context, *ListHotspotUsersRequest, ...grpc.CallOption) (*ListHotspotUsersResponse, error)
-	AddHotspotUser(context.Context, *AddHotspotUserRequest, ...grpc.CallOption) (*AddHotspotUserResponse, error)
-	RemoveHotspotUser(context.Context, *RemoveHotspotUserRequest, ...grpc.CallOption) (*RemoveHotspotUserResponse, error)
-	DisableHotspotUser(context.Context, *DisableHotspotUserRequest, ...grpc.CallOption) (*DisableHotspotUserResponse, error)
-	EnableHotspotUser(context.Context, *EnableHotspotUserRequest, ...grpc.CallOption) (*EnableHotspotUserResponse, error)
-	ListHotspotProfiles(context.Context, *ListProfilesRequest, ...grpc.CallOption) (*ListProfilesResponse, error)
-	GetHotspotProfile(context.Context, *GetProfileRequest, ...grpc.CallOption) (*GetProfileResponse, error)
-	AddHotspotProfile(context.Context, *AddHotspotProfileRequest, ...grpc.CallOption) (*AddHotspotProfileResponse, error)
-	UpdateHotspotProfile(context.Context, *UpdateHotspotProfileRequest, ...grpc.CallOption) (*UpdateHotspotProfileResponse, error)
-	DeleteHotspotProfile(context.Context, *DeleteHotspotProfileRequest, ...grpc.CallOption) (*DeleteHotspotProfileResponse, error)
-	BulkRemoveHotspotUsers(context.Context, *BulkRemoveHotspotUsersRequest, ...grpc.CallOption) (*BulkRemoveHotspotUsersResponse, error)
-	SetupExpiryScheduler(context.Context, *SetupExpirySchedulerRequest, ...grpc.CallOption) (*SetupExpirySchedulerResponse, error)
-	ListDhcpLeases(context.Context, *ListDhcpLeasesRequest, ...grpc.CallOption) (*ListDhcpLeasesResponse, error)
-	ListSchedulers(context.Context, *ListSchedulersRequest, ...grpc.CallOption) (*ListSchedulersResponse, error)
-	AddScheduler(context.Context, *AddSchedulerRequest, ...grpc.CallOption) (*AddSchedulerResponse, error)
-	UpdateScheduler(context.Context, *UpdateSchedulerRequest, ...grpc.CallOption) (*UpdateSchedulerResponse, error)
-	ListLogs(context.Context, *ListLogsRequest, ...grpc.CallOption) (*ListLogsResponse, error)
-	ListSellingScripts(context.Context, *ListSellingScriptsRequest, ...grpc.CallOption) (*ListSellingScriptsResponse, error)
-	DeleteSellingScripts(context.Context, *DeleteSellingScriptsRequest, ...grpc.CallOption) (*DeleteSellingScriptsResponse, error)
-	GetSystemResource(context.Context, *SystemResourceRequest, ...grpc.CallOption) (*SystemResourceResponse, error)
-	GetInterfaces(context.Context, *InterfacesRequest, ...grpc.CallOption) (*InterfacesResponse, error)
-	ListSessions(context.Context, *ListSessionsRequest, ...grpc.CallOption) (*ListSessionsResponse, error)
-	GetSession(context.Context, *GetSessionRequest, ...grpc.CallOption) (*GetSessionResponse, error)
-	CreateSession(context.Context, *CreateSessionRequest, ...grpc.CallOption) (*CreateSessionResponse, error)
-	UpdateSession(context.Context, *UpdateSessionRequest, ...grpc.CallOption) (*UpdateSessionResponse, error)
-	DeleteSession(context.Context, *DeleteSessionRequest, ...grpc.CallOption) (*DeleteSessionResponse, error)
-	ListPppSecrets(context.Context, *ListPppSecretsRequest, ...grpc.CallOption) (*ListPppSecretsResponse, error)
-	GetPppSecret(context.Context, *GetPppSecretRequest, ...grpc.CallOption) (*GetPppSecretResponse, error)
-	AddPppSecret(context.Context, *AddPppSecretRequest, ...grpc.CallOption) (*AddPppSecretResponse, error)
-	UpdatePppSecret(context.Context, *UpdatePppSecretRequest, ...grpc.CallOption) (*UpdatePppSecretResponse, error)
-	DeletePppSecret(context.Context, *DeletePppSecretRequest, ...grpc.CallOption) (*DeletePppSecretResponse, error)
-	EnablePppSecret(context.Context, *EnablePppSecretRequest, ...grpc.CallOption) (*EnablePppSecretResponse, error)
-	DisablePppSecret(context.Context, *DisablePppSecretRequest, ...grpc.CallOption) (*DisablePppSecretResponse, error)
-	ListPppProfiles(context.Context, *ListPppProfilesRequest, ...grpc.CallOption) (*ListPppProfilesResponse, error)
-	AddPppProfile(context.Context, *AddPppProfileRequest, ...grpc.CallOption) (*AddPppProfileResponse, error)
-	UpdatePppProfile(context.Context, *UpdatePppProfileRequest, ...grpc.CallOption) (*UpdatePppProfileResponse, error)
-	DeletePppProfile(context.Context, *DeletePppProfileRequest, ...grpc.CallOption) (*DeletePppProfileResponse, error)
-	ListPppActive(context.Context, *ListPppActiveRequest, ...grpc.CallOption) (*ListPppActiveResponse, error)
-	DisconnectPppActive(context.Context, *DisconnectPppActiveRequest, ...grpc.CallOption) (*DisconnectPppActiveResponse, error)
-	ListPppPools(context.Context, *ListPppPoolsRequest, ...grpc.CallOption) (*ListPppPoolsResponse, error)
+	TestConnect(context.Context,*TestConnectRequest,...grpc.CallOption)(*TestConnectResponse,error)
+	GetDashboard(context.Context,*GetDashboardRequest,...grpc.CallOption)(*GetDashboardResponse,error)
+	ListActiveHotspotUsers(context.Context,*ListActiveRequest,...grpc.CallOption)(*ListActiveResponse,error)
+	ListHotspotUsers(context.Context,*ListHotspotUsersRequest,...grpc.CallOption)(*ListHotspotUsersResponse,error)
+	AddHotspotUser(context.Context,*AddHotspotUserRequest,...grpc.CallOption)(*AddHotspotUserResponse,error)
+	RemoveHotspotUser(context.Context,*RemoveHotspotUserRequest,...grpc.CallOption)(*RemoveHotspotUserResponse,error)
+	DisableHotspotUser(context.Context,*DisableHotspotUserRequest,...grpc.CallOption)(*DisableHotspotUserResponse,error)
+	EnableHotspotUser(context.Context,*EnableHotspotUserRequest,...grpc.CallOption)(*EnableHotspotUserResponse,error)
+	ListHotspotProfiles(context.Context,*ListProfilesRequest,...grpc.CallOption)(*ListProfilesResponse,error)
+	GetHotspotProfile(context.Context,*GetProfileRequest,...grpc.CallOption)(*GetProfileResponse,error)
+	AddHotspotProfile(context.Context,*AddHotspotProfileRequest,...grpc.CallOption)(*AddHotspotProfileResponse,error)
+	UpdateHotspotProfile(context.Context,*UpdateHotspotProfileRequest,...grpc.CallOption)(*UpdateHotspotProfileResponse,error)
+	DeleteHotspotProfile(context.Context,*DeleteHotspotProfileRequest,...grpc.CallOption)(*DeleteHotspotProfileResponse,error)
+	BulkRemoveHotspotUsers(context.Context,*BulkRemoveHotspotUsersRequest,...grpc.CallOption)(*BulkRemoveHotspotUsersResponse,error)
+	SetupExpiryScheduler(context.Context,*SetupExpirySchedulerRequest,...grpc.CallOption)(*SetupExpirySchedulerResponse,error)
+	ListDhcpLeases(context.Context,*ListDhcpLeasesRequest,...grpc.CallOption)(*ListDhcpLeasesResponse,error)
+	ListSchedulers(context.Context,*ListSchedulersRequest,...grpc.CallOption)(*ListSchedulersResponse,error)
+	AddScheduler(context.Context,*AddSchedulerRequest,...grpc.CallOption)(*AddSchedulerResponse,error)
+	UpdateScheduler(context.Context,*UpdateSchedulerRequest,...grpc.CallOption)(*UpdateSchedulerResponse,error)
+	ListLogs(context.Context,*ListLogsRequest,...grpc.CallOption)(*ListLogsResponse,error)
+	ListSellingScripts(context.Context,*ListSellingScriptsRequest,...grpc.CallOption)(*ListSellingScriptsResponse,error)
+	GetSystemResource(context.Context,*SystemResourceRequest,...grpc.CallOption)(*SystemResourceResponse,error)
+	GetInterfaces(context.Context,*InterfacesRequest,...grpc.CallOption)(*InterfacesResponse,error)
+	ListSessions(context.Context,*ListSessionsRequest,...grpc.CallOption)(*ListSessionsResponse,error)
+	GetSession(context.Context,*GetSessionRequest,...grpc.CallOption)(*GetSessionResponse,error)
+	CreateSession(context.Context,*CreateSessionRequest,...grpc.CallOption)(*CreateSessionResponse,error)
+	UpdateSession(context.Context,*UpdateSessionRequest,...grpc.CallOption)(*UpdateSessionResponse,error)
+	DeleteSession(context.Context,*DeleteSessionRequest,...grpc.CallOption)(*DeleteSessionResponse,error)
+	ListPppSecrets(context.Context,*ListPppSecretsRequest,...grpc.CallOption)(*ListPppSecretsResponse,error)
+	GetPppSecret(context.Context,*GetPppSecretRequest,...grpc.CallOption)(*GetPppSecretResponse,error)
+	AddPppSecret(context.Context,*AddPppSecretRequest,...grpc.CallOption)(*AddPppSecretResponse,error)
+	UpdatePppSecret(context.Context,*UpdatePppSecretRequest,...grpc.CallOption)(*UpdatePppSecretResponse,error)
+	DeletePppSecret(context.Context,*DeletePppSecretRequest,...grpc.CallOption)(*DeletePppSecretResponse,error)
+	EnablePppSecret(context.Context,*EnablePppSecretRequest,...grpc.CallOption)(*EnablePppSecretResponse,error)
+	DisablePppSecret(context.Context,*DisablePppSecretRequest,...grpc.CallOption)(*DisablePppSecretResponse,error)
+	ListPppProfiles(context.Context,*ListPppProfilesRequest,...grpc.CallOption)(*ListPppProfilesResponse,error)
+	AddPppProfile(context.Context,*AddPppProfileRequest,...grpc.CallOption)(*AddPppProfileResponse,error)
+	UpdatePppProfile(context.Context,*UpdatePppProfileRequest,...grpc.CallOption)(*UpdatePppProfileResponse,error)
+	DeletePppProfile(context.Context,*DeletePppProfileRequest,...grpc.CallOption)(*DeletePppProfileResponse,error)
+	ListPppActive(context.Context,*ListPppActiveRequest,...grpc.CallOption)(*ListPppActiveResponse,error)
+	DisconnectPppActive(context.Context,*DisconnectPppActiveRequest,...grpc.CallOption)(*DisconnectPppActiveResponse,error)
+	ListPppPools(context.Context,*ListPppPoolsRequest,...grpc.CallOption)(*ListPppPoolsResponse,error)
 }
 
 type routerServiceClient struct{ cc grpc.ClientConnInterface }
 func NewRouterServiceClient(cc grpc.ClientConnInterface) RouterServiceClient { return &routerServiceClient{cc} }
+func callUnary(ctx context.Context,cc grpc.ClientConnInterface,method string,in,out any,opts ...grpc.CallOption) error { return cc.Invoke(ctx,method,in,out,opts...) }
 
-func callUnary(ctx context.Context, cc grpc.ClientConnInterface, method string, in, out any, opts ...grpc.CallOption) error {
-	return cc.Invoke(ctx, method, in, out, opts...)
-}
-
-func (c *routerServiceClient) TestConnect(ctx context.Context, in *TestConnectRequest, opts ...grpc.CallOption) (*TestConnectResponse,error) { out:=new(TestConnectResponse); if err:=callUnary(ctx,c.cc,RouterService_TestConnect_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) GetDashboard(ctx context.Context, in *GetDashboardRequest, opts ...grpc.CallOption) (*GetDashboardResponse,error) { out:=new(GetDashboardResponse); if err:=callUnary(ctx,c.cc,RouterService_GetDashboard_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListActiveHotspotUsers(ctx context.Context, in *ListActiveRequest, opts ...grpc.CallOption) (*ListActiveResponse,error) { out:=new(ListActiveResponse); if err:=callUnary(ctx,c.cc,RouterService_ListActiveHotspotUsers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListHotspotUsers(ctx context.Context, in *ListHotspotUsersRequest, opts ...grpc.CallOption) (*ListHotspotUsersResponse,error) { out:=new(ListHotspotUsersResponse); if err:=callUnary(ctx,c.cc,RouterService_ListHotspotUsers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) AddHotspotUser(ctx context.Context, in *AddHotspotUserRequest, opts ...grpc.CallOption) (*AddHotspotUserResponse,error) { out:=new(AddHotspotUserResponse); if err:=callUnary(ctx,c.cc,RouterService_AddHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) RemoveHotspotUser(ctx context.Context, in *RemoveHotspotUserRequest, opts ...grpc.CallOption) (*RemoveHotspotUserResponse,error) { out:=new(RemoveHotspotUserResponse); if err:=callUnary(ctx,c.cc,RouterService_RemoveHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) DisableHotspotUser(ctx context.Context, in *DisableHotspotUserRequest, opts ...grpc.CallOption) (*DisableHotspotUserResponse,error) { out:=new(DisableHotspotUserResponse); if err:=callUnary(ctx,c.cc,RouterService_DisableHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) EnableHotspotUser(ctx context.Context, in *EnableHotspotUserRequest, opts ...grpc.CallOption) (*EnableHotspotUserResponse,error) { out:=new(EnableHotspotUserResponse); if err:=callUnary(ctx,c.cc,RouterService_EnableHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListHotspotProfiles(ctx context.Context, in *ListProfilesRequest, opts ...grpc.CallOption) (*ListProfilesResponse,error) { out:=new(ListProfilesResponse); if err:=callUnary(ctx,c.cc,RouterService_ListHotspotProfiles_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) GetHotspotProfile(ctx context.Context, in *GetProfileRequest, opts ...grpc.CallOption) (*GetProfileResponse,error) { out:=new(GetProfileResponse); if err:=callUnary(ctx,c.cc,RouterService_GetHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) AddHotspotProfile(ctx context.Context, in *AddHotspotProfileRequest, opts ...grpc.CallOption) (*AddHotspotProfileResponse,error) { out:=new(AddHotspotProfileResponse); if err:=callUnary(ctx,c.cc,RouterService_AddHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) UpdateHotspotProfile(ctx context.Context, in *UpdateHotspotProfileRequest, opts ...grpc.CallOption) (*UpdateHotspotProfileResponse,error) { out:=new(UpdateHotspotProfileResponse); if err:=callUnary(ctx,c.cc,RouterService_UpdateHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) DeleteHotspotProfile(ctx context.Context, in *DeleteHotspotProfileRequest, opts ...grpc.CallOption) (*DeleteHotspotProfileResponse,error) { out:=new(DeleteHotspotProfileResponse); if err:=callUnary(ctx,c.cc,RouterService_DeleteHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) BulkRemoveHotspotUsers(ctx context.Context, in *BulkRemoveHotspotUsersRequest, opts ...grpc.CallOption) (*BulkRemoveHotspotUsersResponse,error) { out:=new(BulkRemoveHotspotUsersResponse); if err:=callUnary(ctx,c.cc,RouterService_BulkRemoveHotspotUsers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) SetupExpiryScheduler(ctx context.Context, in *SetupExpirySchedulerRequest, opts ...grpc.CallOption) (*SetupExpirySchedulerResponse,error) { out:=new(SetupExpirySchedulerResponse); if err:=callUnary(ctx,c.cc,RouterService_SetupExpiryScheduler_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListDhcpLeases(ctx context.Context, in *ListDhcpLeasesRequest, opts ...grpc.CallOption) (*ListDhcpLeasesResponse,error) { out:=new(ListDhcpLeasesResponse); if err:=callUnary(ctx,c.cc,RouterService_ListDhcpLeases_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListSchedulers(ctx context.Context, in *ListSchedulersRequest, opts ...grpc.CallOption) (*ListSchedulersResponse,error) { out:=new(ListSchedulersResponse); if err:=callUnary(ctx,c.cc,RouterService_ListSchedulers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) AddScheduler(ctx context.Context, in *AddSchedulerRequest, opts ...grpc.CallOption) (*AddSchedulerResponse,error) { out:=new(AddSchedulerResponse); if err:=callUnary(ctx,c.cc,RouterService_AddScheduler_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) UpdateScheduler(ctx context.Context, in *UpdateSchedulerRequest, opts ...grpc.CallOption) (*UpdateSchedulerResponse,error) { out:=new(UpdateSchedulerResponse); if err:=callUnary(ctx,c.cc,RouterService_UpdateScheduler_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListLogs(ctx context.Context, in *ListLogsRequest, opts ...grpc.CallOption) (*ListLogsResponse,error) { out:=new(ListLogsResponse); if err:=callUnary(ctx,c.cc,RouterService_ListLogs_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListSellingScripts(ctx context.Context, in *ListSellingScriptsRequest, opts ...grpc.CallOption) (*ListSellingScriptsResponse,error) { out:=new(ListSellingScriptsResponse); if err:=callUnary(ctx,c.cc,RouterService_ListSellingScripts_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) DeleteSellingScripts(ctx context.Context, in *DeleteSellingScriptsRequest, opts ...grpc.CallOption) (*DeleteSellingScriptsResponse,error) { out:=new(DeleteSellingScriptsResponse); if err:=callUnary(ctx,c.cc,RouterService_DeleteSellingScripts_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) GetSystemResource(ctx context.Context, in *SystemResourceRequest, opts ...grpc.CallOption) (*SystemResourceResponse,error) { out:=new(SystemResourceResponse); if err:=callUnary(ctx,c.cc,RouterService_GetSystemResource_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) GetInterfaces(ctx context.Context, in *InterfacesRequest, opts ...grpc.CallOption) (*InterfacesResponse,error) { out:=new(InterfacesResponse); if err:=callUnary(ctx,c.cc,RouterService_GetInterfaces_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse,error) { out:=new(ListSessionsResponse); if err:=callUnary(ctx,c.cc,RouterService_ListSessions_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) GetSession(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse,error) { out:=new(GetSessionResponse); if err:=callUnary(ctx,c.cc,RouterService_GetSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) CreateSession(ctx context.Context, in *CreateSessionRequest, opts ...grpc.CallOption) (*CreateSessionResponse,error) { out:=new(CreateSessionResponse); if err:=callUnary(ctx,c.cc,RouterService_CreateSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil }
-func (c *routerServiceClient) UpdateSession(ctx context.Context, in *UpdateSessionRequest, opts ...grpc.CallOption) (*UpdateSessionResponse,error){out:=new(UpdateSessionResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdateSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*DeleteSessionResponse,error){out:=new(DeleteSessionResponse);if err:=callUnary(ctx,c.cc,RouterService_DeleteSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) ListPppSecrets(ctx context.Context, in *ListPppSecretsRequest, opts ...grpc.CallOption) (*ListPppSecretsResponse,error){out:=new(ListPppSecretsResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppSecrets_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) GetPppSecret(ctx context.Context, in *GetPppSecretRequest, opts ...grpc.CallOption) (*GetPppSecretResponse,error){out:=new(GetPppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_GetPppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) AddPppSecret(ctx context.Context, in *AddPppSecretRequest, opts ...grpc.CallOption) (*AddPppSecretResponse,error){out:=new(AddPppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_AddPppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) UpdatePppSecret(ctx context.Context, in *UpdatePppSecretRequest, opts ...grpc.CallOption) (*UpdatePppSecretResponse,error){out:=new(UpdatePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdatePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) DeletePppSecret(ctx context.Context, in *DeletePppSecretRequest, opts ...grpc.CallOption) (*DeletePppSecretResponse,error){out:=new(DeletePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_DeletePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) EnablePppSecret(ctx context.Context, in *EnablePppSecretRequest, opts ...grpc.CallOption) (*EnablePppSecretResponse,error){out:=new(EnablePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_EnablePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) DisablePppSecret(ctx context.Context, in *DisablePppSecretRequest, opts ...grpc.CallOption) (*DisablePppSecretResponse,error){out:=new(DisablePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_DisablePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) ListPppProfiles(ctx context.Context, in *ListPppProfilesRequest, opts ...grpc.CallOption) (*ListPppProfilesResponse,error){out:=new(ListPppProfilesResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppProfiles_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) AddPppProfile(ctx context.Context, in *AddPppProfileRequest, opts ...grpc.CallOption) (*AddPppProfileResponse,error){out:=new(AddPppProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_AddPppProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) UpdatePppProfile(ctx context.Context, in *UpdatePppProfileRequest, opts ...grpc.CallOption) (*UpdatePppProfileResponse,error){out:=new(UpdatePppProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdatePppProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) DeletePppProfile(ctx context.Context, in *DeletePppProfileRequest, opts ...grpc.CallOption) (*DeletePppProfileResponse,error){out:=new(DeletePppProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_DeletePppProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) ListPppActive(ctx context.Context, in *ListPppActiveRequest, opts ...grpc.CallOption) (*ListPppActiveResponse,error){out:=new(ListPppActiveResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppActive_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) DisconnectPppActive(ctx context.Context, in *DisconnectPppActiveRequest, opts ...grpc.CallOption) (*DisconnectPppActiveResponse,error){out:=new(DisconnectPppActiveResponse);if err:=callUnary(ctx,c.cc,RouterService_DisconnectPppActive_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
-func (c *routerServiceClient) ListPppPools(ctx context.Context, in *ListPppPoolsRequest, opts ...grpc.CallOption) (*ListPppPoolsResponse,error){out:=new(ListPppPoolsResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppPools_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) TestConnect(ctx context.Context,in *TestConnectRequest,opts ...grpc.CallOption)(*TestConnectResponse,error){out:=new(TestConnectResponse);if err:=callUnary(ctx,c.cc,RouterService_TestConnect_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) GetDashboard(ctx context.Context,in *GetDashboardRequest,opts ...grpc.CallOption)(*GetDashboardResponse,error){out:=new(GetDashboardResponse);if err:=callUnary(ctx,c.cc,RouterService_GetDashboard_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListActiveHotspotUsers(ctx context.Context,in *ListActiveRequest,opts ...grpc.CallOption)(*ListActiveResponse,error){out:=new(ListActiveResponse);if err:=callUnary(ctx,c.cc,RouterService_ListActiveHotspotUsers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListHotspotUsers(ctx context.Context,in *ListHotspotUsersRequest,opts ...grpc.CallOption)(*ListHotspotUsersResponse,error){out:=new(ListHotspotUsersResponse);if err:=callUnary(ctx,c.cc,RouterService_ListHotspotUsers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) AddHotspotUser(ctx context.Context,in *AddHotspotUserRequest,opts ...grpc.CallOption)(*AddHotspotUserResponse,error){out:=new(AddHotspotUserResponse);if err:=callUnary(ctx,c.cc,RouterService_AddHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) RemoveHotspotUser(ctx context.Context,in *RemoveHotspotUserRequest,opts ...grpc.CallOption)(*RemoveHotspotUserResponse,error){out:=new(RemoveHotspotUserResponse);if err:=callUnary(ctx,c.cc,RouterService_RemoveHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) DisableHotspotUser(ctx context.Context,in *DisableHotspotUserRequest,opts ...grpc.CallOption)(*DisableHotspotUserResponse,error){out:=new(DisableHotspotUserResponse);if err:=callUnary(ctx,c.cc,RouterService_DisableHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) EnableHotspotUser(ctx context.Context,in *EnableHotspotUserRequest,opts ...grpc.CallOption)(*EnableHotspotUserResponse,error){out:=new(EnableHotspotUserResponse);if err:=callUnary(ctx,c.cc,RouterService_EnableHotspotUser_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListHotspotProfiles(ctx context.Context,in *ListProfilesRequest,opts ...grpc.CallOption)(*ListProfilesResponse,error){out:=new(ListProfilesResponse);if err:=callUnary(ctx,c.cc,RouterService_ListHotspotProfiles_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) GetHotspotProfile(ctx context.Context,in *GetProfileRequest,opts ...grpc.CallOption)(*GetProfileResponse,error){out:=new(GetProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_GetHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) AddHotspotProfile(ctx context.Context,in *AddHotspotProfileRequest,opts ...grpc.CallOption)(*AddHotspotProfileResponse,error){out:=new(AddHotspotProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_AddHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) UpdateHotspotProfile(ctx context.Context,in *UpdateHotspotProfileRequest,opts ...grpc.CallOption)(*UpdateHotspotProfileResponse,error){out:=new(UpdateHotspotProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdateHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) DeleteHotspotProfile(ctx context.Context,in *DeleteHotspotProfileRequest,opts ...grpc.CallOption)(*DeleteHotspotProfileResponse,error){out:=new(DeleteHotspotProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_DeleteHotspotProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) BulkRemoveHotspotUsers(ctx context.Context,in *BulkRemoveHotspotUsersRequest,opts ...grpc.CallOption)(*BulkRemoveHotspotUsersResponse,error){out:=new(BulkRemoveHotspotUsersResponse);if err:=callUnary(ctx,c.cc,RouterService_BulkRemoveHotspotUsers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) SetupExpiryScheduler(ctx context.Context,in *SetupExpirySchedulerRequest,opts ...grpc.CallOption)(*SetupExpirySchedulerResponse,error){out:=new(SetupExpirySchedulerResponse);if err:=callUnary(ctx,c.cc,RouterService_SetupExpiryScheduler_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListDhcpLeases(ctx context.Context,in *ListDhcpLeasesRequest,opts ...grpc.CallOption)(*ListDhcpLeasesResponse,error){out:=new(ListDhcpLeasesResponse);if err:=callUnary(ctx,c.cc,RouterService_ListDhcpLeases_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListSchedulers(ctx context.Context,in *ListSchedulersRequest,opts ...grpc.CallOption)(*ListSchedulersResponse,error){out:=new(ListSchedulersResponse);if err:=callUnary(ctx,c.cc,RouterService_ListSchedulers_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) AddScheduler(ctx context.Context,in *AddSchedulerRequest,opts ...grpc.CallOption)(*AddSchedulerResponse,error){out:=new(AddSchedulerResponse);if err:=callUnary(ctx,c.cc,RouterService_AddScheduler_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) UpdateScheduler(ctx context.Context,in *UpdateSchedulerRequest,opts ...grpc.CallOption)(*UpdateSchedulerResponse,error){out:=new(UpdateSchedulerResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdateScheduler_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListLogs(ctx context.Context,in *ListLogsRequest,opts ...grpc.CallOption)(*ListLogsResponse,error){out:=new(ListLogsResponse);if err:=callUnary(ctx,c.cc,RouterService_ListLogs_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListSellingScripts(ctx context.Context,in *ListSellingScriptsRequest,opts ...grpc.CallOption)(*ListSellingScriptsResponse,error){out:=new(ListSellingScriptsResponse);if err:=callUnary(ctx,c.cc,RouterService_ListSellingScripts_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) GetSystemResource(ctx context.Context,in *SystemResourceRequest,opts ...grpc.CallOption)(*SystemResourceResponse,error){out:=new(SystemResourceResponse);if err:=callUnary(ctx,c.cc,RouterService_GetSystemResource_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) GetInterfaces(ctx context.Context,in *InterfacesRequest,opts ...grpc.CallOption)(*InterfacesResponse,error){out:=new(InterfacesResponse);if err:=callUnary(ctx,c.cc,RouterService_GetInterfaces_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListSessions(ctx context.Context,in *ListSessionsRequest,opts ...grpc.CallOption)(*ListSessionsResponse,error){out:=new(ListSessionsResponse);if err:=callUnary(ctx,c.cc,RouterService_ListSessions_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) GetSession(ctx context.Context,in *GetSessionRequest,opts ...grpc.CallOption)(*GetSessionResponse,error){out:=new(GetSessionResponse);if err:=callUnary(ctx,c.cc,RouterService_GetSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) CreateSession(ctx context.Context,in *CreateSessionRequest,opts ...grpc.CallOption)(*CreateSessionResponse,error){out:=new(CreateSessionResponse);if err:=callUnary(ctx,c.cc,RouterService_CreateSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) UpdateSession(ctx context.Context,in *UpdateSessionRequest,opts ...grpc.CallOption)(*UpdateSessionResponse,error){out:=new(UpdateSessionResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdateSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) DeleteSession(ctx context.Context,in *DeleteSessionRequest,opts ...grpc.CallOption)(*DeleteSessionResponse,error){out:=new(DeleteSessionResponse);if err:=callUnary(ctx,c.cc,RouterService_DeleteSession_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListPppSecrets(ctx context.Context,in *ListPppSecretsRequest,opts ...grpc.CallOption)(*ListPppSecretsResponse,error){out:=new(ListPppSecretsResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppSecrets_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) GetPppSecret(ctx context.Context,in *GetPppSecretRequest,opts ...grpc.CallOption)(*GetPppSecretResponse,error){out:=new(GetPppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_GetPppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) AddPppSecret(ctx context.Context,in *AddPppSecretRequest,opts ...grpc.CallOption)(*AddPppSecretResponse,error){out:=new(AddPppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_AddPppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) UpdatePppSecret(ctx context.Context,in *UpdatePppSecretRequest,opts ...grpc.CallOption)(*UpdatePppSecretResponse,error){out:=new(UpdatePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdatePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) DeletePppSecret(ctx context.Context,in *DeletePppSecretRequest,opts ...grpc.CallOption)(*DeletePppSecretResponse,error){out:=new(DeletePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_DeletePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) EnablePppSecret(ctx context.Context,in *EnablePppSecretRequest,opts ...grpc.CallOption)(*EnablePppSecretResponse,error){out:=new(EnablePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_EnablePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) DisablePppSecret(ctx context.Context,in *DisablePppSecretRequest,opts ...grpc.CallOption)(*DisablePppSecretResponse,error){out:=new(DisablePppSecretResponse);if err:=callUnary(ctx,c.cc,RouterService_DisablePppSecret_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListPppProfiles(ctx context.Context,in *ListPppProfilesRequest,opts ...grpc.CallOption)(*ListPppProfilesResponse,error){out:=new(ListPppProfilesResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppProfiles_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) AddPppProfile(ctx context.Context,in *AddPppProfileRequest,opts ...grpc.CallOption)(*AddPppProfileResponse,error){out:=new(AddPppProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_AddPppProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) UpdatePppProfile(ctx context.Context,in *UpdatePppProfileRequest,opts ...grpc.CallOption)(*UpdatePppProfileResponse,error){out:=new(UpdatePppProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_UpdatePppProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) DeletePppProfile(ctx context.Context,in *DeletePppProfileRequest,opts ...grpc.CallOption)(*DeletePppProfileResponse,error){out:=new(DeletePppProfileResponse);if err:=callUnary(ctx,c.cc,RouterService_DeletePppProfile_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListPppActive(ctx context.Context,in *ListPppActiveRequest,opts ...grpc.CallOption)(*ListPppActiveResponse,error){out:=new(ListPppActiveResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppActive_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) DisconnectPppActive(ctx context.Context,in *DisconnectPppActiveRequest,opts ...grpc.CallOption)(*DisconnectPppActiveResponse,error){out:=new(DisconnectPppActiveResponse);if err:=callUnary(ctx,c.cc,RouterService_DisconnectPppActive_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
+func (c *routerServiceClient) ListPppPools(ctx context.Context,in *ListPppPoolsRequest,opts ...grpc.CallOption)(*ListPppPoolsResponse,error){out:=new(ListPppPoolsResponse);if err:=callUnary(ctx,c.cc,RouterService_ListPppPools_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
 
 type RouterServiceServer interface {
 	TestConnect(context.Context,*TestConnectRequest)(*TestConnectResponse,error)
@@ -180,7 +174,6 @@ type RouterServiceServer interface {
 	UpdateScheduler(context.Context,*UpdateSchedulerRequest)(*UpdateSchedulerResponse,error)
 	ListLogs(context.Context,*ListLogsRequest)(*ListLogsResponse,error)
 	ListSellingScripts(context.Context,*ListSellingScriptsRequest)(*ListSellingScriptsResponse,error)
-	DeleteSellingScripts(context.Context,*DeleteSellingScriptsRequest)(*DeleteSellingScriptsResponse,error)
 	GetSystemResource(context.Context,*SystemResourceRequest)(*SystemResourceResponse,error)
 	GetInterfaces(context.Context,*InterfacesRequest)(*InterfacesResponse,error)
 	ListSessions(context.Context,*ListSessionsRequest)(*ListSessionsResponse,error)
@@ -206,67 +199,62 @@ type RouterServiceServer interface {
 }
 
 type UnimplementedRouterServiceServer struct{}
-func (UnimplementedRouterServiceServer) TestConnect(context.Context,*TestConnectRequest)(*TestConnectResponse,error){return nil,status.Error(codes.Unimplemented,"method TestConnect not implemented")}
-func (UnimplementedRouterServiceServer) GetDashboard(context.Context,*GetDashboardRequest)(*GetDashboardResponse,error){return nil,status.Error(codes.Unimplemented,"method GetDashboard not implemented")}
-func (UnimplementedRouterServiceServer) ListActiveHotspotUsers(context.Context,*ListActiveRequest)(*ListActiveResponse,error){return nil,status.Error(codes.Unimplemented,"method ListActiveHotspotUsers not implemented")}
-func (UnimplementedRouterServiceServer) ListHotspotUsers(context.Context,*ListHotspotUsersRequest)(*ListHotspotUsersResponse,error){return nil,status.Error(codes.Unimplemented,"method ListHotspotUsers not implemented")}
-func (UnimplementedRouterServiceServer) AddHotspotUser(context.Context,*AddHotspotUserRequest)(*AddHotspotUserResponse,error){return nil,status.Error(codes.Unimplemented,"method AddHotspotUser not implemented")}
-func (UnimplementedRouterServiceServer) RemoveHotspotUser(context.Context,*RemoveHotspotUserRequest)(*RemoveHotspotUserResponse,error){return nil,status.Error(codes.Unimplemented,"method RemoveHotspotUser not implemented")}
-func (UnimplementedRouterServiceServer) DisableHotspotUser(context.Context,*DisableHotspotUserRequest)(*DisableHotspotUserResponse,error){return nil,status.Error(codes.Unimplemented,"method DisableHotspotUser not implemented")}
-func (UnimplementedRouterServiceServer) EnableHotspotUser(context.Context,*EnableHotspotUserRequest)(*EnableHotspotUserResponse,error){return nil,status.Error(codes.Unimplemented,"method EnableHotspotUser not implemented")}
-func (UnimplementedRouterServiceServer) ListHotspotProfiles(context.Context,*ListProfilesRequest)(*ListProfilesResponse,error){return nil,status.Error(codes.Unimplemented,"method ListHotspotProfiles not implemented")}
-func (UnimplementedRouterServiceServer) GetHotspotProfile(context.Context,*GetProfileRequest)(*GetProfileResponse,error){return nil,status.Error(codes.Unimplemented,"method GetHotspotProfile not implemented")}
-func (UnimplementedRouterServiceServer) AddHotspotProfile(context.Context,*AddHotspotProfileRequest)(*AddHotspotProfileResponse,error){return nil,status.Error(codes.Unimplemented,"method AddHotspotProfile not implemented")}
-func (UnimplementedRouterServiceServer) UpdateHotspotProfile(context.Context,*UpdateHotspotProfileRequest)(*UpdateHotspotProfileResponse,error){return nil,status.Error(codes.Unimplemented,"method UpdateHotspotProfile not implemented")}
-func (UnimplementedRouterServiceServer) DeleteHotspotProfile(context.Context,*DeleteHotspotProfileRequest)(*DeleteHotspotProfileResponse,error){return nil,status.Error(codes.Unimplemented,"method DeleteHotspotProfile not implemented")}
-func (UnimplementedRouterServiceServer) BulkRemoveHotspotUsers(context.Context,*BulkRemoveHotspotUsersRequest)(*BulkRemoveHotspotUsersResponse,error){return nil,status.Error(codes.Unimplemented,"method BulkRemoveHotspotUsers not implemented")}
-func (UnimplementedRouterServiceServer) SetupExpiryScheduler(context.Context,*SetupExpirySchedulerRequest)(*SetupExpirySchedulerResponse,error){return nil,status.Error(codes.Unimplemented,"method SetupExpiryScheduler not implemented")}
-func (UnimplementedRouterServiceServer) ListDhcpLeases(context.Context,*ListDhcpLeasesRequest)(*ListDhcpLeasesResponse,error){return nil,status.Error(codes.Unimplemented,"method ListDhcpLeases not implemented")}
-func (UnimplementedRouterServiceServer) ListSchedulers(context.Context,*ListSchedulersRequest)(*ListSchedulersResponse,error){return nil,status.Error(codes.Unimplemented,"method ListSchedulers not implemented")}
-func (UnimplementedRouterServiceServer) AddScheduler(context.Context,*AddSchedulerRequest)(*AddSchedulerResponse,error){return nil,status.Error(codes.Unimplemented,"method AddScheduler not implemented")}
-func (UnimplementedRouterServiceServer) UpdateScheduler(context.Context,*UpdateSchedulerRequest)(*UpdateSchedulerResponse,error){return nil,status.Error(codes.Unimplemented,"method UpdateScheduler not implemented")}
-func (UnimplementedRouterServiceServer) ListLogs(context.Context,*ListLogsRequest)(*ListLogsResponse,error){return nil,status.Error(codes.Unimplemented,"method ListLogs not implemented")}
-func (UnimplementedRouterServiceServer) ListSellingScripts(context.Context,*ListSellingScriptsRequest)(*ListSellingScriptsResponse,error){return nil,status.Error(codes.Unimplemented,"method ListSellingScripts not implemented")}
-func (UnimplementedRouterServiceServer) DeleteSellingScripts(context.Context,*DeleteSellingScriptsRequest)(*DeleteSellingScriptsResponse,error){return nil,status.Error(codes.Unimplemented,"method DeleteSellingScripts not implemented")}
-func (UnimplementedRouterServiceServer) GetSystemResource(context.Context,*SystemResourceRequest)(*SystemResourceResponse,error){return nil,status.Error(codes.Unimplemented,"method GetSystemResource not implemented")}
-func (UnimplementedRouterServiceServer) GetInterfaces(context.Context,*InterfacesRequest)(*InterfacesResponse,error){return nil,status.Error(codes.Unimplemented,"method GetInterfaces not implemented")}
-func (UnimplementedRouterServiceServer) ListSessions(context.Context,*ListSessionsRequest)(*ListSessionsResponse,error){return nil,status.Error(codes.Unimplemented,"method ListSessions not implemented")}
-func (UnimplementedRouterServiceServer) GetSession(context.Context,*GetSessionRequest)(*GetSessionResponse,error){return nil,status.Error(codes.Unimplemented,"method GetSession not implemented")}
-func (UnimplementedRouterServiceServer) CreateSession(context.Context,*CreateSessionRequest)(*CreateSessionResponse,error){return nil,status.Error(codes.Unimplemented,"method CreateSession not implemented")}
-func (UnimplementedRouterServiceServer) UpdateSession(context.Context,*UpdateSessionRequest)(*UpdateSessionResponse,error){return nil,status.Error(codes.Unimplemented,"method UpdateSession not implemented")}
-func (UnimplementedRouterServiceServer) DeleteSession(context.Context,*DeleteSessionRequest)(*DeleteSessionResponse,error){return nil,status.Error(codes.Unimplemented,"method DeleteSession not implemented")}
-func (UnimplementedRouterServiceServer) ListPppSecrets(context.Context,*ListPppSecretsRequest)(*ListPppSecretsResponse,error){return nil,status.Error(codes.Unimplemented,"method ListPppSecrets not implemented")}
-func (UnimplementedRouterServiceServer) GetPppSecret(context.Context,*GetPppSecretRequest)(*GetPppSecretResponse,error){return nil,status.Error(codes.Unimplemented,"method GetPppSecret not implemented")}
-func (UnimplementedRouterServiceServer) AddPppSecret(context.Context,*AddPppSecretRequest)(*AddPppSecretResponse,error){return nil,status.Error(codes.Unimplemented,"method AddPppSecret not implemented")}
-func (UnimplementedRouterServiceServer) UpdatePppSecret(context.Context,*UpdatePppSecretRequest)(*UpdatePppSecretResponse,error){return nil,status.Error(codes.Unimplemented,"method UpdatePppSecret not implemented")}
-func (UnimplementedRouterServiceServer) DeletePppSecret(context.Context,*DeletePppSecretRequest)(*DeletePppSecretResponse,error){return nil,status.Error(codes.Unimplemented,"method DeletePppSecret not implemented")}
-func (UnimplementedRouterServiceServer) EnablePppSecret(context.Context,*EnablePppSecretRequest)(*EnablePppSecretResponse,error){return nil,status.Error(codes.Unimplemented,"method EnablePppSecret not implemented")}
-func (UnimplementedRouterServiceServer) DisablePppSecret(context.Context,*DisablePppSecretRequest)(*DisablePppSecretResponse,error){return nil,status.Error(codes.Unimplemented,"method DisablePppSecret not implemented")}
-func (UnimplementedRouterServiceServer) ListPppProfiles(context.Context,*ListPppProfilesRequest)(*ListPppProfilesResponse,error){return nil,status.Error(codes.Unimplemented,"method ListPppProfiles not implemented")}
-func (UnimplementedRouterServiceServer) AddPppProfile(context.Context,*AddPppProfileRequest)(*AddPppProfileResponse,error){return nil,status.Error(codes.Unimplemented,"method AddPppProfile not implemented")}
-func (UnimplementedRouterServiceServer) UpdatePppProfile(context.Context,*UpdatePppProfileRequest)(*UpdatePppProfileResponse,error){return nil,status.Error(codes.Unimplemented,"method UpdatePppProfile not implemented")}
-func (UnimplementedRouterServiceServer) DeletePppProfile(context.Context,*DeletePppProfileRequest)(*DeletePppProfileResponse,error){return nil,status.Error(codes.Unimplemented,"method DeletePppProfile not implemented")}
-func (UnimplementedRouterServiceServer) ListPppActive(context.Context,*ListPppActiveRequest)(*ListPppActiveResponse,error){return nil,status.Error(codes.Unimplemented,"method ListPppActive not implemented")}
-func (UnimplementedRouterServiceServer) DisconnectPppActive(context.Context,*DisconnectPppActiveRequest)(*DisconnectPppActiveResponse,error){return nil,status.Error(codes.Unimplemented,"method DisconnectPppActive not implemented")}
-func (UnimplementedRouterServiceServer) ListPppPools(context.Context,*ListPppPoolsRequest)(*ListPppPoolsResponse,error){return nil,status.Error(codes.Unimplemented,"method ListPppPools not implemented")}
+func (UnimplementedRouterServiceServer) TestConnect(context.Context,*TestConnectRequest)(*TestConnectResponse,error){return nil,status.Errorf(codes.Unimplemented,"method TestConnect not implemented")}
+func (UnimplementedRouterServiceServer) GetDashboard(context.Context,*GetDashboardRequest)(*GetDashboardResponse,error){return nil,status.Errorf(codes.Unimplemented,"method GetDashboard not implemented")}
+func (UnimplementedRouterServiceServer) ListActiveHotspotUsers(context.Context,*ListActiveRequest)(*ListActiveResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListActiveHotspotUsers not implemented")}
+func (UnimplementedRouterServiceServer) ListHotspotUsers(context.Context,*ListHotspotUsersRequest)(*ListHotspotUsersResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListHotspotUsers not implemented")}
+func (UnimplementedRouterServiceServer) AddHotspotUser(context.Context,*AddHotspotUserRequest)(*AddHotspotUserResponse,error){return nil,status.Errorf(codes.Unimplemented,"method AddHotspotUser not implemented")}
+func (UnimplementedRouterServiceServer) RemoveHotspotUser(context.Context,*RemoveHotspotUserRequest)(*RemoveHotspotUserResponse,error){return nil,status.Errorf(codes.Unimplemented,"method RemoveHotspotUser not implemented")}
+func (UnimplementedRouterServiceServer) DisableHotspotUser(context.Context,*DisableHotspotUserRequest)(*DisableHotspotUserResponse,error){return nil,status.Errorf(codes.Unimplemented,"method DisableHotspotUser not implemented")}
+func (UnimplementedRouterServiceServer) EnableHotspotUser(context.Context,*EnableHotspotUserRequest)(*EnableHotspotUserResponse,error){return nil,status.Errorf(codes.Unimplemented,"method EnableHotspotUser not implemented")}
+func (UnimplementedRouterServiceServer) ListHotspotProfiles(context.Context,*ListProfilesRequest)(*ListProfilesResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListHotspotProfiles not implemented")}
+func (UnimplementedRouterServiceServer) GetHotspotProfile(context.Context,*GetProfileRequest)(*GetProfileResponse,error){return nil,status.Errorf(codes.Unimplemented,"method GetHotspotProfile not implemented")}
+func (UnimplementedRouterServiceServer) AddHotspotProfile(context.Context,*AddHotspotProfileRequest)(*AddHotspotProfileResponse,error){return nil,status.Errorf(codes.Unimplemented,"method AddHotspotProfile not implemented")}
+func (UnimplementedRouterServiceServer) UpdateHotspotProfile(context.Context,*UpdateHotspotProfileRequest)(*UpdateHotspotProfileResponse,error){return nil,status.Errorf(codes.Unimplemented,"method UpdateHotspotProfile not implemented")}
+func (UnimplementedRouterServiceServer) DeleteHotspotProfile(context.Context,*DeleteHotspotProfileRequest)(*DeleteHotspotProfileResponse,error){return nil,status.Errorf(codes.Unimplemented,"method DeleteHotspotProfile not implemented")}
+func (UnimplementedRouterServiceServer) BulkRemoveHotspotUsers(context.Context,*BulkRemoveHotspotUsersRequest)(*BulkRemoveHotspotUsersResponse,error){return nil,status.Errorf(codes.Unimplemented,"method BulkRemoveHotspotUsers not implemented")}
+func (UnimplementedRouterServiceServer) SetupExpiryScheduler(context.Context,*SetupExpirySchedulerRequest)(*SetupExpirySchedulerResponse,error){return nil,status.Errorf(codes.Unimplemented,"method SetupExpiryScheduler not implemented")}
+func (UnimplementedRouterServiceServer) ListDhcpLeases(context.Context,*ListDhcpLeasesRequest)(*ListDhcpLeasesResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListDhcpLeases not implemented")}
+func (UnimplementedRouterServiceServer) ListSchedulers(context.Context,*ListSchedulersRequest)(*ListSchedulersResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListSchedulers not implemented")}
+func (UnimplementedRouterServiceServer) AddScheduler(context.Context,*AddSchedulerRequest)(*AddSchedulerResponse,error){return nil,status.Errorf(codes.Unimplemented,"method AddScheduler not implemented")}
+func (UnimplementedRouterServiceServer) UpdateScheduler(context.Context,*UpdateSchedulerRequest)(*UpdateSchedulerResponse,error){return nil,status.Errorf(codes.Unimplemented,"method UpdateScheduler not implemented")}
+func (UnimplementedRouterServiceServer) ListLogs(context.Context,*ListLogsRequest)(*ListLogsResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListLogs not implemented")}
+func (UnimplementedRouterServiceServer) ListSellingScripts(context.Context,*ListSellingScriptsRequest)(*ListSellingScriptsResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListSellingScripts not implemented")}
+func (UnimplementedRouterServiceServer) GetSystemResource(context.Context,*SystemResourceRequest)(*SystemResourceResponse,error){return nil,status.Errorf(codes.Unimplemented,"method GetSystemResource not implemented")}
+func (UnimplementedRouterServiceServer) GetInterfaces(context.Context,*InterfacesRequest)(*InterfacesResponse,error){return nil,status.Errorf(codes.Unimplemented,"method GetInterfaces not implemented")}
+func (UnimplementedRouterServiceServer) ListSessions(context.Context,*ListSessionsRequest)(*ListSessionsResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListSessions not implemented")}
+func (UnimplementedRouterServiceServer) GetSession(context.Context,*GetSessionRequest)(*GetSessionResponse,error){return nil,status.Errorf(codes.Unimplemented,"method GetSession not implemented")}
+func (UnimplementedRouterServiceServer) CreateSession(context.Context,*CreateSessionRequest)(*CreateSessionResponse,error){return nil,status.Errorf(codes.Unimplemented,"method CreateSession not implemented")}
+func (UnimplementedRouterServiceServer) UpdateSession(context.Context,*UpdateSessionRequest)(*UpdateSessionResponse,error){return nil,status.Errorf(codes.Unimplemented,"method UpdateSession not implemented")}
+func (UnimplementedRouterServiceServer) DeleteSession(context.Context,*DeleteSessionRequest)(*DeleteSessionResponse,error){return nil,status.Errorf(codes.Unimplemented,"method DeleteSession not implemented")}
+func (UnimplementedRouterServiceServer) ListPppSecrets(context.Context,*ListPppSecretsRequest)(*ListPppSecretsResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListPppSecrets not implemented")}
+func (UnimplementedRouterServiceServer) GetPppSecret(context.Context,*GetPppSecretRequest)(*GetPppSecretResponse,error){return nil,status.Errorf(codes.Unimplemented,"method GetPppSecret not implemented")}
+func (UnimplementedRouterServiceServer) AddPppSecret(context.Context,*AddPppSecretRequest)(*AddPppSecretResponse,error){return nil,status.Errorf(codes.Unimplemented,"method AddPppSecret not implemented")}
+func (UnimplementedRouterServiceServer) UpdatePppSecret(context.Context,*UpdatePppSecretRequest)(*UpdatePppSecretResponse,error){return nil,status.Errorf(codes.Unimplemented,"method UpdatePppSecret not implemented")}
+func (UnimplementedRouterServiceServer) DeletePppSecret(context.Context,*DeletePppSecretRequest)(*DeletePppSecretResponse,error){return nil,status.Errorf(codes.Unimplemented,"method DeletePppSecret not implemented")}
+func (UnimplementedRouterServiceServer) EnablePppSecret(context.Context,*EnablePppSecretRequest)(*EnablePppSecretResponse,error){return nil,status.Errorf(codes.Unimplemented,"method EnablePppSecret not implemented")}
+func (UnimplementedRouterServiceServer) DisablePppSecret(context.Context,*DisablePppSecretRequest)(*DisablePppSecretResponse,error){return nil,status.Errorf(codes.Unimplemented,"method DisablePppSecret not implemented")}
+func (UnimplementedRouterServiceServer) ListPppProfiles(context.Context,*ListPppProfilesRequest)(*ListPppProfilesResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListPppProfiles not implemented")}
+func (UnimplementedRouterServiceServer) AddPppProfile(context.Context,*AddPppProfileRequest)(*AddPppProfileResponse,error){return nil,status.Errorf(codes.Unimplemented,"method AddPppProfile not implemented")}
+func (UnimplementedRouterServiceServer) UpdatePppProfile(context.Context,*UpdatePppProfileRequest)(*UpdatePppProfileResponse,error){return nil,status.Errorf(codes.Unimplemented,"method UpdatePppProfile not implemented")}
+func (UnimplementedRouterServiceServer) DeletePppProfile(context.Context,*DeletePppProfileRequest)(*DeletePppProfileResponse,error){return nil,status.Errorf(codes.Unimplemented,"method DeletePppProfile not implemented")}
+func (UnimplementedRouterServiceServer) ListPppActive(context.Context,*ListPppActiveRequest)(*ListPppActiveResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListPppActive not implemented")}
+func (UnimplementedRouterServiceServer) DisconnectPppActive(context.Context,*DisconnectPppActiveRequest)(*DisconnectPppActiveResponse,error){return nil,status.Errorf(codes.Unimplemented,"method DisconnectPppActive not implemented")}
+func (UnimplementedRouterServiceServer) ListPppPools(context.Context,*ListPppPoolsRequest)(*ListPppPoolsResponse,error){return nil,status.Errorf(codes.Unimplemented,"method ListPppPools not implemented")}
 func (UnimplementedRouterServiceServer) mustEmbedUnimplementedRouterServiceServer() {}
 
-func RegisterRouterServiceServer(s grpc.ServiceRegistrar, srv RouterServiceServer) { s.RegisterService(&RouterService_ServiceDesc, srv) }
+func RegisterRouterServiceServer(s grpc.ServiceRegistrar,srv RouterServiceServer){s.RegisterService(&RouterService_ServiceDesc,srv)}
 
-func unaryHandler[T any](method string, call func(context.Context, T)(any,error), newReq func() T) grpc.MethodDesc {
-	return grpc.MethodDesc{MethodName: method, Handler: func(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any,error) {
-		in := newReq(); if err:=dec(in); err!=nil{return nil,err}
-		if interceptor==nil{return call(ctx,in)}
-		info:=&grpc.UnaryServerInfo{Server:srv,FullMethod:"/router.RouterService/"+method}
-		handler:=func(ctx context.Context, req any)(any,error){return call(ctx,req.(T))}
-		return interceptor(ctx,in,info,handler)
-	}}
-}
+func _RouterService_TestConnect_Handler(srv any,ctx context.Context,dec func(any)error,interceptor grpc.UnaryServerInterceptor)(any,error){in:=new(TestConnectRequest);if err:=dec(in);err!=nil{return nil,err};if interceptor==nil{return srv.(RouterServiceServer).TestConnect(ctx,in)};info:=&grpc.UnaryServerInfo{Server:srv,FullMethod:RouterService_TestConnect_FullMethodName};handler:=func(ctx context.Context,req any)(any,error){return srv.(RouterServiceServer).TestConnect(ctx,req.(*TestConnectRequest))};return interceptor(ctx,in,info,handler)}
+func _RouterService_GetDashboard_Handler(srv any,ctx context.Context,dec func(any)error,interceptor grpc.UnaryServerInterceptor)(any,error){in:=new(GetDashboardRequest);if err:=dec(in);err!=nil{return nil,err};if interceptor==nil{return srv.(RouterServiceServer).GetDashboard(ctx,in)};info:=&grpc.UnaryServerInfo{Server:srv,FullMethod:RouterService_GetDashboard_FullMethodName};handler:=func(ctx context.Context,req any)(any,error){return srv.(RouterServiceServer).GetDashboard(ctx,req.(*GetDashboardRequest))};return interceptor(ctx,in,info,handler)}
+func _RouterService_ListSessions_Handler(srv any,ctx context.Context,dec func(any)error,interceptor grpc.UnaryServerInterceptor)(any,error){in:=new(ListSessionsRequest);if err:=dec(in);err!=nil{return nil,err};if interceptor==nil{return srv.(RouterServiceServer).ListSessions(ctx,in)};info:=&grpc.UnaryServerInfo{Server:srv,FullMethod:RouterService_ListSessions_FullMethodName};handler:=func(ctx context.Context,req any)(any,error){return srv.(RouterServiceServer).ListSessions(ctx,req.(*ListSessionsRequest))};return interceptor(ctx,in,info,handler)}
 
 var RouterService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "router.RouterService",
-	HandlerType: (*RouterServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		unaryHandler("TestConnect", func(ctx context.Context, req *TestConnectRequest)(any,error){return RouterServiceServer(nil).TestConnect(ctx,req)}, func() *TestConnectRequest{return new(TestConnectRequest)}),
+	ServiceName:"router.RouterService",
+	HandlerType:(*RouterServiceServer)(nil),
+	Methods:[]grpc.MethodDesc{
+		{MethodName:"TestConnect",Handler:_RouterService_TestConnect_Handler},
+		{MethodName:"GetDashboard",Handler:_RouterService_GetDashboard_Handler},
+		{MethodName:"ListSessions",Handler:_RouterService_ListSessions_Handler},
 	},
 }
