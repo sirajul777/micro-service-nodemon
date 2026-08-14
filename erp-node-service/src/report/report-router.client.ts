@@ -10,15 +10,16 @@ export interface ReportScript {
   comment: string;
 }
 
-const REPORT_SCRIPTS_MARKER = '__REPORT_SCRIPTS__';
-const REPORT_DELETE_MARKER = '__REPORT_DELETE__';
+export interface ReportSellingScript {
+  id: string;
+  date: string;
+  time: string;
+  username: string;
+  price: number;
+  profile: string;
+  comment: string;
+}
 
-/**
- * Report-only gRPC adapter. It intentionally uses the already deployed
- * ListHotspotUsers/RemoveHotspotUser RPCs as a compatibility transport so
- * report parity can be deployed without requiring a protobuf regeneration
- * across every service at the same time.
- */
 export class ReportRouterClient {
   private readonly client: any;
 
@@ -45,7 +46,11 @@ export class ReportRouterClient {
   private call(method: string, request: Record<string, string>): Promise<any> {
     return new Promise((resolve, reject) => {
       const deadline = new Date(Date.now() + 30_000);
-      this.client[method](request, { deadline }, (err: any, response: any) => {
+      const fn = this.client?.[method];
+      if (typeof fn !== 'function') {
+        return reject(new Error(`gRPC method ${method} is not available in RouterService`));
+      }
+      fn.call(this.client, request, { deadline }, (err: any, response: any) => {
         if (err) return reject(err);
         if (!response?.success) return reject(new Error(response?.error || `${method} failed`));
         resolve(response);
@@ -57,36 +62,37 @@ export class ReportRouterClient {
     sessionId: string,
     filter: { idhr?: string; idbl?: string } = {},
   ): Promise<ReportScript[]> {
-    const marker = [
-      REPORT_SCRIPTS_MARKER,
-      `idhr=${filter.idhr || ''}`,
-      `idbl=${filter.idbl || ''}`,
-    ].join('|');
-    const response = await this.call('ListHotspotUsers', {
+    const response = await this.call('ListSellingScripts', {
       sessionId,
-      profile: marker,
-      comment: '',
+      idhr: filter.idhr || '',
+      idbl: filter.idbl || '',
     });
-    return (response.users || []).map((row: any) => ({
-      id: row.id || '',
-      name: row.name || '',
-      owner: row.profile || '',
-      comment: row.comment || '',
-    }));
+
+    return (response.scripts || []).map((row: any) => {
+      const date = row.date || '';
+      const time = row.time || '';
+      const username = row.username || '';
+      const price = Number(row.price || 0);
+      const profile = row.profile || '';
+      const comment = row.comment || '';
+      return {
+        id: row.id || '',
+        name: `${date}-|-${time}-|-${username}-|-${price}-|-0-|-0-|-0-|-${profile}-|-${comment}`,
+        owner: profile,
+        comment,
+      };
+    });
   }
 
   async deleteScripts(
     sessionId: string,
     filter: { idhr?: string; idbl?: string } = {},
   ): Promise<void> {
-    const marker = [
-      REPORT_DELETE_MARKER,
-      `|idhr=${filter.idhr || ''}`,
-      `|idbl=${filter.idbl || ''}`,
-    ].join('');
-    await this.call('RemoveHotspotUser', {
+    await this.call('ListSellingScripts', {
       sessionId,
-      name: marker,
+      idhr: filter.idhr || '',
+      idbl: filter.idbl || '',
     });
+    throw new Error('MikroTik selling-script delete RPC is not available in the current RouterService contract');
   }
 }
