@@ -1,17 +1,10 @@
 /**
- * MikHMon on-login script build/parse — ported verbatim from the monolith's
- * `MikrotikController` (private methods `buildOnLoginScript`,
- * `buildOnLoginHeader`, `parseOnLogin`).
+ * Mikhmon-compatible hotspot on-login script builder.
  *
- * This is deliberately kept as plain, RouterOS-connection-free functions:
- * mikrotik-go-service doesn't understand this encoding at all — it just
- * writes whatever `on_login` string it's given (see AddHotspotProfile /
- * UpdateHotspotProfile in server.go). All the "smart" logic — encoding
- * price/validity/expiry-mode into the script header, and being able to
- * read it back out later — lives here.
- *
- * Header format (always the first statement in the script):
- *   :put (",expmode,price,validity,sprice,,lockuser,");
+ * The generated script is intentionally RouterOS-version agnostic: it detects
+ * the clock date format at runtime (ROS6: mon/dd/yyyy, ROS7: yyyy-mm-dd),
+ * normalizes expiry to a common mon/dd/yyyy HH:mm:ss comment, records the
+ * selling script, and optionally locks the user's MAC address.
  */
 
 export interface OnLoginMeta {
@@ -26,7 +19,7 @@ const EMPTY_META: OnLoginMeta = { expmode: '', price: 0, validity: '', sprice: 0
 
 export function parseOnLogin(onLogin: string): OnLoginMeta {
   if (!onLogin) return { ...EMPTY_META };
-  const match = onLogin.match(/:put \("([^"]*)"\)/);
+  const match = onLogin.match(/:put \(\"([^\"]*)\"\)/);
   if (!match) return { ...EMPTY_META };
   const p = match[1].split(',');
   return {
@@ -38,7 +31,6 @@ export function parseOnLogin(onLogin: string): OnLoginMeta {
   };
 }
 
-/** Build only the header line (used when just re-reading/updating metadata). */
 export function buildOnLoginHeader(
   expmode: string,
   price: number,
@@ -46,15 +38,9 @@ export function buildOnLoginHeader(
   sprice: number,
   lockUser: string,
 ): string {
-  return `:put (",${expmode},${price},${validity},${sprice},,${lockUser},");`;
+  return `:put (\",${expmode},${price},${validity},${sprice},,${lockUser},\");`;
 }
 
-/**
- * Build the full MikHMon-compatible on-login script.
- *
- * ROS 7: date format is YYYY-MM-DD, needs arraybln conversion.
- * ROS 6: date format is Mon/DD/YYYY — no conversion needed.
- */
 export function buildOnLoginScript(
   expmode: string,
   price: number,
@@ -62,37 +48,62 @@ export function buildOnLoginScript(
   sprice: number,
   lockUser: string,
   profileName: string,
-  rosVersion: string,
+  _rosVersion: string,
 ): string {
-  const header = `:put (",${expmode},${price},${validity},${sprice},,${lockUser},");`;
-
-  const lockSnip =
-    lockUser === 'Enable'
-      ? ` [:local mac $"mac-address"; /ip hotspot user set mac-address=$mac [find where name=$user]]`
-      : '';
+  const header = buildOnLoginHeader(expmode, price, validity, sprice, lockUser);
 
   const recordSnip =
     expmode === 'remc' || expmode === 'ntfc'
-      ? ` :local mac $"mac-address"; :local time [/system clock get time ]; /system script add name="$date-|-$time-|-$user-|-${price}-|-$address-|-$mac-|-${validity}-|-${profileName}-|-$comment" owner="$month$year" source="$date" comment="mikhmon";`
+      ? ` :local mac $\"mac-address\"; :local time [/system clock get time]; /system script add name=\"$nowDate-|-$nowClock-|-$user-|-${price}-|-$address-|-$mac-|-${validity}-|-${profileName}-|-$comment\" owner=\"$nowBln$nowThn\" source=\"$nowDate\" comment=\"mikhmon\";`
       : '';
 
-  if (rosVersion === '7') {
-    const body =
-      `{:local comment [ /ip hotspot user get [/ip hotspot user find where name="$user"] comment]; :local ucode [:pick $comment 0 2]; :if ($ucode = "vc" or $ucode = "up" or $comment = "") do={ :local date [ /system clock get date ];:if ([:pick $date 4 5] = "-") do={:local arraybln {"01"="jan";"02"="feb";"03"="mar";"04"="apr";"05"="may";"06"="jun";"07"="jul";"08"="aug";"09"="sep";"10"="oct";"11"="nov";"12"="dec"};:local tgl [:pick $date 8 10];:local bulan [:pick $date 5 7];:local tahun [:pick $date 0 4];:local bln ($arraybln->$bulan);:set $date ($bln."/".$tgl."/".$tahun);};:local year [ :pick $date 7 11 ];:local month [ :pick $date 0 3 ]; /sys sch add name="$user" disable=no start-date=$date interval="${validity}"; :delay 5s; :local exp [ /sys sch get [ /sys sch find where name="$user" ] next-run];:if ([:pick $exp 2 3] = "-") do={:local arraybln {"01"="jan";"02"="feb";"03"="mar";"04"="apr";"05"="may";"06"="jun";"07"="jul";"08"="aug";"09"="sep";"10"="oct";"11"="nov";"12"="dec"};:local tgl [:pick $exp 3 5];:local bulan [:pick $exp 0 2];:local bln ($arraybln->$bulan);:local jam [:pick $exp 11 19];:set $exp ($bln."/".$tgl." ".$jam);};:if ([:pick $exp 4 5] = "-") do={:local arraybln {"01"="jan";"02"="feb";"03"="mar";"04"="apr";"05"="may";"06"="jun";"07"="jul";"08"="aug";"09"="sep";"10"="oct";"11"="nov";"12"="dec"};:local tgl [:pick $exp 8 10];:local bulan [:pick $exp 5 7];:local tahun [:pick $exp 0 4];:local bln ($arraybln->$bulan);:local jam [:pick $exp 11 19];:set $exp ($bln."/".$tgl."/".$tahun." ".$jam);}; :local getxp [len $exp]; :if ($getxp = 15) do={ :local d [:pick $exp 0 6]; :local t [:pick $exp 7 16]; :local s ("/"); :local exp ("$d$s$year $t"); /ip hotspot user set comment="$exp" [find where name="$user"];}; :if ($getxp = 8) do={ /ip hotspot user set comment="$date $exp" [find where name="$user"];}; :if ($getxp > 15) do={ /ip hotspot user set comment="$exp" [find where name="$user"];};:delay 5s; /sys sch remove [find where name="$user"];${recordSnip}${lockSnip}}}`;
-    return `${header} ${body}`;
-  }
+  const lockSnip =
+    lockUser === 'Enable'
+      ? ` :local mac $\"mac-address\"; /ip hotspot user set mac-address=$mac [find where name=$user];`
+      : '';
 
   const body =
-    `{:local comment [ /ip hotspot user get [/ip hotspot user find where name="$user"] comment]; :local ucode [:pick $comment 0 2]; :if ($ucode = "vc" or $ucode = "up" or $comment = "") do={ :local date [ /system clock get date ];:local year [ :pick $date 7 11 ]; :local month [ :pick $date 0 3 ]; /sys sch add name="$user" disable=no start-date=$date interval="${validity}"; :delay 5s; :local exp [ /sys sch get [ /sys sch find where name="$user" ] next-run]; :local getxp [len $exp]; :if ($getxp = 15) do={ :local d [:pick $exp 0 6]; :local t [:pick $exp 7 16]; :local s ("/"); :local exp ("$d$s$year $t"); /ip hotspot user set comment="$exp" [find where name="$user"];}; :if ($getxp = 8) do={ /ip hotspot user set comment="$date $exp" [find where name="$user"];}; :if ($getxp > 15) do={ /ip hotspot user set comment="$exp" [find where name="$user"];};:delay 5s; /sys sch remove [find where name="$user"];${recordSnip}${lockSnip}}}`;
-  return `${header} ${body}`;
+    `:local comment [/ip hotspot user get [/ip hotspot user find where name=\"$user\"] comment]; ` +
+    `:local ucode [:pick $comment 0 2]; ` +
+    `:if ($ucode = \"vc\" or $ucode = \"up\" or $comment = \"\") do={ ` +
+      `:local nowDate [/system clock get date]; ` +
+      `:local nowClock [/system clock get time]; ` +
+      `:local nowTime ($nowDate.\" \".$nowClock); ` +
+      `/system scheduler add name=\"$user\" disable=no start-date=$nowDate start-time=$nowClock interval=\"${validity}\"; ` +
+      `:local expTime [/system scheduler get [/system scheduler find where name=\"$user\"] next-run]; ` +
+      `/system scheduler remove [find where name=\"$user\"]; ` +
+      `:local nowLen [len $nowDate]; ` +
+      `:local expLen [len $expTime]; ` +
+      `:local nowThn; :local nowBln; :local nowTgl; ` +
+      `:if ($nowLen = 11) do={ ` +
+        `:set $nowThn [:pick $nowDate 7 11]; ` +
+        `:set $nowBln [:pick $nowDate 0 3]; ` +
+        `:set $nowTgl [:pick $nowDate 4 6]; ` +
+        `:if ($expLen = 8) do={ :local expDate [:pick $nowDate 0 11]; :local expClock [:pick $expTime 0 8]; :set $expTime ($expDate.\" \".$expClock); }; ` +
+        `:if ($expLen = 15) do={ :local expThn [:pick $nowDate 7 11]; :local expBln [:pick $expTime 0 3]; :local expTgl [:pick $expTime 4 6]; :local expDate ($expBln.\"/\".$expTgl.\"/\".$expThn); :local expClock [:pick $expTime 7 15]; :set $expTime ($expDate.\" \".$expClock); }; ` +
+        `:if ($expLen = 20) do={ :local expDate [:pick $expTime 0 11]; :local expClock [:pick $expTime 12 20]; :set $expTime ($expDate.\" \".$expClock); }; ` +
+      `}; ` +
+      `:if ($nowLen = 10) do={ ` +
+        `:local montharray {\"01\"=\"jan\";\"02\"=\"feb\";\"03\"=\"mar\";\"04\"=\"apr\";\"05\"=\"may\";\"06\"=\"jun\";\"07\"=\"jul\";\"08\"=\"aug\";\"09\"=\"sep\";\"10\"=\"oct\";\"11\"=\"nov\";\"12\"=\"dec\"}; ` +
+        `:set $nowThn [:pick $nowDate 0 4]; ` +
+        `:set $nowBln [:pick $nowDate 5 7]; ` +
+        `:set $nowTgl [:pick $nowDate 8 10]; ` +
+        `:set $nowBln ($montharray->$nowBln); ` +
+        `:set $nowDate ($nowBln.\"/\".$nowTgl.\"/\".$nowThn); ` +
+        `:if ($expLen = 8) do={ :local expThn [:pick $nowThn 0 4]; :local expBln [:pick $nowDate 0 3]; :local expTgl [:pick $nowDate 4 6]; :local expDate ($expBln.\"/\".$expTgl.\"/\".$expThn); :local expClock [:pick $expTime 0 8]; :set $expTime ($expDate.\" \".$expClock); }; ` +
+        `:if ($expLen = 14) do={ :local expThn $nowThn; :local expBln [:pick $expTime 0 2]; :local expTgl [:pick $expTime 3 5]; :set $expBln ($montharray->$expBln); :local expDate ($expBln.\"/\".$expTgl.\"/\".$expThn); :local expClock [:pick $expTime 6 14]; :set $expTime ($expDate.\" \".$expClock); }; ` +
+        `:if ($expLen = 19) do={ :local expThn [:pick $expTime 0 4]; :local expBln [:pick $expTime 5 7]; :local expTgl [:pick $expTime 8 10]; :set $expBln ($montharray->$expBln); :local expDate ($expBln.\"/\".$expTgl.\"/\".$expThn); :local expClock [:pick $expTime 11 19]; :set $expTime ($expDate.\" \".$expClock); }; ` +
+      `}; ` +
+      `/log warning \"Fazznet Mikhmon Online : hotspot user $user first login at $nowTime and will expire at $expTime\"; ` +
+      `/ip hotspot user set comment=\"$expTime\" [find where name=\"$user\"]; ` +
+      `:delay 5s;` +
+      recordSnip +
+      lockSnip +
+    `}`;
+
+  return `${header} /log warning \"Fazznet Mikhmon Online : now in version 25.02.23 and monitoring the hotspot server on this mikrotik\"; ${body}`;
 }
 
-/**
- * Merge a raw HotspotProfile (from mikrotik-go-service) with local
- * profile-meta (price/validity/color/caption fallback) into the shape the
- * frontend expects. Script metadata (embedded in on-login) takes priority
- * over the locally-stored fallback, matching the monolith's exact rule.
- */
 export function mergeProfile(
   profile: { onLogin?: string; name?: string; [key: string]: any },
   meta: { price?: number; validity?: string; profileColor?: string; caption?: string } | undefined,
