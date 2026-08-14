@@ -10,16 +10,6 @@ export interface ReportScript {
   comment: string;
 }
 
-export interface ReportSellingScript {
-  id: string;
-  date: string;
-  time: string;
-  username: string;
-  price: number;
-  profile: string;
-  comment: string;
-}
-
 export class ReportRouterClient {
   private readonly client: any;
 
@@ -87,12 +77,12 @@ export class ReportRouterClient {
   async deleteScripts(
     sessionId: string,
     filter: { idhr?: string; idbl?: string } = {},
-  ): Promise<void> {
-    await this.call('ListSellingScripts', {
+  ): Promise<{ deleted: number }> {
+    const response = await this.call('DeleteSellingScripts', {
       sessionId,
       idhr: filter.idhr || '',
       idbl: filter.idbl || '',
     });
-    throw new Error('MikroTik selling-script delete RPC is not available in the current RouterService contract');
+    return { deleted: Number(response.deleted || 0) };
   }
 }
