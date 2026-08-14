@@ -102,3 +102,105 @@ message UpdateSchedulerRequest {
   string comment = 5;
 }
 message UpdateSchedulerResponse { bool success = 1; string error = 2; }
+
+message ListSellingScriptsRequest {
+  string session_id = 1;
+  string idhr = 2;
+  string idbl = 3;
+}
+message SellingScript {
+  string id = 1;
+  string date = 2;
+  string time = 3;
+  string username = 4;
+  double price = 5;
+  string profile = 6;
+  string comment = 7;
+}
+message ListSellingScriptsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated SellingScript scripts = 3;
+}
+
+message TestConnectRequest { string session_id = 1; }
+message TestConnectResponse { bool success = 1; string identity = 2; string ros_version = 3; string error = 4; }
+message GetDashboardRequest { string session_id = 1; }
+message GetDashboardResponse { bool success = 1; string error = 2; string identity = 3; string ros_version = 4; string uptime = 5; string version = 6; string cpu_load = 7; string free_memory = 8; string total_memory = 9; string free_hdd = 10; string total_hdd = 11; int32 active_hotspot_users = 12; int32 total_hotspot_users = 13; }
+message ListActiveRequest { string session_id = 1; string server = 2; }
+message ActiveHotspotUser { string id = 1; string user = 2; string address = 3; string mac_address = 4; string uptime = 5; string bytes_in = 6; string bytes_out = 7; string packets_in = 8; string packets_out = 9; string server = 10; }
+message ListActiveResponse { bool success = 1; string error = 2; repeated ActiveHotspotUser users = 3; }
+message ListHotspotUsersRequest { string session_id = 1; string profile = 2; string comment = 3; }
+message HotspotUser { string id = 1; string name = 2; string password = 3; string profile = 4; string comment = 5; string limit_uptime = 6; string disabled = 7; }
+message ListHotspotUsersResponse { bool success = 1; string error = 2; repeated HotspotUser users = 3; }
+message AddHotspotUserRequest { string session_id = 1; string name = 2; string password = 3; string profile = 4; string comment = 5; string limit_uptime = 6; }
+message AddHotspotUserResponse { bool success = 1; string error = 2; }
+message RemoveHotspotUserRequest { string session_id = 1; string name = 2; }
+message RemoveHotspotUserResponse { bool success = 1; string error = 2; }
+message DisableHotspotUserRequest { string session_id = 1; string name = 2; }
+message DisableHotspotUserResponse { bool success = 1; string error = 2; }
+message EnableHotspotUserRequest { string session_id = 1; string name = 2; }
+message EnableHotspotUserResponse { bool success = 1; string error = 2; }
+message ListProfilesRequest { string session_id = 1; }
+message HotspotProfile { string id = 1; string name = 2; string on_login = 3; string session_timeout = 4; string idle_timeout = 5; string rate_limit = 6; string shared_users = 7; string address_pool = 8; }
+message ListProfilesResponse { bool success = 1; string error = 2; repeated HotspotProfile profiles = 3; }
+message GetProfileRequest { string session_id = 1; string name = 2; }
+message GetProfileResponse { bool success = 1; string error = 2; HotspotProfile profile = 3; }
+message AddHotspotProfileRequest { string session_id = 1; string name = 2; string on_login = 3; string session_timeout = 4; string idle_timeout = 5; string rate_limit = 6; string shared_users = 7; string address_pool = 8; }
+message AddHotspotProfileResponse { bool success = 1; string error = 2; }
+message UpdateHotspotProfileRequest { string session_id = 1; string name = 2; string on_login = 3; string session_timeout = 4; string idle_timeout = 5; string rate_limit = 6; string shared_users = 7; string address_pool = 8; }
+message UpdateHotspotProfileResponse { bool success = 1; string error = 2; }
+message DeleteHotspotProfileRequest { string session_id = 1; string name = 2; }
+message DeleteHotspotProfileResponse { bool success = 1; string error = 2; }
+message BulkRemoveHotspotUsersRequest { string session_id = 1; repeated string names = 2; }
+message BulkRemoveHotspotUsersResponse { bool success = 1; string error = 2; int32 removed = 3; repeated string failed_names = 4; }
+message SetupExpirySchedulerRequest { string session_id = 1; }
+message SetupExpirySchedulerResponse { bool success = 1; string error = 2; }
+message SystemResourceRequest { string session_id = 1; }
+message SystemResourceResponse { bool success = 1; string error = 2; string version = 3; string uptime = 4; string cpu_load = 5; string free_memory = 6; string total_memory = 7; string free_hdd = 8; string total_hdd = 9; string ros_version = 10; }
+message InterfacesRequest { string session_id = 1; }
+message InterfaceInfo { string id = 1; string name = 2; string type = 3; string mac_address = 4; string tx = 5; string rx = 6; string running = 7; }
+message InterfacesResponse { bool success = 1; string error = 2; repeated InterfaceInfo interfaces = 3; }
+message RouterSessionInfo { string id = 1; string name = 2; string ip = 3; int32 port = 4; string user = 5; string hotspot_name = 6; string dns_name = 7; string currency = 8; int32 reload_interval = 9; string iface = 10; int32 idle_to = 11; string livereport = 12; }
+message ListSessionsRequest {}
+message ListSessionsResponse { bool success = 1; string error = 2; repeated RouterSessionInfo sessions = 3; }
+message GetSessionRequest { string id = 1; }
+message GetSessionResponse { bool success = 1; string error = 2; RouterSessionInfo session = 3; }
+message CreateSessionRequest { string id = 1; string name = 2; string ip = 3; int32 port = 4; string user = 5; string password = 6; string hotspot_name = 7; string dns_name = 8; string currency = 9; int32 reload_interval = 10; string iface = 11; int32 idle_to = 12; string livereport = 13; }
+message CreateSessionResponse { bool success = 1; string error = 2; RouterSessionInfo session = 3; }
+message UpdateSessionRequest { string id = 1; string name = 2; string ip = 3; int32 port = 4; string user = 5; string password = 6; string hotspot_name = 7; string dns_name = 8; string currency = 9; int32 reload_interval = 10; string iface = 11; int32 idle_to = 12; string livereport = 13; }
+message UpdateSessionResponse { bool success = 1; string error = 2; RouterSessionInfo session = 3; }
+message DeleteSessionRequest { string id = 1; }
+message DeleteSessionResponse { bool success = 1; string error = 2; }
+message ListPppSecretsRequest { string session_id = 1; string profile = 2; string name = 3; }
+message PppSecret { string id = 1; string name = 2; string password = 3; string service = 4; string profile = 5; string local_address = 6; string remote_address = 7; string comment = 8; string disabled = 9; }
+message ListPppSecretsResponse { bool success = 1; string error = 2; repeated PppSecret secrets = 3; }
+message GetPppSecretRequest { string session_id = 1; string name = 2; }
+message GetPppSecretResponse { bool success = 1; string error = 2; PppSecret secret = 3; }
+message AddPppSecretRequest { string session_id = 1; string name = 2; string password = 3; string service = 4; string profile = 5; string local_address = 6; string remote_address = 7; string comment = 8; }
+message AddPppSecretResponse { bool success = 1; string error = 2; }
+message UpdatePppSecretRequest { string session_id = 1; string name = 2; string password = 3; string service = 4; string profile = 5; string local_address = 6; string remote_address = 7; string comment = 8; }
+message UpdatePppSecretResponse { bool success = 1; string error = 2; }
+message DeletePppSecretRequest { string session_id = 1; string name = 2; }
+message DeletePppSecretResponse { bool success = 1; string error = 2; }
+message EnablePppSecretRequest { string session_id = 1; string name = 2; }
+message EnablePppSecretResponse { bool success = 1; string error = 2; }
+message DisablePppSecretRequest { string session_id = 1; string name = 2; }
+message DisablePppSecretResponse { bool success = 1; string error = 2; }
+message ListPppProfilesRequest { string session_id = 1; }
+message PppProfile { string id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message ListPppProfilesResponse { bool success = 1; string error = 2; repeated PppProfile profiles = 3; }
+message AddPppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message AddPppProfileResponse { bool success = 1; string error = 2; }
+message UpdatePppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message UpdatePppProfileResponse { bool success = 1; string error = 2; }
+message DeletePppProfileRequest { string session_id = 1; string name = 2; }
+message DeletePppProfileResponse { bool success = 1; string error = 2; }
+message ListPppActiveRequest { string session_id = 1; }
+message PppActive { string id = 1; string name = 2; string address = 3; string uptime = 4; string service = 5; }
+message ListPppActiveResponse { bool success = 1; string error = 2; repeated PppActive users = 3; }
+message DisconnectPppActiveRequest { string session_id = 1; string name = 2; }
+message DisconnectPppActiveResponse { bool success = 1; string error = 2; }
+message ListPppPoolsRequest { string session_id = 1; }
+message PppPool { string id = 1; string name = 2; string ranges = 3; }
+message ListPppPoolsResponse { bool success = 1; string error = 2; repeated PppPool pools = 3; }
