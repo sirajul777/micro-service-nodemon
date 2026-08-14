@@ -26,6 +26,7 @@ service RouterService {
   rpc UpdateScheduler(UpdateSchedulerRequest) returns (UpdateSchedulerResponse);
   rpc ListLogs(ListLogsRequest) returns (ListLogsResponse);
   rpc ListSellingScripts(ListSellingScriptsRequest) returns (ListSellingScriptsResponse);
+  rpc DeleteSellingScripts(DeleteSellingScriptsRequest) returns (DeleteSellingScriptsResponse);
   rpc GetSystemResource(SystemResourceRequest) returns (SystemResourceResponse);
   rpc GetInterfaces(InterfacesRequest) returns (InterfacesResponse);
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
@@ -52,77 +53,21 @@ service RouterService {
 message ListLogsRequest { string session_id = 1; string topics = 2; }
 message LogEntry { string id = 1; string time = 2; string topics = 3; string message = 4; }
 message ListLogsResponse { bool success = 1; string error = 2; repeated LogEntry logs = 3; }
-
 message ListDhcpLeasesRequest { string session_id = 1; }
-message DhcpLease {
-  string id = 1;
-  string address = 2;
-  string mac_address = 3;
-  string client_id = 4;
-  string server = 5;
-  string status = 6;
-  string expires_after = 7;
-  string last_seen = 8;
-  string active_address = 9;
-  string active_mac_address = 10;
-  string host_name = 11;
-  string comment = 12;
-  string disabled = 13;
-}
+message DhcpLease { string id = 1; string address = 2; string mac_address = 3; string client_id = 4; string server = 5; string status = 6; string expires_after = 7; string last_seen = 8; string active_address = 9; string active_mac_address = 10; string host_name = 11; string comment = 12; string disabled = 13; }
 message ListDhcpLeasesResponse { bool success = 1; string error = 2; repeated DhcpLease leases = 3; }
-
-message Scheduler {
-  string id = 1;
-  string name = 2;
-  string start_date = 3;
-  string start_time = 4;
-  string interval = 5;
-  string on_event = 6;
-  string disabled = 7;
-  string comment = 8;
-}
+message Scheduler { string id = 1; string name = 2; string start_date = 3; string start_time = 4; string interval = 5; string on_event = 6; string disabled = 7; string comment = 8; }
 message ListSchedulersRequest { string session_id = 1; }
 message ListSchedulersResponse { bool success = 1; string error = 2; repeated Scheduler schedulers = 3; }
-message AddSchedulerRequest {
-  string session_id = 1;
-  string name = 2;
-  string start_date = 3;
-  string start_time = 4;
-  string interval = 5;
-  string on_event = 6;
-  string disabled = 7;
-  string comment = 8;
-}
+message AddSchedulerRequest { string session_id = 1; string name = 2; string start_date = 3; string start_time = 4; string interval = 5; string on_event = 6; string disabled = 7; string comment = 8; }
 message AddSchedulerResponse { bool success = 1; string error = 2; }
-message UpdateSchedulerRequest {
-  string session_id = 1;
-  string name = 2;
-  string on_event = 3;
-  string disabled = 4;
-  string comment = 5;
-}
+message UpdateSchedulerRequest { string session_id = 1; string name = 2; string on_event = 3; string disabled = 4; string comment = 5; }
 message UpdateSchedulerResponse { bool success = 1; string error = 2; }
-
-message ListSellingScriptsRequest {
-  string session_id = 1;
-  string idhr = 2;
-  string idbl = 3;
-}
-message SellingScript {
-  string id = 1;
-  string date = 2;
-  string time = 3;
-  string username = 4;
-  double price = 5;
-  string profile = 6;
-  string comment = 7;
-}
-message ListSellingScriptsResponse {
-  bool success = 1;
-  string error = 2;
-  repeated SellingScript scripts = 3;
-}
-
+message ListSellingScriptsRequest { string session_id = 1; string idhr = 2; string idbl = 3; }
+message SellingScript { string id = 1; string date = 2; string time = 3; string username = 4; double price = 5; string profile = 6; string comment = 7; }
+message ListSellingScriptsResponse { bool success = 1; string error = 2; repeated SellingScript scripts = 3; }
+message DeleteSellingScriptsRequest { string session_id = 1; string idhr = 2; string idbl = 3; }
+message DeleteSellingScriptsResponse { bool success = 1; string error = 2; int32 deleted = 3; }
 message TestConnectRequest { string session_id = 1; }
 message TestConnectResponse { bool success = 1; string identity = 2; string ros_version = 3; string error = 4; }
 message GetDashboardRequest { string session_id = 1; }
