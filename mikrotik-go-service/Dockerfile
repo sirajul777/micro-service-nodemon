@@ -15,12 +15,20 @@ RUN go mod download
 
 # Copy source and regenerate protobuf bindings from the authoritative schema.
 COPY . .
+RUN rm -f proto/router.pb.go proto/router_grpc.pb.go
 RUN protoc \
       --go_out=. \
       --go_opt=paths=source_relative \
       --go-grpc_out=. \
       --go-grpc_opt=paths=source_relative \
       proto/router.proto
+
+RUN grep -q 'type UnimplementedRouterServiceServer struct' proto/router_grpc.pb.go
+RUN grep -q 'ListSessions(context.Context, \*ListSessionsRequest)' proto/router_grpc.pb.go
+RUN grep -q 'ListDhcpLeases(context.Context, \*ListDhcpLeasesRequest)' proto/router_grpc.pb.go
+RUN grep -q 'ListSchedulers(context.Context, \*ListSchedulersRequest)' proto/router_grpc.pb.go
+RUN grep -q 'ListLogs(context.Context, \*ListLogsRequest)' proto/router_grpc.pb.go
+RUN grep -q '{MethodName: "ListSessions", Handler: _RouterService_ListSessions_Handler}' proto/router_grpc.pb.go
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o mikrotik-service .
 
