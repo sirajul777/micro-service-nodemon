@@ -1,3 +1,5 @@
+syntax = "proto3";
+
 package router;
 
 option go_package = "github.com/mikhmon/mikrotik-go-service/proto";
