@@ -1,41 +1,11 @@
 package server
 
 import (
-    "context"
-    pb "github.com/mikhmon/mikrotik-go-service/proto"
+ "context"
+ pb "github.com/mikhmon/mikrotik-go-service/proto"
 )
 
-func (s *RouterServiceServer) GetDashboard(ctx context.Context, req *pb.GetDashboardRequest) (*pb.GetDashboardResponse, error) {
-    resp := &pb.GetDashboardResponse{}
-    c, err := s.dial(ctx, req.SessionId); if err != nil { resp.Error = err.Error(); return resp, nil }; defer c.Close()
-    id, err := c.Run("/system/identity/print"); if err != nil { resp.Error = err.Error(); return resp, nil }
-    rs, err := c.Run("/system/resource/print"); if err != nil { resp.Error = err.Error(); return resp, nil }
-    if len(id)>0 { resp.Identity=id[0]["name"] }
-    if len(rs)>0 { r:=rs[0]; resp.Version=r["version"]; resp.RosVersion=r["version"]; resp.Uptime=r["uptime"]; resp.CpuLoad=r["cpu-load"]; resp.FreeMemory=r["free-memory"]; resp.TotalMemory=r["total-memory"]; resp.FreeHdd=r["free-hdd-space"]; resp.TotalHdd=r["total-hdd-space"] }
-    if a,e:=c.Run("/ip/hotspot/active/print"); e==nil { resp.ActiveHotspotUsers=int32(len(a)) }
-    if u,e:=c.Run("/ip/hotspot/user/print"); e==nil { resp.TotalHotspotUsers=int32(len(u)) }
-    resp.Success=true; return resp,nil
-}
-
-func (s *RouterServiceServer) ListActiveHotspotUsers(ctx context.Context, req *pb.ListActiveRequest) (*pb.ListActiveResponse, error) {
-    resp:=&pb.ListActiveResponse{}; c,err:=s.dial(ctx,req.SessionId); if err!=nil{resp.Error=err.Error();return resp,nil}; defer c.Close()
-    words:=[]string{}; if req.Server!=""{words=append(words,"?server="+req.Server)}
-    rows,err:=c.Run("/ip/hotspot/active/print",words...); if err!=nil{resp.Error=err.Error();return resp,nil}
-    for _,r:=range rows{resp.Users=append(resp.Users,&pb.ActiveHotspotUser{Id:r[".id"],User:r["user"],Address:r["address"],MacAddress:r["mac-address"],Uptime:r["uptime"],BytesIn:r["bytes-in"],BytesOut:r["bytes-out"],PacketsIn:r["packets-in"],PacketsOut:r["packets-out"],Server:r["server"]})}
-    resp.Success=true; return resp,nil
-}
-
-func (s *RouterServiceServer) GetInterfaces(ctx context.Context, req *pb.InterfacesRequest) (*pb.InterfacesResponse, error) {
-    resp:=&pb.InterfacesResponse{}; c,err:=s.dial(ctx,req.SessionId); if err!=nil{resp.Error=err.Error();return resp,nil}; defer c.Close()
-    rows,err:=c.Run("/interface/print"); if err!=nil{resp.Error=err.Error();return resp,nil}
-    for _,r:=range rows{tx:=r["tx-byte"];if tx==""{tx=r["tx"]};rx:=r["rx-byte"];if rx==""{rx=r["rx"]};resp.Interfaces=append(resp.Interfaces,&pb.InterfaceInfo{Id:r[".id"],Name:r["name"],Type:r["type"],MacAddress:r["mac-address"],Tx:tx,Rx:rx,Running:r["running"]})}
-    resp.Success=true; return resp,nil
-}
-
-func (s *RouterServiceServer) ListPppSecrets(ctx context.Context, req *pb.ListPppSecretsRequest) (*pb.ListPppSecretsResponse, error) {
-    resp:=&pb.ListPppSecretsResponse{}; c,err:=s.dial(ctx,req.SessionId); if err!=nil{resp.Error=err.Error();return resp,nil}; defer c.Close()
-    words:=[]string{};if req.Profile!=""{words=append(words,"?profile="+req.Profile)};if req.Name!=""{words=append(words,"?name="+req.Name)}
-    rows,err:=c.Run("/ppp/secret/print",words...);if err!=nil{resp.Error=err.Error();return resp,nil}
-    for _,r:=range rows{resp.Secrets=append(resp.Secrets,&pb.PppSecret{Id:r[".id"],Name:r["name"],Password:r["password"],Service:r["service"],Profile:r["profile"],LocalAddress:r["local-address"],RemoteAddress:r["remote-address"],Comment:r["comment"],Disabled:r["disabled"]})}
-    resp.Success=true;return resp,nil
-}
+func (s *RouterServiceServer) GetDashboard(ctx context.Context, req *pb.GetDashboardRequest) (*pb.GetDashboardResponse,error) { r:=&pb.GetDashboardResponse{}; c,e:=s.dial(ctx,req.SessionId); if e!=nil{r.Error=e.Error();return r,nil}; defer c.Close(); id,e:=c.Run("/system/identity/print");if e!=nil{r.Error=e.Error();return r,nil}; rs,e:=c.Run("/system/resource/print");if e!=nil{r.Error=e.Error();return r,nil};if len(id)>0{r.Identity=id[0]["name"]};if len(rs)>0{x:=rs[0];r.Version=x["version"];r.RosVersion=x["version"];r.Uptime=x["uptime"];r.CpuLoad=x["cpu-load"];r.FreeMemory=x["free-memory"];r.TotalMemory=x["total-memory"];r.FreeHdd=x["free-hdd-space"];r.TotalHdd=x["total-hdd-space"]};if a,e:=c.Run("/ip/hotspot/active/print");e==nil{r.ActiveHotspotUsers=int32(len(a))};if u,e:=c.Run("/ip/hotspot/user/print");e==nil{r.TotalHotspotUsers=int32(len(u))};r.Success=true;return r,nil }
+func (s *RouterServiceServer) ListActiveHotspotUsers(ctx context.Context, req *pb.ListActiveRequest) (*pb.ListActiveResponse,error) { r:=&pb.ListActiveResponse{};c,e:=s.dial(ctx,req.SessionId);if e!=nil{r.Error=e.Error();return r,nil};defer c.Close();w:=[]string{};if req.Server!=""{w=append(w,"?server="+req.Server)};rows,e:=c.Run("/ip/hotspot/active/print",w...);if e!=nil{r.Error=e.Error();return r,nil};for _,x:=range rows{r.Users=append(r.Users,&pb.ActiveHotspotUser{Id:x[".id"],User:x["user"],Address:x["address"],MacAddress:x["mac-address"],Uptime:x["uptime"],BytesIn:x["bytes-in"],BytesOut:x["bytes-out"],PacketsIn:x["packets-in"],PacketsOut:x["packets-out"],Server:x["server"]})};r.Success=true;return r,nil }
+func (s *RouterServiceServer) GetInterfaces(ctx context.Context, req *pb.InterfacesRequest) (*pb.InterfacesResponse,error) { r:=&pb.InterfacesResponse{};c,e:=s.dial(ctx,req.SessionId);if e!=nil{r.Error=e.Error();return r,nil};defer c.Close();rows,e:=c.Run("/interface/print");if e!=nil{r.Error=e.Error();return r,nil};for _,x:=range rows{tx:=x["tx-byte"];if tx==""{tx=x["tx"]};rx:=x["rx-byte"];if rx==""{rx=x["rx"]};r.Interfaces=append(r.Interfaces,&pb.InterfaceInfo{Id:x[".id"],Name:x["name"],Type:x["type"],MacAddress:x["mac-address"],Tx:tx,Rx:rx,Running:x["running"]})};r.Success=true;return r,nil }
+func (s *RouterServiceServer) ListPppSecrets(ctx context.Context, req *pb.ListPppSecretsRequest) (*pb.ListPppSecretsResponse,error) { r:=&pb.ListPppSecretsResponse{};c,e:=s.dial(ctx,req.SessionId);if e!=nil{r.Error=e.Error();return r,nil};defer c.Close();w:=[]string{};if req.Profile!=""{w=append(w,"?profile="+req.Profile)};if req.Name!=""{w=append(w,"?name="+req.Name)};rows,e:=c.Run("/ppp/secret/print",w...);if e!=nil{r.Error=e.Error();return r,nil};for _,x:=range rows{r.Secrets=append(r.Secrets,&pb.PppSecret{Id:x[".id"],Name:x["name"],Password:x["password"],Service:x["service"],Profile:x["profile"],LocalAddress:x["local-address"],RemoteAddress:x["remote-address"],Comment:x["comment"],Disabled:x["disabled"]})};r.Success=true;return r,nil }
