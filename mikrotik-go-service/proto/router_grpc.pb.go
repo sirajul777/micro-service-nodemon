@@ -105,9 +105,9 @@ type RouterServiceClient interface {
 	ListPppPools(context.Context,*ListPppPoolsRequest,...grpc.CallOption)(*ListPppPoolsResponse,error)
 }
 
-type routerServiceClient struct{ cc grpc.ClientConnInterface }
-func NewRouterServiceClient(cc grpc.ClientConnInterface) RouterServiceClient { return &routerServiceClient{cc} }
-func callUnary(ctx context.Context,cc grpc.ClientConnInterface,method string,in,out any,opts ...grpc.CallOption) error { return cc.Invoke(ctx,method,in,out,opts...) }
+type routerServiceClient struct{cc grpc.ClientConnInterface}
+func NewRouterServiceClient(cc grpc.ClientConnInterface) RouterServiceClient{return &routerServiceClient{cc}}
+func callUnary(ctx context.Context,cc grpc.ClientConnInterface,method string,in,out any,opts ...grpc.CallOption)error{return cc.Invoke(ctx,method,in,out,opts...)}
 
 func (c *routerServiceClient) TestConnect(ctx context.Context,in *TestConnectRequest,opts ...grpc.CallOption)(*TestConnectResponse,error){out:=new(TestConnectResponse);if err:=callUnary(ctx,c.cc,RouterService_TestConnect_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
 func (c *routerServiceClient) GetDashboard(ctx context.Context,in *GetDashboardRequest,opts ...grpc.CallOption)(*GetDashboardResponse,error){out:=new(GetDashboardResponse);if err:=callUnary(ctx,c.cc,RouterService_GetDashboard_FullMethodName,in,out,opts...);err!=nil{return nil,err};return out,nil}
@@ -246,7 +246,6 @@ func (UnimplementedRouterServiceServer) mustEmbedUnimplementedRouterServiceServe
 func RegisterRouterServiceServer(s grpc.ServiceRegistrar,srv RouterServiceServer){s.RegisterService(&RouterService_ServiceDesc,srv)}
 
 func _RouterService_TestConnect_Handler(srv any,ctx context.Context,dec func(any)error,interceptor grpc.UnaryServerInterceptor)(any,error){in:=new(TestConnectRequest);if err:=dec(in);err!=nil{return nil,err};if interceptor==nil{return srv.(RouterServiceServer).TestConnect(ctx,in)};info:=&grpc.UnaryServerInfo{Server:srv,FullMethod:RouterService_TestConnect_FullMethodName};handler:=func(ctx context.Context,req any)(any,error){return srv.(RouterServiceServer).TestConnect(ctx,req.(*TestConnectRequest))};return interceptor(ctx,in,info,handler)}
-func _RouterService_GetDashboard_Handler(srv any,ctx context.Context,dec func(any)error,interceptor grpc.UnaryServerInterceptor)(any,error){in:=new(GetDashboardRequest);if err:=dec(in);err!=nil{return nil,err};if interceptor==nil{return srv.(RouterServiceServer).GetDashboard(ctx,in)};info:=&grpc.UnaryServerInfo{Server:srv,FullMethod:RouterService_GetDashboard_FullMethodName};handler:=func(ctx context.Context,req any)(any,error){return srv.(RouterServiceServer).GetDashboard(ctx,req.(*GetDashboardRequest))};return interceptor(ctx,in,info,handler)}
 func _RouterService_ListSessions_Handler(srv any,ctx context.Context,dec func(any)error,interceptor grpc.UnaryServerInterceptor)(any,error){in:=new(ListSessionsRequest);if err:=dec(in);err!=nil{return nil,err};if interceptor==nil{return srv.(RouterServiceServer).ListSessions(ctx,in)};info:=&grpc.UnaryServerInfo{Server:srv,FullMethod:RouterService_ListSessions_FullMethodName};handler:=func(ctx context.Context,req any)(any,error){return srv.(RouterServiceServer).ListSessions(ctx,req.(*ListSessionsRequest))};return interceptor(ctx,in,info,handler)}
 
 var RouterService_ServiceDesc = grpc.ServiceDesc{
@@ -254,7 +253,8 @@ var RouterService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType:(*RouterServiceServer)(nil),
 	Methods:[]grpc.MethodDesc{
 		{MethodName:"TestConnect",Handler:_RouterService_TestConnect_Handler},
-		{MethodName:"GetDashboard",Handler:_RouterService_GetDashboard_Handler},
 		{MethodName:"ListSessions",Handler:_RouterService_ListSessions_Handler},
 	},
+	Streams: []grpc.StreamDesc{},
+	Metadata: "proto/router.proto",
 }
