@@ -133,11 +133,11 @@ message EnablePppSecretResponse { bool success = 1; string error = 2; }
 message DisablePppSecretRequest { string session_id = 1; string name = 2; }
 message DisablePppSecretResponse { bool success = 1; string error = 2; }
 message ListPppProfilesRequest { string session_id = 1; }
-message PppProfile { string id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message PppProfile { string id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; string dns = 6; string bridge = 7; string only_one = 8; string change_tcp_mss = 9; }
 message ListPppProfilesResponse { bool success = 1; string error = 2; repeated PppProfile profiles = 3; }
-message AddPppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message AddPppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; string dns = 6; string bridge = 7; string only_one = 8; string change_tcp_mss = 9; }
 message AddPppProfileResponse { bool success = 1; string error = 2; }
-message UpdatePppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message UpdatePppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; string dns = 6; string bridge = 7; string only_one = 8; string change_tcp_mss = 9; }
 message UpdatePppProfileResponse { bool success = 1; string error = 2; }
 message DeletePppProfileRequest { string session_id = 1; string name = 2; }
 message DeletePppProfileResponse { bool success = 1; string error = 2; }
