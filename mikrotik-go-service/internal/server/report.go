@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikhmon/mikrotik-go-service/internal/mikrotik"
 	pb "github.com/mikhmon/mikrotik-go-service/proto"
 )
 
@@ -61,8 +62,8 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	return resp, nil
 }
 
-func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string) ([]map[string]string, error) }, isROS7 bool, idhr, idbl string) ([]map[string]string, error) {
-	var rows []map[string]string
+func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string) ([]mikrotik.Sentence, error) }, isROS7 bool, idhr, idbl string) ([]mikrotik.Sentence, error) {
+	var rows []mikrotik.Sentence
 	var err error
 
 	if idhr != "" {
@@ -101,6 +102,7 @@ func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string)
 }
 
 type reportError struct{ message string }
+
 func (e *reportError) Error() string { return e.message }
 
 func valueAt(parts []string, index int) string {
