@@ -62,5 +62,5 @@ export class HotspotController {
   async scheduler(@Param('session') session:string){const resp=await this.mikrotik.listSchedulers(session);if(!resp.success)throw new BadRequestException(resp.error||'Gagal memuat scheduler');return resp.schedulers||[];}
 
   @Get(':session/dhcp/leases') @RequirePermission('viewDashboard')
-  async dhcpLeases(@Param('session') session:string){const active=await this.mikrotik.listActiveHotspotUsers(session,'');if(!active.success)return[];return(active.users||[]).map((u:any)=>({id:u.id,address:u.address,macAddress:u.mac_address,hostName:u.user,status:'bound'}));}
+  async dhcpLeases(@Param('session') session:string){const resp=await this.mikrotik.listDhcpLeases(session);if(!resp.success)throw new BadRequestException(resp.error||'Gagal memuat DHCP lease');return(resp.leases||[]).map((lease:any)=>({id:lease.id,address:lease.address,macAddress:lease.macAddress,clientId:lease.clientId,server:lease.server,status:lease.status,expiresAfter:lease.expiresAfter,lastSeen:lease.lastSeen,activeAddress:lease.activeAddress,activeMacAddress:lease.activeMacAddress,hostName:lease.hostName,comment:lease.comment,disabled:lease.disabled}));}
 }
