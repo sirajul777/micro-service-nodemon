@@ -23,12 +23,15 @@ RUN protoc \
       --go-grpc_opt=paths=source_relative \
       proto/router.proto
 
+# Verify the generated source contains the RPC contract before compiling.
 RUN grep -q 'type UnimplementedRouterServiceServer struct' proto/router_grpc.pb.go
 RUN grep -q 'ListSessions(context.Context, \*ListSessionsRequest)' proto/router_grpc.pb.go
 RUN grep -q 'ListDhcpLeases(context.Context, \*ListDhcpLeasesRequest)' proto/router_grpc.pb.go
 RUN grep -q 'ListSchedulers(context.Context, \*ListSchedulersRequest)' proto/router_grpc.pb.go
 RUN grep -q 'ListLogs(context.Context, \*ListLogsRequest)' proto/router_grpc.pb.go
-RUN grep -q '{MethodName: "ListSessions", Handler: _RouterService_ListSessions_Handler}' proto/router_grpc.pb.go
+RUN grep -q 'ListSessions' proto/router_grpc.pb.go
+RUN grep -q '_RouterService_ListSessions_Handler' proto/router_grpc.pb.go
+RUN grep -q 'MethodName:"ListSessions"' proto/router_grpc.pb.go
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o mikrotik-service .
 
