@@ -164,13 +164,9 @@ func main() {
 		log.Fatalf("[mikrotik-go-service] failed to listen on %s: %v", grpcAddr, err)
 	}
 
-	// GRPC_SERVICE_TOKEN enables service-to-service authentication. When it is
-	// unset the interceptor is in compatibility mode so existing Node clients
-	// continue working during a rolling migration. Once both clients are
-	// configured with the token, set it here and the boundary becomes enforced.
 	serviceToken := os.Getenv("GRPC_SERVICE_TOKEN")
 	gs := grpc.NewServer(grpc.UnaryInterceptor(server.ServiceAuthInterceptor(serviceToken)))
-	pb.RegisterRouterServiceServer(gs, server.NewReportRouterServiceServer(routerServer))
+	pb.RegisterRouterServiceServer(gs, routerServer)
 
 	log.Printf("[mikrotik-go-service] gRPC listener ready on %s (service auth: %t)", grpcAddr, serviceToken != "")
 	go func() {
