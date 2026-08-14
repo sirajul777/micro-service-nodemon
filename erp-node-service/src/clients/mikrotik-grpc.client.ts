@@ -431,36 +431,6 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  listDhcpLeases(sessionId: string): Promise<{ success: boolean; leases?: any[]; error?: string }> {
-    return new Promise((resolve) => {
-      (async () => {
-        const ready = await this.ensureClientReady();
-        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
-        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
-        this.client.ListDhcpLeases({ sessionId }, { deadline }, (err: any, resp: any) => {
-          if (err) return resolve({ success: false, error: `gRPC ListDhcpLeases failed: ${err.message}` });
-          if (!resp?.success) return resolve({ success: false, error: resp?.error || 'ListDhcpLeases reported failure' });
-          resolve({ success: true, leases: resp.leases || [] });
-        });
-      })();
-    });
-  }
-
-  listLogs(sessionId: string, topics?: string): Promise<{ success: boolean; logs?: any[]; error?: string }> {
-    return new Promise((resolve) => {
-      (async () => {
-        const ready = await this.ensureClientReady();
-        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
-        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
-        this.client.ListLogs({ sessionId, topics: topics || '' }, { deadline }, (err: any, resp: any) => {
-          if (err) return resolve({ success: false, error: `gRPC ListLogs failed: ${err.message}` });
-          if (!resp?.success) return resolve({ success: false, error: resp?.error || 'ListLogs reported failure' });
-          resolve({ success: true, logs: resp.logs || [] });
-        });
-      })();
-    });
-  }
-
   listPppSecrets(sessionId: string, profile?: string, name?: string): Promise<{ success: boolean; secrets?: any[]; error?: string }> {
     return new Promise((resolve) => {
       (async () => {
@@ -489,16 +459,171 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  addPppSecret(params: any): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.AddPppSecret(params, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC AddPppSecret failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  updatePppSecret(params: any): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.UpdatePppSecret(params, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC UpdatePppSecret failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  deletePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.DeletePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC DeletePppSecret failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  enablePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.EnablePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC EnablePppSecret failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  disablePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.DisablePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC DisablePppSecret failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  listPppProfiles(sessionId: string): Promise<{ success: boolean; profiles?: any[]; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.ListPppProfiles({ sessionId }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC ListPppProfiles failed: ${err.message}` }); resolve({ success: resp?.success, profiles: resp?.profiles || [], error: resp?.error }); }); })(); }); }
-  addPppProfile(params: any): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.AddPppProfile(params, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC AddPppProfile failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  updatePppProfile(params: any): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.UpdatePppProfile(params, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC UpdatePppProfile failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  deletePppProfile(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.DeletePppProfile({ sessionId, name }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC DeletePppProfile failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  listPppActive(sessionId: string): Promise<{ success: boolean; connections?: any[]; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.ListPppActive({ sessionId }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC ListPppActive failed: ${err.message}` }); resolve({ success: resp?.success, connections: resp?.connections || [], error: resp?.error }); }); })(); }); }
-  disconnectPppActive(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.DisconnectPppActive({ sessionId, name }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC DisconnectPppActive failed: ${err.message}` }); resolve({ success: resp?.success, error: resp?.error }); }); })(); }); }
-  listPppPools(sessionId: string): Promise<{ success: boolean; pools?: any[]; error?: string }> { return new Promise((resolve) => { (async () => { const ready = await this.ensureClientReady(); if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` }); const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15); this.client.ListPppPools({ sessionId }, { deadline }, (err: any, resp: any) => { if (err) return resolve({ success: false, error: `gRPC ListPppPools failed: ${err.message}` }); resolve({ success: resp?.success, pools: resp?.pools || [], error: resp?.error }); }); })(); }); }
+  addPppSecret(params: any): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.AddPppSecret(params, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC AddPppSecret failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  updatePppSecret(params: any): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.UpdatePppSecret(params, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC UpdatePppSecret failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  deletePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DeletePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC DeletePppSecret failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  enablePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.EnablePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC EnablePppSecret failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  disablePppSecret(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DisablePppSecret({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC DisablePppSecret failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  listPppProfiles(sessionId: string): Promise<{ success: boolean; profiles?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.ListPppProfiles({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC ListPppProfiles failed: ${err.message}` });
+          resolve({ success: resp?.success, profiles: resp?.profiles || [], error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  addPppProfile(params: any): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.AddPppProfile(params, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC AddPppProfile failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  updatePppProfile(params: any): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.UpdatePppProfile(params, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC UpdatePppProfile failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  deletePppProfile(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DeletePppProfile({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC DeletePppProfile failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  listPppActive(sessionId: string): Promise<{ success: boolean; connections?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.ListPppActive({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC ListPppActive failed: ${err.message}` });
+          resolve({ success: resp?.success, connections: resp?.connections || [], error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  disconnectPppActive(sessionId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.DisconnectPppActive({ sessionId, name }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC DisconnectPppActive failed: ${err.message}` });
+          resolve({ success: resp?.success, error: resp?.error });
+        });
+      })();
+    });
+  }
+
+  listPppPools(sessionId: string): Promise<{ success: boolean; pools?: any[]; error?: string }> {
+    return new Promise((resolve) => {
+      (async () => {
+        const ready = await this.ensureClientReady();
+        if (!ready) return resolve({ success: false, error: `mikrotik gRPC client not initialized (target ${this.address})` });
+        const deadline = new Date(); deadline.setSeconds(deadline.getSeconds() + 15);
+        this.client.ListPppPools({ sessionId }, { deadline }, (err: any, resp: any) => {
+          if (err) return resolve({ success: false, error: `gRPC ListPppPools failed: ${err.message}` });
+          resolve({ success: resp?.success, pools: resp?.pools || [], error: resp?.error });
+        });
+      })();
+    });
+  }
 }
