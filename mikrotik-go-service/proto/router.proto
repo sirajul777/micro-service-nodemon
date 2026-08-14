@@ -142,10 +142,10 @@ message UpdatePppProfileResponse { bool success = 1; string error = 2; }
 message DeletePppProfileRequest { string session_id = 1; string name = 2; }
 message DeletePppProfileResponse { bool success = 1; string error = 2; }
 message ListPppActiveRequest { string session_id = 1; }
-message PppActive { string id = 1; string name = 2; string address = 3; string uptime = 4; string service = 5; }
-message ListPppActiveResponse { bool success = 1; string error = 2; repeated PppActive users = 3; }
+message PppActive { string id = 1; string name = 2; string service = 3; string call_id = 4; string address = 5; string uptime = 6; string bytes_in = 7; string bytes_out = 8; string profile = 9; }
+message ListPppActiveResponse { bool success = 1; string error = 2; repeated PppActive connections = 3; }
 message DisconnectPppActiveRequest { string session_id = 1; string name = 2; }
 message DisconnectPppActiveResponse { bool success = 1; string error = 2; }
 message ListPppPoolsRequest { string session_id = 1; }
-message PppPool { string id = 1; string name = 2; string ranges = 3; }
+message PppPool { string id = 1; string name = 2; string ranges = 3; string next_pool = 4; }
 message ListPppPoolsResponse { bool success = 1; string error = 2; repeated PppPool pools = 3; }
