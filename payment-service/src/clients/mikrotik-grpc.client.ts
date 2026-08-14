@@ -10,16 +10,7 @@ import { join } from 'path';
  * In the monolith `VoucherOrderService.settleOrder()` created the hotspot user
  * directly via `MikrotikService`. In microservices the router is owned by the
  * Go service, so we call its `AddHotspotUser` RPC synchronously — voucher
- * provisioning must succeed before we mark the order PAID (the same critical
- * path as the monolith).
- *
- * The proto is loaded from the shared `router.proto`. Path resolution: the
- * compiled output lives in `dist/`, and the proto is copied alongside during
- * build (see postbuild) or referenced from the repo root.
- *
- * If the Go service is unreachable, `addHotspotUser` throws so the caller can
- * roll the order back to 'pending' and alert the admin — never mark paid
- * without a working voucher.
+ * provisioning must succeed before we mark the order PAID.
  */
 @Injectable()
 export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
@@ -32,13 +23,6 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
   }
 
   private get protoPath(): string {
-    // See the identical fix in erp-node-service's mikrotik-grpc.client.ts —
-    // compiled location is dist/clients/mikrotik-grpc.client.js and the
-    // proto is copied to dist/proto/router.proto (package.json's
-    // copy:proto), so this is one level up from dist/clients, not two.
-    // '..','..' resolved to /app/proto/router.proto, which the Docker
-    // runtime image never has (only dist/ is copied in) — so this ENOENT
-    // was silently breaking AddHotspotUser on every settled order.
     return (
       process.env.ROUTER_PROTO_PATH ||
       join(__dirname, '..', 'proto', 'router.proto')
@@ -77,7 +61,13 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Create a hotspot user on the router via gRPC.
-   * @throws if the Go service is unreachable or the RPC reports failure.
+   *
+   * Router provisioning is intentionally treated as idempotent at this
+   * boundary: if RouterOS reports that the username already exists, the
+   * caller may safely continue its settlement retry. This closes the crash
+   * window where RouterOS committed the user but payment-service died before
+   * persisting PAID. Credential generation must remain stable for the order
+   * when this retry path is used.
    */
   addHotspotUser(params: {
     sessionId: string;
@@ -111,7 +101,15 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
             return;
           }
           if (!resp?.success) {
-            reject(new Error(resp?.error || 'mikrotik AddHotspotUser reported failure'));
+            const message = String(resp?.error || 'mikrotik AddHotspotUser reported failure');
+            if (/already\s+(have|exists|exist)|already.*name|duplicate/i.test(message)) {
+              this.logger.warn(
+                `[mikrotik-grpc] AddHotspotUser reported existing user ${params.name}; treating as idempotent success`,
+              );
+              resolve({ success: true });
+              return;
+            }
+            reject(new Error(message));
             return;
           }
           resolve({ success: true });
@@ -121,10 +119,6 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Billing suspension (overdue → suspend, paid/re-enable → restore) ──
-  // Used by BillingController's run-overdue / re-enable endpoints. Two
-  // variants because a billing customer's `type` determines which RouterOS
-  // subsystem they live under (hotspot user vs ppp secret) — same split
-  // the monolith's billing.controller.ts made.
 
   private callSimple(
     method: string,

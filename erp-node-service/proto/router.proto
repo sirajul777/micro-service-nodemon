@@ -4,64 +4,35 @@ package router;
 
 option go_package = "github.com/mikhmon/mikrotik-go-service/proto";
 
-// RouterService exposes MikroTik operations to other microservices
-// (payment-service, erp-node-service, main-node-service) via gRPC.
 service RouterService {
-  // Connection test
   rpc TestConnect(TestConnectRequest) returns (TestConnectResponse);
-
-  // Dashboard
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse);
-
-  // Hotspot users
   rpc ListActiveHotspotUsers(ListActiveRequest) returns (ListActiveResponse);
   rpc ListHotspotUsers(ListHotspotUsersRequest) returns (ListHotspotUsersResponse);
   rpc AddHotspotUser(AddHotspotUserRequest) returns (AddHotspotUserResponse);
   rpc RemoveHotspotUser(RemoveHotspotUserRequest) returns (RemoveHotspotUserResponse);
-  // Suspend/restore a hotspot customer without deleting their account —
-  // mirrors DisablePppSecret/EnablePppSecret below. Needed by
-  // payment-service's billing overdue-suspension flow (billing customers
-  // whose `type` is 'hotspot' rather than 'pppoe').
   rpc DisableHotspotUser(DisableHotspotUserRequest) returns (DisableHotspotUserResponse);
   rpc EnableHotspotUser(EnableHotspotUserRequest) returns (EnableHotspotUserResponse);
-
-  // Hotspot profiles
   rpc ListHotspotProfiles(ListProfilesRequest) returns (ListProfilesResponse);
   rpc GetHotspotProfile(GetProfileRequest) returns (GetProfileResponse);
-  // Generic field-passthrough CRUD, mirroring AddPppProfile/UpdatePppProfile/
-  // DeletePppProfile below — Go doesn't understand MikHMon's on-login script
-  // metadata (price/validity/expiry mode encoded into the script text), it
-  // just writes whatever `on_login` string the caller built. That business
-  // logic lives in erp-node-service (ported from the monolith's
-  // buildOnLoginScript/parseOnLogin), not here — same "smart client, dumb
-  // server" split used for router-session management.
   rpc AddHotspotProfile(AddHotspotProfileRequest) returns (AddHotspotProfileResponse);
   rpc UpdateHotspotProfile(UpdateHotspotProfileRequest) returns (UpdateHotspotProfileResponse);
   rpc DeleteHotspotProfile(DeleteHotspotProfileRequest) returns (DeleteHotspotProfileResponse);
-  // Bulk-remove — just RemoveHotspotUser looped server-side so the caller
-  // makes one round-trip instead of N.
   rpc BulkRemoveHotspotUsers(BulkRemoveHotspotUsersRequest) returns (BulkRemoveHotspotUsersResponse);
-  // Idempotent: creates the "mikhmon-cleanup-expired" scheduler if missing,
-  // otherwise just re-confirms it (used after every profile save, matching
-  // the monolith calling this on every add/edit). The cleanup script itself
-  // is fixed/static (no customer input), so it's hardcoded here rather than
-  // sent over the wire from erp-node-service.
   rpc SetupExpiryScheduler(SetupExpirySchedulerRequest) returns (SetupExpirySchedulerResponse);
-
-  // System info
+  rpc ListDhcpLeases(ListDhcpLeasesRequest) returns (ListDhcpLeasesResponse);
+  rpc ListSchedulers(ListSchedulersRequest) returns (ListSchedulersResponse);
+  rpc AddScheduler(AddSchedulerRequest) returns (AddSchedulerResponse);
+  rpc UpdateScheduler(UpdateSchedulerRequest) returns (UpdateSchedulerResponse);
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse);
+  rpc ListSellingScripts(ListSellingScriptsRequest) returns (ListSellingScriptsResponse);
   rpc GetSystemResource(SystemResourceRequest) returns (SystemResourceResponse);
   rpc GetInterfaces(InterfacesRequest) returns (InterfacesResponse);
-
-  // Router session management (CRUD) — the router connection profiles
-  // (id, ip, credentials, hotspot/UI settings) that every other RPC above
-  // is dialed against via session_id.
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
   rpc UpdateSession(UpdateSessionRequest) returns (UpdateSessionResponse);
   rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
-
-  // ── PPPoE secrets ────────────────────────────────────────────────
   rpc ListPppSecrets(ListPppSecretsRequest) returns (ListPppSecretsResponse);
   rpc GetPppSecret(GetPppSecretRequest) returns (GetPppSecretResponse);
   rpc AddPppSecret(AddPppSecretRequest) returns (AddPppSecretResponse);
@@ -69,538 +40,150 @@ service RouterService {
   rpc DeletePppSecret(DeletePppSecretRequest) returns (DeletePppSecretResponse);
   rpc EnablePppSecret(EnablePppSecretRequest) returns (EnablePppSecretResponse);
   rpc DisablePppSecret(DisablePppSecretRequest) returns (DisablePppSecretResponse);
-
-  // ── PPPoE profiles ───────────────────────────────────────────────
   rpc ListPppProfiles(ListPppProfilesRequest) returns (ListPppProfilesResponse);
   rpc AddPppProfile(AddPppProfileRequest) returns (AddPppProfileResponse);
   rpc UpdatePppProfile(UpdatePppProfileRequest) returns (UpdatePppProfileResponse);
   rpc DeletePppProfile(DeletePppProfileRequest) returns (DeletePppProfileResponse);
-
-  // ── PPPoE active conns & pools ───────────────────────────────────
   rpc ListPppActive(ListPppActiveRequest) returns (ListPppActiveResponse);
   rpc DisconnectPppActive(DisconnectPppActiveRequest) returns (DisconnectPppActiveResponse);
   rpc ListPppPools(ListPppPoolsRequest) returns (ListPppPoolsResponse);
 }
 
-// ── Connection test ────────────────────────────────────────────────
-message TestConnectRequest {
-  string session_id = 1;
-}
-message TestConnectResponse {
-  bool success = 1;
-  string identity = 2;
-  string ros_version = 3;
-  string error = 4;
-}
+message ListLogsRequest { string session_id = 1; string topics = 2; }
+message LogEntry { string id = 1; string time = 2; string topics = 3; string message = 4; }
+message ListLogsResponse { bool success = 1; string error = 2; repeated LogEntry logs = 3; }
 
-// ── Dashboard ─────────────────────────────────────────────────────
-message GetDashboardRequest {
-  string session_id = 1;
-}
-message GetDashboardResponse {
-  bool success = 1;
-  string error = 2;
-  string identity = 3;
-  string ros_version = 4;
-  string uptime = 5;
-  string version = 6;
-  string cpu_load = 7;
-  string free_memory = 8;
-  string total_memory = 9;
-  string free_hdd = 10;
-  string total_hdd = 11;
-  int32 active_hotspot_users = 12;
-  int32 total_hotspot_users = 13;
-}
-
-// ── Hotspot active ────────────────────────────────────────────────
-message ListActiveRequest {
-  string session_id = 1;
-  string server = 2;
-}
-message ActiveHotspotUser {
+message ListDhcpLeasesRequest { string session_id = 1; }
+message DhcpLease {
   string id = 1;
-  string user = 2;
-  string address = 3;
-  string mac_address = 4;
-  string uptime = 5;
-  string bytes_in = 6;
-  string bytes_out = 7;
-  string packets_in = 8;
-  string packets_out = 9;
-  string server = 10;
+  string address = 2;
+  string mac_address = 3;
+  string client_id = 4;
+  string server = 5;
+  string status = 6;
+  string expires_after = 7;
+  string last_seen = 8;
+  string active_address = 9;
+  string active_mac_address = 10;
+  string host_name = 11;
+  string comment = 12;
+  string disabled = 13;
 }
-message ListActiveResponse {
-  bool success = 1;
-  string error = 2;
-  repeated ActiveHotspotUser users = 3;
-}
+message ListDhcpLeasesResponse { bool success = 1; string error = 2; repeated DhcpLease leases = 3; }
 
-// ── Hotspot users ─────────────────────────────────────────────────
-message ListHotspotUsersRequest {
-  string session_id = 1;
-  string profile = 2;
-  string comment = 3;
-}
-message HotspotUser {
+message Scheduler {
   string id = 1;
   string name = 2;
-  string password = 3;
-  string profile = 4;
-  string comment = 5;
-  string limit_uptime = 6;
+  string start_date = 3;
+  string start_time = 4;
+  string interval = 5;
+  string on_event = 6;
   string disabled = 7;
+  string comment = 8;
 }
-message ListHotspotUsersResponse {
-  bool success = 1;
-  string error = 2;
-  repeated HotspotUser users = 3;
-}
-
-message AddHotspotUserRequest {
+message ListSchedulersRequest { string session_id = 1; }
+message ListSchedulersResponse { bool success = 1; string error = 2; repeated Scheduler schedulers = 3; }
+message AddSchedulerRequest {
   string session_id = 1;
   string name = 2;
-  string password = 3;
-  string profile = 4;
+  string start_date = 3;
+  string start_time = 4;
+  string interval = 5;
+  string on_event = 6;
+  string disabled = 7;
+  string comment = 8;
+}
+message AddSchedulerResponse { bool success = 1; string error = 2; }
+message UpdateSchedulerRequest {
+  string session_id = 1;
+  string name = 2;
+  string on_event = 3;
+  string disabled = 4;
   string comment = 5;
-  string limit_uptime = 6;
 }
-message AddHotspotUserResponse {
-  bool success = 1;
-  string error = 2;
-}
+message UpdateSchedulerResponse { bool success = 1; string error = 2; }
 
-message RemoveHotspotUserRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message RemoveHotspotUserResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message DisableHotspotUserRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message DisableHotspotUserResponse {
-  bool success = 1;
-  string error = 2;
-}
-message EnableHotspotUserRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message EnableHotspotUserResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-// ── Hotspot profiles ──────────────────────────────────────────────
-message ListProfilesRequest {
-  string session_id = 1;
-}
-message HotspotProfile {
-  string id = 1;
-  string name = 2;
-  string on_login = 3;
-  string session_timeout = 4;
-  string idle_timeout = 5;
-  string rate_limit = 6;
-  string shared_users = 7;
-  string address_pool = 8;
-}
-message ListProfilesResponse {
-  bool success = 1;
-  string error = 2;
-  repeated HotspotProfile profiles = 3;
-}
-
-message GetProfileRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message GetProfileResponse {
-  bool success = 1;
-  string error = 2;
-  HotspotProfile profile = 3;
-}
-
-message AddHotspotProfileRequest {
-  string session_id = 1;
-  string name = 2;
-  string on_login = 3;
-  string session_timeout = 4;
-  string idle_timeout = 5;
-  string rate_limit = 6;
-  string shared_users = 7;
-  string address_pool = 8;
-}
-message AddHotspotProfileResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message UpdateHotspotProfileRequest {
-  string session_id = 1;
-  string name = 2;
-  string on_login = 3;
-  // Same convention as AddPppProfile/UpdatePppProfile: empty string = leave
-  // unchanged. To actually clear a field, the caller sends RouterOS's own
-  // "no value" literal (e.g. "00:00:00" for session-timeout, "none" for
-  // address-pool) — matching what the monolith already did for this exact
-  // endpoint, so erp-node-service's port needs no new convention here.
-  string session_timeout = 4;
-  string idle_timeout = 5;
-  string rate_limit = 6;
-  string shared_users = 7;
-  string address_pool = 8;
-}
-message UpdateHotspotProfileResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message DeleteHotspotProfileRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message DeleteHotspotProfileResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message BulkRemoveHotspotUsersRequest {
-  string session_id = 1;
-  repeated string names = 2;
-}
-message BulkRemoveHotspotUsersResponse {
-  bool success = 1;
-  string error = 2;
-  int32 removed = 3;
-  repeated string failed_names = 4;
-}
-
-message SetupExpirySchedulerRequest {
-  string session_id = 1;
-}
-message SetupExpirySchedulerResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-// ── System ────────────────────────────────────────────────────────
-message SystemResourceRequest {
-  string session_id = 1;
-}
-message SystemResourceResponse {
-  bool success = 1;
-  string error = 2;
-  string version = 3;
-  string uptime = 4;
-  string cpu_load = 5;
-  string free_memory = 6;
-  string total_memory = 7;
-  string free_hdd = 8;
-  string total_hdd = 9;
-  string ros_version = 10;
-}
-
-message InterfacesRequest {
-  string session_id = 1;
-}
-message InterfaceInfo {
-  string id = 1;
-  string name = 2;
-  string type = 3;
-  string mac_address = 4;
-  string tx = 5;
-  string rx = 6;
-  string running = 7;
-}
-message InterfacesResponse {
-  bool success = 1;
-  string error = 2;
-  repeated InterfaceInfo interfaces = 3;
-}
-
-// ── Router sessions (CRUD) ─────────────────────────────────────────
-message RouterSessionInfo {
-  string id = 1;
-  string name = 2;
-  string ip = 3;
-  int32 port = 4;
-  string user = 5;
-  string hotspot_name = 6;
-  string dns_name = 7;
-  string currency = 8;
-  int32 reload_interval = 9;
-  string iface = 10;
-  int32 idle_to = 11;
-  string livereport = 12;
-  // password is intentionally never included in list/get responses.
-}
-
+message TestConnectRequest { string session_id = 1; }
+message TestConnectResponse { bool success = 1; string identity = 2; string ros_version = 3; string error = 4; }
+message GetDashboardRequest { string session_id = 1; }
+message GetDashboardResponse { bool success = 1; string error = 2; string identity = 3; string ros_version = 4; string uptime = 5; string version = 6; string cpu_load = 7; string free_memory = 8; string total_memory = 9; string free_hdd = 10; string total_hdd = 11; int32 active_hotspot_users = 12; int32 total_hotspot_users = 13; }
+message ListActiveRequest { string session_id = 1; string server = 2; }
+message ActiveHotspotUser { string id = 1; string user = 2; string address = 3; string mac_address = 4; string uptime = 5; string bytes_in = 6; string bytes_out = 7; string packets_in = 8; string packets_out = 9; string server = 10; }
+message ListActiveResponse { bool success = 1; string error = 2; repeated ActiveHotspotUser users = 3; }
+message ListHotspotUsersRequest { string session_id = 1; string profile = 2; string comment = 3; }
+message HotspotUser { string id = 1; string name = 2; string password = 3; string profile = 4; string comment = 5; string limit_uptime = 6; string disabled = 7; }
+message ListHotspotUsersResponse { bool success = 1; string error = 2; repeated HotspotUser users = 3; }
+message AddHotspotUserRequest { string session_id = 1; string name = 2; string password = 3; string profile = 4; string comment = 5; string limit_uptime = 6; }
+message AddHotspotUserResponse { bool success = 1; string error = 2; }
+message RemoveHotspotUserRequest { string session_id = 1; string name = 2; }
+message RemoveHotspotUserResponse { bool success = 1; string error = 2; }
+message DisableHotspotUserRequest { string session_id = 1; string name = 2; }
+message DisableHotspotUserResponse { bool success = 1; string error = 2; }
+message EnableHotspotUserRequest { string session_id = 1; string name = 2; }
+message EnableHotspotUserResponse { bool success = 1; string error = 2; }
+message ListProfilesRequest { string session_id = 1; }
+message HotspotProfile { string id = 1; string name = 2; string on_login = 3; string session_timeout = 4; string idle_timeout = 5; string rate_limit = 6; string shared_users = 7; string address_pool = 8; }
+message ListProfilesResponse { bool success = 1; string error = 2; repeated HotspotProfile profiles = 3; }
+message GetProfileRequest { string session_id = 1; string name = 2; }
+message GetProfileResponse { bool success = 1; string error = 2; HotspotProfile profile = 3; }
+message AddHotspotProfileRequest { string session_id = 1; string name = 2; string on_login = 3; string session_timeout = 4; string idle_timeout = 5; string rate_limit = 6; string shared_users = 7; string address_pool = 8; }
+message AddHotspotProfileResponse { bool success = 1; string error = 2; }
+message UpdateHotspotProfileRequest { string session_id = 1; string name = 2; string on_login = 3; string session_timeout = 4; string idle_timeout = 5; string rate_limit = 6; string shared_users = 7; string address_pool = 8; }
+message UpdateHotspotProfileResponse { bool success = 1; string error = 2; }
+message DeleteHotspotProfileRequest { string session_id = 1; string name = 2; }
+message DeleteHotspotProfileResponse { bool success = 1; string error = 2; }
+message BulkRemoveHotspotUsersRequest { string session_id = 1; repeated string names = 2; }
+message BulkRemoveHotspotUsersResponse { bool success = 1; string error = 2; int32 removed = 3; repeated string failed_names = 4; }
+message SetupExpirySchedulerRequest { string session_id = 1; }
+message SetupExpirySchedulerResponse { bool success = 1; string error = 2; }
+message SystemResourceRequest { string session_id = 1; }
+message SystemResourceResponse { bool success = 1; string error = 2; string version = 3; string uptime = 4; string cpu_load = 5; string free_memory = 6; string total_memory = 7; string free_hdd = 8; string total_hdd = 9; string ros_version = 10; }
+message InterfacesRequest { string session_id = 1; }
+message InterfaceInfo { string id = 1; string name = 2; string type = 3; string mac_address = 4; string tx = 5; string rx = 6; string running = 7; }
+message InterfacesResponse { bool success = 1; string error = 2; repeated InterfaceInfo interfaces = 3; }
+message RouterSessionInfo { string id = 1; string name = 2; string ip = 3; int32 port = 4; string user = 5; string hotspot_name = 6; string dns_name = 7; string currency = 8; int32 reload_interval = 9; string iface = 10; int32 idle_to = 11; string livereport = 12; }
 message ListSessionsRequest {}
-message ListSessionsResponse {
-  bool success = 1;
-  string error = 2;
-  repeated RouterSessionInfo sessions = 3;
-}
-
-message GetSessionRequest {
-  string id = 1;
-}
-message GetSessionResponse {
-  bool success = 1;
-  string error = 2;
-  RouterSessionInfo session = 3;
-}
-
-message CreateSessionRequest {
-  string id = 1;
-  string name = 2;
-  string ip = 3;
-  int32 port = 4;
-  string user = 5;
-  string password = 6;
-  string hotspot_name = 7;
-  string dns_name = 8;
-  string currency = 9;
-  int32 reload_interval = 10;
-  string iface = 11;
-  int32 idle_to = 12;
-  string livereport = 13;
-}
-message CreateSessionResponse {
-  bool success = 1;
-  string error = 2;
-  RouterSessionInfo session = 3;
-}
-
-message UpdateSessionRequest {
-  string id = 1;
-  string name = 2;
-  string ip = 3;
-  int32 port = 4;
-  string user = 5;
-  // Empty password means "keep the existing password".
-  string password = 6;
-  string hotspot_name = 7;
-  string dns_name = 8;
-  string currency = 9;
-  int32 reload_interval = 10;
-  string iface = 11;
-  int32 idle_to = 12;
-  string livereport = 13;
-}
-message UpdateSessionResponse {
-  bool success = 1;
-  string error = 2;
-  RouterSessionInfo session = 3;
-}
-
-message DeleteSessionRequest {
-  string id = 1;
-}
-message DeleteSessionResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-// ── PPPoE secrets ─────────────────────────────────────────────────
-message ListPppSecretsRequest {
-  string session_id = 1;
-  string profile = 2;
-  string name = 3;
-}
-message PppSecret {
-  string id = 1;
-  string name = 2;
-  string password = 3;
-  string service = 4;
-  string profile = 5;
-  string local_address = 6;
-  string remote_address = 7;
-  string comment = 8;
-  string disabled = 9;
-}
-message ListPppSecretsResponse {
-  bool success = 1;
-  string error = 2;
-  repeated PppSecret secrets = 3;
-}
-
-message GetPppSecretRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message GetPppSecretResponse {
-  bool success = 1;
-  string error = 2;
-  PppSecret secret = 3;
-}
-
-message AddPppSecretRequest {
-  string session_id = 1;
-  string name = 2;
-  string password = 3;
-  string service = 4;
-  string profile = 5;
-  string local_address = 6;
-  string remote_address = 7;
-  string comment = 8;
-}
-message AddPppSecretResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message UpdatePppSecretRequest {
-  string session_id = 1;
-  string name = 2;
-  string password = 3;
-  string service = 4;
-  string profile = 5;
-  string local_address = 6;
-  string remote_address = 7;
-  string comment = 8;
-}
-message UpdatePppSecretResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message DeletePppSecretRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message DeletePppSecretResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message EnablePppSecretRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message EnablePppSecretResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message DisablePppSecretRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message DisablePppSecretResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-// ── PPPoE profiles ────────────────────────────────────────────────
-message ListPppProfilesRequest {
-  string session_id = 1;
-}
-message PppProfile {
-  string id = 1;
-  string name = 2;
-  string local_address = 3;
-  string remote_address = 4;
-  string dns = 5;
-  string rate_limit = 6;
-  string bridge = 7;
-  string only_one = 8;
-  string change_tcp_mss = 9;
-}
-message ListPppProfilesResponse {
-  bool success = 1;
-  string error = 2;
-  repeated PppProfile profiles = 3;
-}
-
-message AddPppProfileRequest {
-  string session_id = 1;
-  string name = 2;
-  string local_address = 3;
-  string remote_address = 4;
-  string dns = 5;
-  string rate_limit = 6;
-  string bridge = 7;
-  string only_one = 8;
-  string change_tcp_mss = 9;
-}
-message AddPppProfileResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message UpdatePppProfileRequest {
-  string session_id = 1;
-  string name = 2;
-  string local_address = 3;
-  string remote_address = 4;
-  string dns = 5;
-  string rate_limit = 6;
-  string bridge = 7;
-  string only_one = 8;
-  string change_tcp_mss = 9;
-}
-message UpdatePppProfileResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message DeletePppProfileRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message DeletePppProfileResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-// ── PPPoE active & pools ──────────────────────────────────────────
-message ListPppActiveRequest {
-  string session_id = 1;
-}
-message PppActive {
-  string id = 1;
-  string name = 2;
-  string service = 3;
-  string call_id = 4;
-  string address = 5;
-  string uptime = 6;
-  string bytes_in = 7;
-  string bytes_out = 8;
-  string profile = 9;
-}
-message ListPppActiveResponse {
-  bool success = 1;
-  string error = 2;
-  repeated PppActive connections = 3;
-}
-
-message DisconnectPppActiveRequest {
-  string session_id = 1;
-  string name = 2;
-}
-message DisconnectPppActiveResponse {
-  bool success = 1;
-  string error = 2;
-}
-
-message ListPppPoolsRequest {
-  string session_id = 1;
-}
-message PppPool {
-  string id = 1;
-  string name = 2;
-  string ranges = 3;
-  string next_pool = 4;
-}
-message ListPppPoolsResponse {
-  bool success = 1;
-  string error = 2;
-  repeated PppPool pools = 3;
-}
+message ListSessionsResponse { bool success = 1; string error = 2; repeated RouterSessionInfo sessions = 3; }
+message GetSessionRequest { string id = 1; }
+message GetSessionResponse { bool success = 1; string error = 2; RouterSessionInfo session = 3; }
+message CreateSessionRequest { string id = 1; string name = 2; string ip = 3; int32 port = 4; string user = 5; string password = 6; string hotspot_name = 7; string dns_name = 8; string currency = 9; int32 reload_interval = 10; string iface = 11; int32 idle_to = 12; string livereport = 13; }
+message CreateSessionResponse { bool success = 1; string error = 2; RouterSessionInfo session = 3; }
+message UpdateSessionRequest { string id = 1; string name = 2; string ip = 3; int32 port = 4; string user = 5; string password = 6; string hotspot_name = 7; string dns_name = 8; string currency = 9; int32 reload_interval = 10; string iface = 11; int32 idle_to = 12; string livereport = 13; }
+message UpdateSessionResponse { bool success = 1; string error = 2; RouterSessionInfo session = 3; }
+message DeleteSessionRequest { string id = 1; }
+message DeleteSessionResponse { bool success = 1; string error = 2; }
+message ListPppSecretsRequest { string session_id = 1; string profile = 2; string name = 3; }
+message PppSecret { string id = 1; string name = 2; string password = 3; string service = 4; string profile = 5; string local_address = 6; string remote_address = 7; string comment = 8; string disabled = 9; }
+message ListPppSecretsResponse { bool success = 1; string error = 2; repeated PppSecret secrets = 3; }
+message GetPppSecretRequest { string session_id = 1; string name = 2; }
+message GetPppSecretResponse { bool success = 1; string error = 2; PppSecret secret = 3; }
+message AddPppSecretRequest { string session_id = 1; string name = 2; string password = 3; string service = 4; string profile = 5; string local_address = 6; string remote_address = 7; string comment = 8; }
+message AddPppSecretResponse { bool success = 1; string error = 2; }
+message UpdatePppSecretRequest { string session_id = 1; string name = 2; string password = 3; string service = 4; string profile = 5; string local_address = 6; string remote_address = 7; string comment = 8; }
+message UpdatePppSecretResponse { bool success = 1; string error = 2; }
+message DeletePppSecretRequest { string session_id = 1; string name = 2; }
+message DeletePppSecretResponse { bool success = 1; string error = 2; }
+message EnablePppSecretRequest { string session_id = 1; string name = 2; }
+message EnablePppSecretResponse { bool success = 1; string error = 2; }
+message DisablePppSecretRequest { string session_id = 1; string name = 2; }
+message DisablePppSecretResponse { bool success = 1; string error = 2; }
+message ListPppProfilesRequest { string session_id = 1; }
+message PppProfile { string id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message ListPppProfilesResponse { bool success = 1; string error = 2; repeated PppProfile profiles = 3; }
+message AddPppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message AddPppProfileResponse { bool success = 1; string error = 2; }
+message UpdatePppProfileRequest { string session_id = 1; string name = 2; string local_address = 3; string remote_address = 4; string rate_limit = 5; }
+message UpdatePppProfileResponse { bool success = 1; string error = 2; }
+message DeletePppProfileRequest { string session_id = 1; string name = 2; }
+message DeletePppProfileResponse { bool success = 1; string error = 2; }
+message ListPppActiveRequest { string session_id = 1; }
+message PppActive { string id = 1; string name = 2; string address = 3; string uptime = 4; string service = 5; }
+message ListPppActiveResponse { bool success = 1; string error = 2; repeated PppActive users = 3; }
+message DisconnectPppActiveRequest { string session_id = 1; string name = 2; }
+message DisconnectPppActiveResponse { bool success = 1; string error = 2; }
+message ListPppPoolsRequest { string session_id = 1; }
+message PppPool { string id = 1; string name = 2; string ranges = 3; }
+message ListPppPoolsResponse { bool success = 1; string error = 2; repeated PppPool pools = 3; }
+message ListSellingScriptsRequest { string session_id = 1; string owner = 2; }
+message SellingScript { string id = 1; string name = 2; string owner = 3; string source = 4; string comment = 5; string policy = 6; }
+message ListSellingScriptsResponse { bool success = 1; string error = 2; repeated SellingScript scripts = 3; }

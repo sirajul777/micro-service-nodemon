@@ -1,24 +1,8 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Param,
-  Body,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { VoucherBatchService, VoucherBatch } from './voucher-batch.service';
 import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-/**
- * Voucher batch controller. Ported from the monolith's VoucherBatchController.
- *
- * Key change: MikroTik operations go through MikrotikGrpcClient → Go
- * (testConnect, listHotspotUsers, removeHotspotUser, listHotspotProfiles)
- * instead of direct MikrotikService calls.
- */
 @Controller('voucher/batches')
 @UseGuards(JwtAuthGuard)
 export class VoucherBatchController {
@@ -26,8 +10,6 @@ export class VoucherBatchController {
     private readonly batchService: VoucherBatchService,
     private readonly mikrotikGrpc: MikrotikGrpcClient,
   ) {}
-
-  // ── CRUD ────────────────────────────────────────────────────────
 
   @Get(':session')
   async getAll(@Param('session') session: string) {
@@ -47,7 +29,7 @@ export class VoucherBatchController {
     body.sessionId = session;
     if (!body.id) body.id = `BATCH-${Date.now()}`;
     if (!body.createdAt) body.createdAt = new Date().toISOString();
-    return this.batchService.saveBatch(body);
+    return this.batchService.createBatch(body);
   }
 
   @Delete(':session/:id')
@@ -65,12 +47,8 @@ export class VoucherBatchController {
     @Param('id') id: string,
     @Body() body: { username: string; usedBy: string },
   ) {
-    return {
-      success: await this.batchService.markUsed(session, id, body.username, body.usedBy),
-    };
+    return { success: await this.batchService.markUsed(session, id, body.username, body.usedBy) };
   }
-
-  // ── MikroTik sync operations (via gRPC → Go) ────────────────────
 
   @Post(':session/sync-used')
   async syncUsedFromMikrotik(@Param('session') session: string) {
@@ -82,62 +60,46 @@ export class VoucherBatchController {
     const batches = await this.batchService.loadAll(session);
     if (!batches.length) return { success: true, updated: 0, message: 'Tidak ada batch' };
 
-    // Build a map of available usernames → batch/voucher indices.
     const availableMap: Record<string, { batchIdx: number; vcrIdx: number }> = {};
-    batches.forEach((batch, bi) => {
-      batch.vouchers.forEach((vcr, vi) => {
-        if (vcr.status === 'available') {
-          availableMap[vcr.username] = { batchIdx: bi, vcrIdx: vi };
-        }
-      });
-    });
+    batches.forEach((batch, bi) => batch.vouchers.forEach((vcr, vi) => {
+      if (vcr.status === 'available') availableMap[vcr.username] = { batchIdx: bi, vcrIdx: vi };
+    }));
 
     if (!Object.keys(availableMap).length) {
       return { success: true, updated: 0, message: 'Tidak ada voucher available' };
     }
 
     const res = await this.mikrotikGrpc.listHotspotUsers({ sessionId: session });
-    if (!res.success) {
-      return { success: false, updated: 0, error: res.error || 'Gagal ambil user dari router' };
-    }
+    if (!res.success) return { success: false, updated: 0, error: res.error || 'Gagal ambil user dari router' };
 
     let updated = 0;
     const changedBatches = new Set<number>();
-
     for (const hsUser of res.users || []) {
       const username = hsUser.name || '';
       if (!availableMap[username]) continue;
       const comment = hsUser.comment || '';
       const isExpired = /^\w{3}\/\d{2}\/\d{4}/.test(comment) || /^\d{4}-\d{2}-\d{2}/.test(comment);
       const bytesIn = parseInt(hsUser['bytes-in'] || '0', 10) > 0;
-
       if (isExpired || bytesIn) {
         const { batchIdx, vcrIdx } = availableMap[username];
-        const vcr = batches[batchIdx].vouchers[vcrIdx];
-        vcr.status = 'used';
-        vcr.usedBy = isExpired ? 'Hotspot (expired)' : 'Hotspot (traffic)';
-        vcr.usedAt = comment || new Date().toLocaleString('id-ID');
+        const voucher = batches[batchIdx].vouchers[vcrIdx];
+        voucher.status = 'used';
+        voucher.usedBy = isExpired ? 'Hotspot (expired)' : 'Hotspot (traffic)';
+        voucher.usedAt = comment || new Date().toISOString();
         changedBatches.add(batchIdx);
         updated++;
       }
     }
 
-    for (const bi of changedBatches) {
-      await this.batchService.saveBatch(batches[bi]);
-    }
-
+    // Status synchronization must not publish a provisioning event.
+    for (const bi of changedBatches) await this.batchService.saveBatch(batches[bi]);
     return { success: true, updated };
   }
-
-  // ── Import profiles MikroTik (via gRPC → Go) ────────────────────
 
   @Get(':session/import/profiles')
   async getImportProfiles(@Param('session') session: string) {
     const res = await this.mikrotikGrpc.listHotspotProfiles(session);
-    if (!res.success) {
-      return { success: false, error: res.error || 'Gagal ambil profile dari router' };
-    }
-
+    if (!res.success) return { success: false, error: res.error || 'Gagal ambil profile dari router' };
     const localMeta = await this.batchService.readLocalProfileMeta(session);
     const profiles = (res.profiles || []).map((p: any) => {
       const ol = this.parseOnLogin(p.on_login || '');
@@ -153,49 +115,30 @@ export class VoucherBatchController {
         caption: loc.caption || p.name,
       };
     });
-
     return { success: true, profiles };
   }
 
   @Post(':session/import/profile')
-  async importOneProfile(
-    @Param('session') session: string,
-    @Body() body: { profileName: string; createdBy?: string },
-  ) {
+  async importOneProfile(@Param('session') session: string, @Body() body: { profileName: string; createdBy?: string }) {
     const profileName = body.profileName;
     if (!profileName) return { success: false, error: 'profileName required' };
 
-    // Fetch profiles from the router.
     const profilesRes = await this.mikrotikGrpc.listHotspotProfiles(session);
-    if (!profilesRes.success) {
-      return { success: false, error: profilesRes.error || 'Gagal ambil profile' };
-    }
-
+    if (!profilesRes.success) return { success: false, error: profilesRes.error || 'Gagal ambil profile' };
     const profileData = (profilesRes.profiles || []).find((p: any) => p.name === profileName);
-    if (!profileData) {
-      return { success: false, error: `Profile "${profileName}" tidak ditemukan di router` };
-    }
+    if (!profileData) return { success: false, error: `Profile "${profileName}" tidak ditemukan di router` };
 
     const ol = this.parseOnLogin(profileData.on_login || '');
     const localMeta = await this.batchService.readLocalProfileMeta(session);
     const loc = localMeta[profileName] || {};
-
-    // Fetch users for this profile from the router.
-    const usersRes = await this.mikrotikGrpc.listHotspotUsers({
-      sessionId: session,
-      profile: profileName,
-    });
-    if (!usersRes.success) {
-      return { success: false, error: usersRes.error || 'Gagal ambil user' };
-    }
+    const usersRes = await this.mikrotikGrpc.listHotspotUsers({ sessionId: session, profile: profileName });
+    if (!usersRes.success) return { success: false, error: usersRes.error || 'Gagal ambil user' };
 
     const users = usersRes.users || [];
     const batchId = `IMPORT-${profileName}-${session}`;
     const existingBatch = await this.batchService.getById(session, batchId);
     const existingVcrMap: Record<string, any> = {};
-    if (existingBatch) {
-      for (const v of existingBatch.vouchers) existingVcrMap[v.username] = v;
-    }
+    if (existingBatch) for (const v of existingBatch.vouchers) existingVcrMap[v.username] = v;
 
     const vouchers = users.map((u: any) => {
       const comment = u.comment || '';
@@ -231,20 +174,11 @@ export class VoucherBatchController {
       vouchers,
     };
 
+    // Importing existing router users must never provision them again.
     const saved = await this.batchService.saveBatch(batch);
     const stats = this.batchService.getStats(saved);
-
-    return {
-      success: true,
-      profileName,
-      batchId,
-      imported: vouchers.length,
-      available: stats.remaining,
-      used: stats.used,
-    };
+    return { success: true, profileName, batchId, imported: vouchers.length, available: stats.remaining, used: stats.used };
   }
-
-  // ── Helpers ──────────────────────────────────────────────────────
 
   private parseOnLogin(onLogin: string) {
     const empty = { expmode: '', price: 0, validity: '', sprice: 0, lockUser: '' };

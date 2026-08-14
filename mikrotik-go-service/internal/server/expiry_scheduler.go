@@ -1,0 +1,12 @@
+package server
+
+// cleanupScriptROS6 preserves the legacy Mikhmon expiry cleanup behavior on
+// RouterOS 6, where /system clock get date returns mon/dd/yyyy.
+const cleanupScriptROS6 = `:foreach i in=[/ip hotspot user find where disabled=no] do={ :local comment [/ip hotspot user get $i comment]; :if ($comment != "") do={ :local dash [:find $comment "-"]; :if ($dash > 0) do={ :local exp [:pick $comment 0 $dash]; :local now [/system clock get date]; :if ($exp < $now) do={ /ip hotspot user remove $i; } } } }`
+
+// cleanupScriptROS7 follows the current Mikhmon/Fazznet date/time comparison
+// template used by the universal on-login script. RouterOS 7's yyyy-mm-dd
+// clock date is normalized to mon/dd/yyyy before comparison. Expiry is read
+// from the hotspot user's comment as "mon/dd/yyyy HH:mm:ss" and both the
+// expired user and any active session are removed.
+const cleanupScriptROS7 = `:local dateint do={:local montharray ( "jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec" );:local days [:pick $d 4 6];:local month [:pick $d 0 3];:local year [:pick $d 7 11];:local monthint ([:find $montharray $month]);:local month ($monthint + 1);:if ([len $month] = 1) do={:local zero ("0");:return [:tonum ("$year$zero$month$days")];} else={:return [:tonum ("$year$month$days")];}}; :local timeint do={:local hours [:pick $t 0 2];:local minutes [:pick $t 3 5];:return ($hours * 60 + $minutes);}; :local date [/system clock get date];:if ([:pick $date 4 5] = "-") do={:local arraybln {"01"="jan";"02"="feb";"03"="mar";"04"="apr";"05"="may";"06"="jun";"07"="jul";"08"="aug";"09"="sep";"10"="oct";"11"="nov";"12"="dec"};:local tgl [:pick $date 8 10];:local bulan [:pick $date 5 7];:local tahun [:pick $date 0 4];:local bln ($arraybln->$bulan);:set $date ($bln."/".$tgl."/".$tahun);}; :local time [/system clock get time]; :local today [$dateint d=$date]; :local curtime [$timeint t=$time]; :foreach i in=[/ip hotspot user find where disabled=no] do={ :local comment [/ip hotspot user get $i comment]; :local name [/ip hotspot user get $i name]; :if ([:len $comment] >= 20) do={ :local gettime [:pick $comment 12 20]; :if ([:pick $comment 3 4] = "/" and [:pick $comment 6 7] = "/") do={ :local expd [$dateint d=$comment]; :local expt [$timeint t=$gettime]; :if (($expd < $today) or ($expd = $today and $expt < $curtime)) do={ /ip hotspot user remove $i; /ip hotspot active remove [find where user=$name]; } } } }`

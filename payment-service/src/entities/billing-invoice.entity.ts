@@ -8,8 +8,9 @@ import {
 } from 'typeorm';
 
 /**
- * A monthly invoice for a billing customer. Mirrors the monolith's
- * invoices table in `db_payment`.
+ * A monthly invoice for a billing customer.
+ * Keeps the business fields required by the monolith while remaining owned by
+ * the payment service.
  */
 @Entity('billing_invoices')
 export class BillingInvoiceEntity {
@@ -28,13 +29,22 @@ export class BillingInvoiceEntity {
   customerName: string;
 
   @Column({ default: '' })
-  period: string; // e.g. "2025-06"
+  type: string; // hotspot | pppoe
+
+  @Column({ nullable: true })
+  mikrotikUser: string;
+
+  @Column({ default: '' })
+  profile: string;
+
+  @Column({ default: '' })
+  period: string; // e.g. "Agustus 2026"
 
   @Column({ type: 'int', default: 0 })
   amount: number;
 
   @Column({ default: 'unpaid' })
-  status: string; // unpaid | paid | overdue
+  status: string; // unpaid | paid | overdue | cancelled
 
   @Column({ nullable: true })
   dueDate: string;
@@ -48,8 +58,9 @@ export class BillingInvoiceEntity {
   @Column({ nullable: true })
   note: string;
 
-  @Column({ type: 'boolean', default: false })
-  reminderSent: boolean;
+  /** ISO timestamps of reminders sent; kept as an array for daily idempotency. */
+  @Column({ type: 'simple-json', nullable: true })
+  reminderSent: string[];
 
   @CreateDateColumn()
   createdAt: string;

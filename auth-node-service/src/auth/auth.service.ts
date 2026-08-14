@@ -31,10 +31,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  /**
-   * Validate against the multi-user system first, then fall back to the
-   * legacy single admin in app_config. Returns the safe user object.
-   */
   async validateUserFull(
     username: string,
     password: string,
@@ -67,7 +63,7 @@ export class AuthService {
       username: user.username,
       name: user.name,
       role: user.role,
-      permissions: user.permissions || {},
+      permissions: user.permissions ? { ...user.permissions } as Record<string, boolean> : {},
       allowedSessions: user.allowedSessions || [],
     };
     const token = await this.jwtService.signAsync(payload);
@@ -75,12 +71,43 @@ export class AuthService {
     return { token, user: safe };
   }
 
+  /**
+   * Verify the JWT and then rehydrate the current user state from the auth DB.
+   * This makes deactivation, permission changes and session restrictions take
+   * effect immediately instead of waiting for the JWT's 24h expiry.
+   */
   async validateToken(token: string): Promise<AuthTokenPayload> {
+    let signed: AuthTokenPayload;
     try {
-      return await this.jwtService.verifyAsync<AuthTokenPayload>(token);
+      signed = await this.jwtService.verifyAsync<AuthTokenPayload>(token);
     } catch {
       throw new UnauthorizedException('Token tidak valid atau kadaluarsa');
     }
+
+    // The legacy single-admin identity is stored in app_config rather than
+    // the users table, so preserve its signed JWT context. New multi-users
+    // are always rehydrated from the authoritative users table below.
+    if (signed.sub === 'legacy-admin') {
+      return {
+        ...signed,
+        permissions: FULL_ADMIN_PERMISSIONS,
+        allowedSessions: [],
+      };
+    }
+
+    const user = await this.userService.getById(signed.sub);
+    if (!user || !user.active) {
+      throw new UnauthorizedException('User tidak aktif atau tidak ditemukan');
+    }
+
+    return {
+      sub: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      permissions: user.permissions ? { ...user.permissions } as Record<string, boolean> : {},
+      allowedSessions: user.allowedSessions || [],
+    };
   }
 
   async changePassword(

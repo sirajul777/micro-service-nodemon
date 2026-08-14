@@ -2,7 +2,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  PrimaryGeneratedColumn
+  Index,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 
 /**
@@ -21,9 +22,9 @@ export class PayhookCallbackLogEntity {
 
   /**
    * PayHook's official idempotency key (`event_id` in the payload). Stays
-   * identical across delivery retries, so it's used to detect and skip
-   * re-processing a callback that already succeeded.
+   * identical across delivery retries, so it must be unique whenever present.
    */
+  @Index({ unique: true })
   @Column({ nullable: true })
   eventId: string;
 

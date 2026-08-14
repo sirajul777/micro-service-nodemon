@@ -2,11 +2,10 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import Redis from 'ioredis';
 
 /**
- * Thin Redis publisher used by the outbox relay to broadcast cross-service
- * events (payment.order.paid / payment.order.settled / payment.failed).
- *
- * Using ioredis directly (rather than @nestjs/microservices client) keeps it
- * simple and lets us control reconnection + auth from env.
+ * Redis publisher used by the transactional outbox relay.
+ * Reliable business events are written to Redis Streams. Pub/Sub remains only
+ * as a compatibility notification for legacy subscribers; consumers that
+ * require delivery must use the Stream/consumer-group path.
  */
 @Injectable()
 export class RedisPublisherService implements OnModuleInit, OnModuleDestroy {
@@ -43,24 +42,18 @@ export class RedisPublisherService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Publish a JSON payload to a topic. Prefer Redis Streams (XADD) and
-   *  keep Pub/Sub as a compatibility fallback. */
   async publish(topic: string, payload: Record<string, any>): Promise<boolean> {
     if (!this.client) return false;
     try {
-      // XADD stream entry: field 'data' contains JSON payload.
-      // MAXLEN ~ caps the stream so it doesn't grow unbounded (approximate
-      // trim, so it's O(1) rather than exact-trimming every write).
+      // Do not MAXLEN-trim reliable streams. Retention is handled separately
+      // so a stopped consumer cannot lose events merely because the producer
+      // continues publishing.
       const id = await this.client.xadd(
         topic,
-        'MAXLEN',
-        '~',
-        10000,
         '*',
         'data',
         JSON.stringify(payload),
       );
-      // Best-effort publish for existing Pub/Sub consumers.
       this.client.publish(topic, JSON.stringify(payload)).catch(() => {});
       return !!id;
     } catch (e: any) {

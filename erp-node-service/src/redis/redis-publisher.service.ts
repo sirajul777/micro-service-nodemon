@@ -2,10 +2,10 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import Redis from 'ioredis';
 
 /**
- * Thin Redis publisher used by the ERP service to broadcast cross-service
- * events (e.g., `voucher.batch.created` → mikrotik-go-service).
- *
- * Ported from payment-service's RedisPublisherService.
+ * Redis publisher used by ERP for reliable cross-service events.
+ * Business events are written to Redis Streams without producer-side trimming.
+ * Pub/Sub remains only as a compatibility notification for legacy subscribers;
+ * reliable consumers must use the Stream/consumer-group path.
  */
 @Injectable()
 export class RedisPublisherService implements OnModuleInit, OnModuleDestroy {
@@ -42,20 +42,13 @@ export class RedisPublisherService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Publish a JSON payload to a topic. Resolves false on failure. */
   async publish(topic: string, payload: Record<string, any>): Promise<boolean> {
     if (!this.client) return false;
     try {
-      // Write to Redis Stream (XADD) and keep Pub/Sub as a compatibility
-      // fallback for any subscribers still listening on channels.
-      // MAXLEN ~ caps the stream so it doesn't grow unbounded — '~' makes
-      // the trim approximate (uses radix-tree node boundaries) so it stays
-      // O(1) instead of an exact trim on every XADD.
+      // Reliable events must not disappear because the producer crossed an
+      // arbitrary message-count retention limit while a consumer was down.
       const id = await this.client.xadd(
         topic,
-        'MAXLEN',
-        '~',
-        10000,
         '*',
         'data',
         JSON.stringify(payload),

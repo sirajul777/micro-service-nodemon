@@ -7,8 +7,7 @@ import {
 } from 'typeorm';
 
 /**
- * A cash-settlement record submitted by a collector. Mirrors the monolith's
- * settlements table in `db_payment`.
+ * A cash-settlement record submitted by a collector.
  */
 @Entity('billing_settlements')
 export class BillingSettlementEntity {
@@ -33,6 +32,9 @@ export class BillingSettlementEntity {
 
   @Column({ nullable: true })
   note: string;
+
+  @Column({ nullable: true })
+  verifiedAt: string;
 
   @CreateDateColumn()
   createdAt: string;

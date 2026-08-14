@@ -12,11 +12,10 @@ import { firstValueFrom } from 'rxjs';
 import { PERMISSIONS_KEY, PermissionKey } from './permissions.decorator';
 
 /**
- * JWT guard for the ERP service. Validates the bearer token by calling
- * auth-node-service's `POST /auth/validate-token` endpoint.
- *
- * Ported from auth-node-service's JwtAuthGuard, but validates via HTTP
- * rather than a shared JWT secret (no @nestjs/jwt dependency needed here).
+ * JWT guard for the ERP service. Validates the bearer token against
+ * auth-node-service and enforces feature permissions and router-session
+ * tenancy. Admins may access all sessions; non-admin users must have an
+ * explicit allowedSessions entry for a :session route.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -39,8 +38,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Bearer token diperlukan');
     }
 
-    // Validate the token against auth-node-service.
-let payload: any;
+    let payload: any;
     try {
       const res = await firstValueFrom(
         this.http.post(
@@ -60,19 +58,28 @@ let payload: any;
 
     req.user = payload;
 
-    // Permission enforcement (admin always passes).
     const required = this.reflector.getAllAndOverride<PermissionKey[]>(
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (required && required.length > 0) {
-      if (payload.role === 'admin') return true;
+    if (required && required.length > 0 && payload.role !== 'admin') {
       const perms = payload.permissions || {};
       const allowed = required.some((p) => perms[p] === true);
       if (!allowed) {
         throw new ForbiddenException('Anda tidak memiliki akses ke fitur ini');
       }
     }
+
+    const session = req.params?.session;
+    if (session && payload.role !== 'admin') {
+      const allowedSessions = Array.isArray(payload.allowedSessions)
+        ? payload.allowedSessions.map(String)
+        : [];
+      if (!allowedSessions.includes(String(session))) {
+        throw new ForbiddenException('Anda tidak memiliki akses ke router session ini');
+      }
+    }
+
     return true;
   }
 }
