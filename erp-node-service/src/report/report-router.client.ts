@@ -31,9 +31,9 @@ export class ReportRouterClient {
     );
   }
 
-  private call(method: string, request: Record<string, string>): Promise<any> {
+  private call(method: string, request: Record<string, string>, timeoutMs = 10000): Promise<any> {
     return new Promise((resolve, reject) => {
-      const deadline = new Date(Date.now() + 30_000);
+      const deadline = new Date(Date.now() + timeoutMs);
       const fn = this.client?.[method];
       if (typeof fn !== 'function') {
         return reject(new Error(`gRPC method ${method} is not available in RouterService`));
@@ -54,7 +54,7 @@ export class ReportRouterClient {
       sessionId,
       idhr: filter.idhr || '',
       idbl: filter.idbl || '',
-    });
+    }, 10000);
 
     return (response.scripts || []).map((row: any) => {
       const date = row.date || '';
@@ -80,7 +80,7 @@ export class ReportRouterClient {
       sessionId,
       idhr: filter.idhr || '',
       idbl: filter.idbl || '',
-    });
+    }, 15000);
     return { deleted: Number(response.deleted || 0) };
   }
 }
