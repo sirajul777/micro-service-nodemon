@@ -29,7 +29,7 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	rosVersion := "7"
 	if len(versionRows) > 0 {
 		version := versionRows[0]["version"]
-		if version != "" {
+		if len(version) > 0 {
 			rosVersion = version[:1]
 		}
 	}
