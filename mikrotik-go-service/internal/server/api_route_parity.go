@@ -105,9 +105,16 @@ func (s *RouterServiceServer) ListPppActive(ctx context.Context, req *pb.ListPpp
 		return resp, nil
 	}
 	for _, r := range rows {
-		resp.Actives = append(resp.Actives, &pb.PppActive{
-			Id: r[".id"], Name: r["name"], Service: r["service"], CallerId: r["caller-id"],
-			Address: r["address"], Uptime: r["uptime"], Encoding: r["encoding"], SessionId: r["session-id"],
+		resp.Connections = append(resp.Connections, &pb.PppActive{
+			Id: r[".id"],
+			Name: r["name"],
+			Service: r["service"],
+			CallId: r["caller-id"],
+			Address: r["address"],
+			Uptime: r["uptime"],
+			BytesIn: r["bytes-in"],
+			BytesOut: r["bytes-out"],
+			Profile: r["profile"],
 		})
 	}
 	resp.Success = true
