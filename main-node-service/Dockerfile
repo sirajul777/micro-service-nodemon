@@ -18,5 +18,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/../auth-node-service/proto ./auth-proto
 COPY --from=builder /app/src/proto ./erp-proto
 COPY --from=builder /app/src/proto/router.proto ./router-proto/router.proto
+COPY --from=builder /app/../bot-py-service/proto/bot_internal.proto ./bot-proto/bot_internal.proto
 EXPOSE 8080
 CMD ["node", "dist/main.js"]
