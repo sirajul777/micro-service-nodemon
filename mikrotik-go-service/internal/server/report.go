@@ -76,6 +76,12 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	return resp, nil
 }
 
+// scriptProplist limits RouterOS replies to the fields actually consumed by
+// the report path. This is especially important for the live month query,
+// where /system/script can contain many records with large descriptions or
+// other metadata that the report never uses.
+const scriptProplist = "=.proplist=.id,name"
+
 func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string) ([]mikrotik.Sentence, error) }, isROS7 bool, idhr, idbl string) ([]mikrotik.Sentence, error) {
 	var rows []mikrotik.Sentence
 	var err error
@@ -87,7 +93,7 @@ func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string)
 		}
 		monthOwner := parts[0] + parts[2]
 		if isROS7 {
-			rows, err = c.Run("/system/script/print", "?owner="+monthOwner)
+			rows, err = c.Run("/system/script/print", "?owner="+monthOwner, scriptProplist)
 			if err != nil {
 				return nil, err
 			}
@@ -99,24 +105,25 @@ func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string)
 			}
 			return filtered, nil
 		}
-		return c.Run("/system/script/print", "?source="+idhr)
+		return c.Run("/system/script/print", "?source="+idhr, scriptProplist)
 	}
 
 	// Live report path: idbl is already the current month owner (e.g.
 	// aug2026), so do not perform any additional RouterOS resource/version
 	// query. Keep the single owner-filtered script query for both ROS6/ROS7
-	// compatibility with the existing monolith data layout.
+	// compatibility with the existing monolith data layout, while limiting
+	// each response record to the id and name fields the report consumes.
 	if idbl != "" {
-		return c.Run("/system/script/print", "?owner="+idbl)
+		return c.Run("/system/script/print", "?owner="+idbl, scriptProplist)
 	}
 
 	now := time.Now()
 	months := [...]string{"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"}
 	monthOwner := months[now.Month()-1] + strconv.Itoa(now.Year())
 	if isROS7 {
-		return c.Run("/system/script/print", "?owner="+monthOwner)
+		return c.Run("/system/script/print", "?owner="+monthOwner, scriptProplist)
 	}
-	return c.Run("/system/script/print", "?comment=mikhmon")
+	return c.Run("/system/script/print", "?comment=mikhmon", scriptProplist)
 }
 
 type reportError struct{ message string }
