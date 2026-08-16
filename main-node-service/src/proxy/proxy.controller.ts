@@ -10,6 +10,8 @@ import { HotspotGrpcClient } from '../erp/hotspot-grpc.client';
 import { VoucherBatchGrpcClient } from '../erp/voucher-batch-grpc.client';
 import { VoucherGenerateGrpcClient } from '../erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from '../erp/voucher-type-grpc.client';
+import { BotGrpcClient } from '../bot/bot-grpc.client';
+import { handleBotGrpcRoute } from './bot.routes';
 
 type Target = 'auth' | 'erp' | 'payment' | 'bot';
 
@@ -30,6 +32,7 @@ export class ProxyController {
     private readonly voucherBatchGrpc: VoucherBatchGrpcClient,
     private readonly voucherGenerateGrpc: VoucherGenerateGrpcClient,
     private readonly voucherTypeGrpc: VoucherTypeGrpcClient,
+    private readonly botGrpc: BotGrpcClient,
   ) {}
 
   @All(['', ':rest(.*)'])
@@ -49,6 +52,9 @@ export class ProxyController {
       if (!(session && this.authService.isAuthenticated(session))) throw new UnauthorizedException('Please login first');
       if (!(await this.authService.validate(session))) throw new UnauthorizedException('Session token tidak valid atau kadaluarsa');
     }
+
+    if ((targetRaw === 'resellers' || targetRaw === 'bot-resellers' || targetRaw === 'telegram') &&
+        await handleBotGrpcRoute(this.botGrpc, req, res, canonical, body, query)) return;
 
     if (targetRaw === 'sessions' && req.method === 'GET' && (canonical === '/sessions' || /^\/sessions\/[^/]+$/.test(canonical))) {
       try {
