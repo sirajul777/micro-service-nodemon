@@ -46,17 +46,29 @@ export class ReportRouterClient {
     });
   }
 
+  private timeoutMsFor(method: string): number {
+    const fallback = method === 'ListSellingScripts' ? 30000 : 10000;
+    const raw = process.env.MIKROTIK_GRPC_TIMEOUT_MS;
+    if (!raw) return fallback;
+
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.min(parsed, 120000);
+  }
+
   async listScripts(
     sessionId: string,
     filter: { idhr?: string; idbl?: string } = {},
   ): Promise<ReportScript[]> {
-    // Live report is requested frequently by the dashboard. Keep the upstream
-    // call bounded so a slow RouterOS script query cannot pin an ERP request.
-    const response = await this.call('ListSellingScripts', {
-      sessionId,
-      idhr: filter.idhr || '',
-      idbl: filter.idbl || '',
-    }, 5000);
+    const response = await this.call(
+      'ListSellingScripts',
+      {
+        sessionId,
+        idhr: filter.idhr || '',
+        idbl: filter.idbl || '',
+      },
+      this.timeoutMsFor('ListSellingScripts'),
+    );
 
     return (response.scripts || []).map((row: any) => {
       const date = row.date || '';
