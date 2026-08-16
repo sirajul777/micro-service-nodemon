@@ -13,6 +13,8 @@ service ErpInternalService {
 message ListSessionsRequest {}
 message GetSessionRequest { string id = 1; }
 
+message GetSessionRequest { string id = 1; }
+
 message SessionData {
   string id = 1;
   string name = 2;
@@ -76,6 +78,13 @@ message SessionMutationResponse {
   bool success = 1;
   string error = 2;
   SessionData session = 3;
+}
+
+message DeleteSessionRequest { string id = 1; }
+
+message DeleteSessionResponse {
+  bool success = 1;
+  string error = 2;
 }
 message DeleteSessionRequest { string id = 1; }
 message DeleteSessionResponse { bool success = 1; string error = 2; }
