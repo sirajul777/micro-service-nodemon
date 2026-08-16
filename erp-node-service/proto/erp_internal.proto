@@ -11,6 +11,7 @@ service ErpInternalService {
 }
 
 message ListSessionsRequest {}
+message GetSessionRequest { string id = 1; }
 
 message GetSessionRequest { string id = 1; }
 
@@ -85,3 +86,5 @@ message DeleteSessionResponse {
   bool success = 1;
   string error = 2;
 }
+message DeleteSessionRequest { string id = 1; }
+message DeleteSessionResponse { bool success = 1; string error = 2; }
