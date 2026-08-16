@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package router;
+
+service RouterService {
+  rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse);
+  rpc ListPppSecrets(ListPppSecretsRequest) returns (ListPppSecretsResponse);
+  rpc GetPppSecret(GetPppSecretRequest) returns (GetPppSecretResponse);
+  rpc ListPppActive(ListPppActiveRequest) returns (ListPppActiveResponse);
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse);
+  rpc GetSystemResource(SystemResourceRequest) returns (SystemResourceResponse);
+  rpc GetInterfaces(InterfacesRequest) returns (InterfacesResponse);
+}
+
+message GetDashboardRequest { string session_id = 1; }
+message GetDashboardResponse { bool success = 1; string error = 2; string identity = 3; string ros_version = 4; string uptime = 5; string version = 6; string cpu_load = 7; string free_memory = 8; string total_memory = 9; string free_hdd = 10; string total_hdd = 11; int32 active_hotspot_users = 12; int32 total_hotspot_users = 13; }
+message ListPppSecretsRequest { string session_id = 1; string profile = 2; string name = 3; }
+message PppSecret { string id = 1; string name = 2; string password = 3; string service = 4; string profile = 5; string local_address = 6; string remote_address = 7; string comment = 8; string disabled = 9; }
+message ListPppSecretsResponse { bool success = 1; string error = 2; repeated PppSecret secrets = 3; }
+message GetPppSecretRequest { string session_id = 1; string name = 2; }
+message GetPppSecretResponse { bool success = 1; string error = 2; PppSecret secret = 3; }
+message ListPppActiveRequest { string session_id = 1; }
+message PppActive { string id = 1; string name = 2; string service = 3; string caller_id = 4; string address = 5; string uptime = 6; string encoding = 7; string session_id = 8; string radius = 9; }
+message ListPppActiveResponse { bool success = 1; string error = 2; repeated PppActive connections = 3; }
+message ListLogsRequest { string session_id = 1; string topics = 2; }
+message LogEntry { string id = 1; string time = 2; string topics = 3; string message = 4; }
+message ListLogsResponse { bool success = 1; string error = 2; repeated LogEntry logs = 3; }
+message SystemResourceRequest { string session_id = 1; }
+message SystemResourceResponse { bool success = 1; string error = 2; string version = 3; string uptime = 4; string cpu_load = 5; string free_memory = 6; string total_memory = 7; string free_hdd = 8; string total_hdd = 9; string ros_version = 10; }
+message InterfacesRequest { string session_id = 1; }
+message InterfaceInfo { string id = 1; string name = 2; string type = 3; string mac_address = 4; string tx = 5; string rx = 6; string running = 7; }
+message InterfacesResponse { bool success = 1; string error = 2; repeated InterfaceInfo interfaces = 3; }
