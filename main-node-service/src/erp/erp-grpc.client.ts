@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { credentials, loadPackageDefinition, ServiceError } from '@grpc/grpc-js';
 import { loadSync } from '@grpc/proto-loader';
+import { existsSync } from 'fs';
 import { join } from 'path';
 
 @Injectable()
@@ -8,9 +9,17 @@ export class ErpGrpcClient implements OnModuleDestroy {
   private readonly client: any;
 
   constructor() {
-    const protoPath =
-      process.env.ERP_GRPC_PROTO_PATH ||
-      join(process.cwd(), 'src', 'proto', 'erp_internal.proto');
+    const candidates = [
+      process.env.ERP_GRPC_PROTO_PATH,
+      join(process.cwd(), 'src', 'proto', 'erp_internal.proto'),
+      join(process.cwd(), 'erp-proto', 'erp_internal.proto'),
+      '/app/erp-proto/erp_internal.proto',
+    ].filter(Boolean) as string[];
+    const protoPath = candidates.find((path) => existsSync(path));
+    if (!protoPath) {
+      throw new Error(`ERP gRPC proto not found; checked: ${candidates.join(', ')}`);
+    }
+
     const packageDef = loadSync(protoPath, {
       keepCase: false,
       longs: String,
