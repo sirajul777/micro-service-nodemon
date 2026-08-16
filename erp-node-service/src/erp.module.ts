@@ -21,11 +21,13 @@ import { ReportController } from './report/report.controller';
 import { VoucherGenerateController } from './voucher-generate/voucher-generate.controller';
 import { PppoeController } from './pppoe/pppoe.controller';
 import { OutboxService } from './outbox/outbox.service';
+import { InternalGrpcModule } from './internal-grpc.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([VoucherTypeEntity, ProfileMetaEntity, VoucherBatchEntity, OutboxEventEntity]),
     HttpModule,
+    InternalGrpcModule,
   ],
   controllers: [VoucherTypeController, ProfileMetaController, VoucherBatchController, RouterSessionController, HotspotController, ReportController, VoucherGenerateController, PppoeController],
   providers: [JwtAuthGuard, MikrotikGrpcClient, RedisPublisherService, OutboxService, VoucherBatchCreationService, VoucherTypeService, ProfileMetaService, VoucherBatchService],
