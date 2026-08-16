@@ -50,11 +50,13 @@ export class ReportRouterClient {
     sessionId: string,
     filter: { idhr?: string; idbl?: string } = {},
   ): Promise<ReportScript[]> {
+    // Live report is requested frequently by the dashboard. Keep the upstream
+    // call bounded so a slow RouterOS script query cannot pin an ERP request.
     const response = await this.call('ListSellingScripts', {
       sessionId,
       idhr: filter.idhr || '',
       idbl: filter.idbl || '',
-    }, 10000);
+    }, 5000);
 
     return (response.scripts || []).map((row: any) => {
       const date = row.date || '';
