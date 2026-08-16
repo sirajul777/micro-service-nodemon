@@ -22,6 +22,7 @@ import { PayhookNotifierService } from './notifier.service';
 import { PayhookSchedulerService } from './payhook-scheduler.service';
 import { VoucherTypeClient } from './clients/voucher-type.client';
 import { GrpcVoucherTypeClient } from './erp/grpc-voucher-type.client';
+import { PaymentAuthGrpcClient } from './auth/auth-grpc.client';
 import { MikrotikGrpcClient } from './clients/mikrotik-grpc.client';
 import { RedisPublisherService } from './redis/redis-publisher.service';
 import { OutboxService } from './redis/outbox.service';
@@ -31,6 +32,7 @@ import { OutboxService } from './redis/outbox.service';
  *
  * Cross-service wiring:
  *   - VoucherTypeClient → gRPC → erp-node-service (voucher catalogue)
+ *   - PaymentAuthGrpcClient → gRPC → auth-node-service (token validation)
  *   - MikrotikGrpcClient → gRPC → mikrotik-go-service (router provisioning)
  *   - OutboxService → Redis pub/sub → bot-py-service (delivery/notify)
  */
@@ -57,6 +59,7 @@ import { OutboxService } from './redis/outbox.service';
     PayhookSchedulerService,
     VoucherTypeClient,
     GrpcVoucherTypeClient,
+    PaymentAuthGrpcClient,
     MikrotikGrpcClient,
     RedisPublisherService,
     OutboxService,
