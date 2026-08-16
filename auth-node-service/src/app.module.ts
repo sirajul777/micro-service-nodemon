@@ -16,6 +16,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { MobileTokenService } from './mobile/mobile-token.service';
 import { MobileAuthController } from './mobile/mobile-auth.controller';
 import { SeedService } from './database/seed.service';
+import { InternalGrpcController } from './internal-grpc.controller';
 
 /**
  * Auth & User Management service.
@@ -31,7 +32,7 @@ import { SeedService } from './database/seed.service';
       password: process.env.DB_PASSWORD || 'super_postgres_password_123',
       database: process.env.DB_NAME || 'db_auth',
       autoLoadEntities: true,
-      synchronize: true, // dev only; use migrations in prod
+      synchronize: true,
     }),
     TypeOrmModule.forFeature([UserEntity, AppConfigEntity, MobileTokenEntity]),
     JwtModule.register({
@@ -44,6 +45,7 @@ import { SeedService } from './database/seed.service';
     AuthController,
     UserController,
     MobileAuthController,
+    InternalGrpcController,
   ],
   providers: [
     UserService,
