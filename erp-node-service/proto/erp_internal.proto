@@ -8,11 +8,19 @@ service ErpInternalService {
   rpc CreateSession(CreateSessionRequest) returns (SessionMutationResponse);
   rpc UpdateSession(UpdateSessionRequest) returns (SessionMutationResponse);
   rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+
+  rpc ListVoucherBatches(ListVoucherBatchesRequest) returns (ListVoucherBatchesResponse);
+  rpc GetVoucherBatch(GetVoucherBatchRequest) returns (GetVoucherBatchResponse);
+  rpc CreateVoucherBatch(CreateVoucherBatchRequest) returns (VoucherBatchMutationResponse);
+  rpc DeleteVoucherBatch(DeleteVoucherBatchRequest) returns (VoucherBatchMutationResponse);
+  rpc MarkVoucherUsed(MarkVoucherUsedRequest) returns (VoucherBatchMutationResponse);
+  rpc SyncVoucherUsed(SyncVoucherUsedRequest) returns (VoucherBatchMutationResponse);
+  rpc AutoSyncVoucherUsed(AutoSyncVoucherUsedRequest) returns (VoucherBatchMutationResponse);
+  rpc ListVoucherImportProfiles(ListVoucherImportProfilesRequest) returns (ListVoucherImportProfilesResponse);
+  rpc ImportVoucherProfile(ImportVoucherProfileRequest) returns (VoucherBatchMutationResponse);
 }
 
 message ListSessionsRequest {}
-message GetSessionRequest { string id = 1; }
-
 message GetSessionRequest { string id = 1; }
 
 message SessionData {
@@ -81,10 +89,110 @@ message SessionMutationResponse {
 }
 
 message DeleteSessionRequest { string id = 1; }
+message DeleteSessionResponse { bool success = 1; string error = 2; }
 
-message DeleteSessionResponse {
+message Voucher {
+  string username = 1;
+  string password = 2;
+  string profile = 3;
+  string comment = 4;
+  string limit_uptime = 5;
+  string color = 6;
+  double price = 7;
+  string caption = 8;
+  string status = 9;
+  string used_by = 10;
+  string used_at = 11;
+}
+
+message VoucherStats {
+  int32 total = 1;
+  int32 used = 2;
+  int32 remaining = 3;
+}
+
+message VoucherBatch {
+  string id = 1;
+  string profile_name = 2;
+  string profile_color = 3;
+  double price = 4;
+  double total_price = 5;
+  string validity = 6;
+  string caption = 7;
+  string session_id = 8;
+  string nas_name = 9;
+  string created_by = 10;
+  string created_at = 11;
+  repeated Voucher vouchers = 12;
+  VoucherStats stats = 13;
+}
+
+message ListVoucherBatchesRequest { string session = 1; }
+message ListVoucherBatchesResponse {
   bool success = 1;
   string error = 2;
+  repeated VoucherBatch batches = 3;
 }
-message DeleteSessionRequest { string id = 1; }
-message DeleteSessionResponse { bool success = 1; string error = 2; }
+
+message GetVoucherBatchRequest { string session = 1; string id = 2; }
+message GetVoucherBatchResponse {
+  bool success = 1;
+  string error = 2;
+  VoucherBatch batch = 3;
+}
+
+message CreateVoucherBatchRequest {
+  string session = 1;
+  VoucherBatch batch = 2;
+}
+
+message DeleteVoucherBatchRequest {
+  string session = 1;
+  string id = 2;
+  bool delete_mikrotik = 3;
+}
+
+message MarkVoucherUsedRequest {
+  string session = 1;
+  string id = 2;
+  string username = 3;
+  string used_by = 4;
+}
+
+message SyncVoucherUsedRequest { string session = 1; }
+message AutoSyncVoucherUsedRequest { string session = 1; }
+
+message ListVoucherImportProfilesRequest { string session = 1; }
+message VoucherImportProfile {
+  string name = 1;
+  string rate_limit = 2;
+  double price = 3;
+  double sprice = 4;
+  string validity = 5;
+  string expmode = 6;
+  string profile_color = 7;
+  string caption = 8;
+}
+message ListVoucherImportProfilesResponse {
+  bool success = 1;
+  string error = 2;
+  repeated VoucherImportProfile profiles = 3;
+}
+
+message ImportVoucherProfileRequest {
+  string session = 1;
+  string profile_name = 2;
+  string created_by = 3;
+}
+
+message VoucherBatchMutationResponse {
+  bool success = 1;
+  string error = 2;
+  string message = 3;
+  string batch_id = 4;
+  int32 updated = 5;
+  int32 imported = 6;
+  int32 available = 7;
+  int32 used = 8;
+  VoucherBatch batch = 9;
+}
