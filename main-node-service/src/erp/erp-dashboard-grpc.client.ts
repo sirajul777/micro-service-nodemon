@@ -55,6 +55,14 @@ export class ErpDashboardGrpcClient implements OnModuleDestroy {
   getSystemResource(sessionId: string) { return this.call('GetSystemResource', { sessionId }, 15000); }
   getInterfaces(sessionId: string) { return this.call('GetInterfaces', { sessionId }, 15000); }
 
+  addPppSecret(params: Record<string, any>) { return this.call('AddPppSecret', params, 15000); }
+  updatePppSecret(params: Record<string, any>) { return this.call('UpdatePppSecret', params, 15000); }
+  deletePppSecret(sessionId: string, name: string) { return this.call('DeletePppSecret', { sessionId, name }, 15000); }
+  disconnectPppActive(sessionId: string, name: string) { return this.call('DisconnectPppActive', { sessionId, name }, 15000); }
+  addPppProfile(params: Record<string, any>) { return this.call('AddPppProfile', params, 15000); }
+  updatePppProfile(params: Record<string, any>) { return this.call('UpdatePppProfile', params, 15000); }
+  deletePppProfile(sessionId: string, name: string) { return this.call('DeletePppProfile', { sessionId, name }, 15000); }
+
   close() { this.client?.close?.(); }
   onModuleDestroy() { this.close(); }
 }
