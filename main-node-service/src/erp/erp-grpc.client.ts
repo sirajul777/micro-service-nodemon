@@ -16,9 +16,7 @@ export class ErpGrpcClient implements OnModuleDestroy {
       '/app/erp-proto/erp_internal.proto',
     ].filter(Boolean) as string[];
     const protoPath = candidates.find((path) => existsSync(path));
-    if (!protoPath) {
-      throw new Error(`ERP gRPC proto not found; checked: ${candidates.join(', ')}`);
-    }
+    if (!protoPath) throw new Error(`ERP gRPC proto not found; checked: ${candidates.join(', ')}`);
 
     const packageDef = loadSync(protoPath, {
       keepCase: false,
@@ -37,13 +35,11 @@ export class ErpGrpcClient implements OnModuleDestroy {
     );
   }
 
-  private call(method: string, request: Record<string, any>, timeoutMs = 5000): Promise<any> {
+  private call(method: string, request: Record<string, any>, timeoutMs = 10000): Promise<any> {
     return new Promise((resolve, reject) => {
       const deadline = new Date(Date.now() + timeoutMs);
       const fn = this.client?.[method];
-      if (typeof fn !== 'function') {
-        return reject(new Error(`gRPC method ${method} is not available in ErpInternalService`));
-      }
+      if (typeof fn !== 'function') return reject(new Error(`gRPC method ${method} is not available in ErpInternalService`));
       fn.call(this.client, request, { deadline }, (err: ServiceError | null, response: any) => {
         if (err) return reject(err);
         resolve(response);
@@ -51,19 +47,12 @@ export class ErpGrpcClient implements OnModuleDestroy {
     });
   }
 
-  async listSessions() {
-    return this.call('ListSessions', {}, 10000);
-  }
+  listSessions() { return this.call('ListSessions', {}, 10000); }
+  getSession(id: string) { return this.call('GetSession', { id }, 10000); }
+  createSession(params: Record<string, any>) { return this.call('CreateSession', params, 15000); }
+  updateSession(params: Record<string, any>) { return this.call('UpdateSession', params, 15000); }
+  deleteSession(id: string) { return this.call('DeleteSession', { id }, 15000); }
 
-  async getSession(id: string) {
-    return this.call('GetSession', { id }, 10000);
-  }
-
-  close() {
-    this.client?.close?.();
-  }
-
-  onModuleDestroy() {
-    this.close();
-  }
+  close() { this.client?.close?.(); }
+  onModuleDestroy() { this.close(); }
 }
