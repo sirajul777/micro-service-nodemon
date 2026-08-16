@@ -7,30 +7,23 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { PaymentAuthGrpcClient } from './auth-grpc.client';
 import { PERMISSIONS_KEY, PermissionKey } from './permissions.decorator';
 
 /**
  * JWT guard for the payment service.
  *
- * Validates the Bearer token against auth-node-service, then enforces feature
- * permissions and router-session tenancy. Admins may access all sessions;
- * non-admin users must have an explicit allowedSessions entry for a
- * /:session/* route.
+ * Validates the Bearer token against auth-node-service over internal gRPC,
+ * then enforces feature permissions and router-session tenancy.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
   constructor(
-    private readonly http: HttpService,
+    private readonly authGrpc: PaymentAuthGrpcClient,
     private readonly reflector: Reflector,
   ) {}
-
-  private get authServiceUrl(): string {
-    return process.env.AUTH_SERVICE_URL || 'http://auth-node-service:3001';
-  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
@@ -42,19 +35,13 @@ export class JwtAuthGuard implements CanActivate {
 
     let payload: any;
     try {
-      const res = await firstValueFrom(
-        this.http.post(
-          `${this.authServiceUrl}/api/auth/validate-token`,
-          {},
-          {
-            headers: { authorization: `Bearer ${token}` },
-            timeout: 5000,
-          },
-        ),
-      );
-      payload = res.data?.payload || res.data;
+      const res = await this.authGrpc.validateToken(token);
+      if (!res?.success || !res?.payload) {
+        throw new UnauthorizedException(res?.message || 'Token tidak valid atau kadaluarsa');
+      }
+      payload = res.payload;
     } catch (e: any) {
-      this.logger.warn(`Token validation failed: ${e.message}`);
+      this.logger.warn(`Token validation gRPC failed: ${e.message}`);
       throw new UnauthorizedException('Token tidak valid atau kadaluarsa');
     }
 
