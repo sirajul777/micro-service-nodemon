@@ -22,6 +22,7 @@ from datetime import datetime
 import db
 import rest_api
 from services import redis_consumer, tg_bot, tg_config_service as tg_cfg
+from internal_grpc import serve as serve_grpc
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("bot-py-service")
@@ -99,17 +100,16 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, *args):
-        pass  # silence default request logging
+        pass
 
 
 def main():
     bootstrap()
 
-    # Start the Redis event consumer.
+    grpc_server = serve_grpc()
+
     consumer = redis_consumer.RedisConsumer(redis_consumer_topics())
     consumer.start()
-
-    # Start Telegram bots (polling) for each enabled config.
     tg_bot.start_all()
 
     log.info("bot-py-service started. Health endpoint on :%d/healthz", HEALTH_PORT)
@@ -120,6 +120,7 @@ def main():
         log.info("Shutting down...")
         consumer.stop()
         tg_bot.stop_all()
+        grpc_server.stop(0)
 
 
 def redis_consumer_topics():
@@ -129,4 +130,3 @@ def redis_consumer_topics():
 
 if __name__ == "__main__":
     main()
-
