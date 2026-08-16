@@ -7,6 +7,7 @@ import { VoucherBatchInternalStore } from './internal-grpc/voucher-batch.store';
 import { VoucherBatchService } from './voucher-batch/voucher-batch.service';
 import { VoucherGenerateInternalController } from './internal-grpc/voucher-generate.controller';
 import { PaymentVoucherTypeInternalController } from './internal-grpc/payment-voucher-type.controller';
+import { VoucherTypeInternalController } from './internal-grpc/voucher-type.controller';
 import { VoucherTypeService } from './voucher-type/voucher-type.service';
 
 @Module({
@@ -15,6 +16,7 @@ import { VoucherTypeService } from './voucher-type/voucher-type.service';
     VoucherBatchInternalController,
     VoucherGenerateInternalController,
     PaymentVoucherTypeInternalController,
+    VoucherTypeInternalController,
   ],
   providers: [
     ErpSessionStore,
