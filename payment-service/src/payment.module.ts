@@ -1,6 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { HttpModule } from '@nestjs/axios';
 
 import { PaymentConfigEntity } from './entities/payment-config.entity';
 import { VoucherOrderEntity } from './entities/voucher-order.entity';
@@ -47,7 +46,6 @@ import { OutboxService } from './redis/outbox.service';
       BillingInvoiceEntity,
       BillingSettlementEntity,
     ]),
-    HttpModule,
   ],
   controllers: [PaymentConfigController, VoucherOrderController, PaymentsController, BillingController],
   providers: [
