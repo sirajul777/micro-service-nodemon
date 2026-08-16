@@ -152,6 +152,8 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3002
+      - AUTH_GRPC_ADDR=auth-node-service:50052
+      - AUTH_GRPC_PROTO_PATH=/app/proto/auth.proto
       - DB_HOST=postgres-db
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-admin_mikrotik}
@@ -163,6 +165,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-kunci_rahasia_auth_identity_provider_999}
       - USE_REDIS_STREAMS=true
     depends_on:
+      auth-node-service:
+        condition: service_started
       postgres-db:
         condition: service_healthy
       redis-broker:
