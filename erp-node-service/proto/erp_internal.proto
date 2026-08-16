@@ -5,11 +5,15 @@ package erp.internal;
 service ErpInternalService {
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc CreateSession(CreateSessionRequest) returns (SessionMutationResponse);
+  rpc UpdateSession(UpdateSessionRequest) returns (SessionMutationResponse);
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
 }
 
 message ListSessionsRequest {}
+message GetSessionRequest { string id = 1; }
 
-message ErpSession {
+message SessionData {
   string id = 1;
   string name = 2;
   string ip = 3;
@@ -21,19 +25,57 @@ message ErpSession {
   int32 reload_interval = 9;
   string iface = 10;
   int32 idle_to = 11;
-  bool livereport = 12;
+  string livereport = 12;
 }
 
 message ListSessionsResponse {
   bool success = 1;
   string error = 2;
-  repeated ErpSession sessions = 3;
+  repeated SessionData sessions = 3;
 }
-
-message GetSessionRequest { string id = 1; }
 
 message GetSessionResponse {
   bool success = 1;
   string error = 2;
-  ErpSession session = 3;
+  SessionData session = 3;
 }
+
+message CreateSessionRequest {
+  string id = 1;
+  string name = 2;
+  string ip = 3;
+  int32 port = 4;
+  string user = 5;
+  string password = 6;
+  string hotspot_name = 7;
+  string dns_name = 8;
+  string currency = 9;
+  int32 reload_interval = 10;
+  string iface = 11;
+  int32 idle_to = 12;
+  string livereport = 13;
+}
+
+message UpdateSessionRequest {
+  string id = 1;
+  string name = 2;
+  string ip = 3;
+  int32 port = 4;
+  string user = 5;
+  string password = 6;
+  string hotspot_name = 7;
+  string dns_name = 8;
+  string currency = 9;
+  int32 reload_interval = 10;
+  string iface = 11;
+  int32 idle_to = 12;
+  string livereport = 13;
+}
+
+message SessionMutationResponse {
+  bool success = 1;
+  string error = 2;
+  SessionData session = 3;
+}
+message DeleteSessionRequest { string id = 1; }
+message DeleteSessionResponse { bool success = 1; string error = 2; }

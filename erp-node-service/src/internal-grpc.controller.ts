@@ -16,4 +16,19 @@ export class InternalGrpcController {
     if (!session) return { success: false, error: 'router session tidak ditemukan' };
     return { success: true, session };
   }
+
+  @GrpcMethod('ErpInternalService', 'CreateSession')
+  async createSession(request: Record<string, any>) {
+    return this.store.create(request);
+  }
+
+  @GrpcMethod('ErpInternalService', 'UpdateSession')
+  async updateSession(request: Record<string, any>) {
+    return this.store.update(request);
+  }
+
+  @GrpcMethod('ErpInternalService', 'DeleteSession')
+  async deleteSession(request: { id: string }) {
+    return this.store.remove(request.id);
+  }
 }
