@@ -29,8 +29,8 @@ export class ProxyService {
     string,
     { failures: number; openUntil: number }
   > = {};
-  private static readonly THRESHOLD = 5; // consecutive failures before open
-  private static readonly COOLDOWN_MS = 15000; // how long to stay open
+  private static readonly THRESHOLD = 5;
+  private static readonly COOLDOWN_MS = 15000;
   private static readonly MAX_RETRIES = 1;
 
   constructor(private readonly http: HttpService) {}
@@ -40,7 +40,6 @@ export class ProxyService {
     if (!b) return false;
     if (b.failures >= ProxyService.THRESHOLD) {
       if (Date.now() < b.openUntil) return true;
-      // Half-open: allow a probe through and reset on success.
       b.failures = 0;
       return false;
     }
@@ -66,16 +65,6 @@ export class ProxyService {
     }
   }
 
-  /**
-   * Forward a request to a downstream service.
-   *
-   * @param target  service key: 'auth' | 'erp' | 'payment' | 'bot'
-   * @param path    full path (e.g. '/api/qris/orders')
-   * @param method  HTTP method
-   * @param token   cached JWT (forwarded as Bearer) or null
-   * @param body    request body (JSON)
-   * @param query   optional query params
-   */
   async forward(
     target: 'auth' | 'erp' | 'payment' | 'bot',
     path: string,
@@ -84,7 +73,6 @@ export class ProxyService {
     body?: any,
     query?: any,
   ): Promise<AxiosResponse> {
-    // Fail fast if the circuit is open.
     if (this.isOpen(target)) {
       throw new ServiceUnavailableException(
         `Layanan ${target} sedang dalam masa pemulihan, coba lagi beberapa saat lagi`,
@@ -94,12 +82,21 @@ export class ProxyService {
     const base = ROUTER[target];
     const url = `${base.replace(/\/+$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
 
+    const isLiveReport = target === 'erp' && /^\/report\/[^/]+\/live$/.test(path);
+    const configuredLiveTimeout = Number.parseInt(
+      process.env.ERP_LIVE_REPORT_PROXY_TIMEOUT_MS || '120000',
+      10,
+    );
+    const liveTimeout = Number.isFinite(configuredLiveTimeout) && configuredLiveTimeout > 0
+      ? Math.min(configuredLiveTimeout, 180000)
+      : 120000;
+
     const config: AxiosRequestConfig = {
       method,
       url,
-      timeout: 20000,
+      timeout: isLiveReport ? liveTimeout : 20000,
       params: query,
-      validateStatus: () => true, // pass through downstream status codes
+      validateStatus: () => true,
     };
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (token) headers.authorization = `Bearer ${token}`;
@@ -114,7 +111,6 @@ export class ProxyService {
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
         const resp = await firstValueFrom(this.http.request(config));
-        // A 5xx from downstream is a real failure for the breaker.
         if (resp.status >= 500) {
           this.recordFailure(target);
         } else {
@@ -123,7 +119,6 @@ export class ProxyService {
         return resp;
       } catch (e: any) {
         const ax = e as AxiosError;
-        // Non-idempotent or last attempt: surface immediately.
         if (attempt === attempts) {
           this.recordFailure(target);
           this.logger.error(
@@ -142,7 +137,6 @@ export class ProxyService {
     throw new BadGatewayException(`Downstream ${target} tidak dapat dijangkau`);
   }
 
-  /** Helper to turn a downstream Axios response into a Nest response payload. */
   respond(resp: AxiosResponse): { status: number; body: any } {
     return { status: resp.status, body: resp.data };
   }
