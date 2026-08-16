@@ -13,7 +13,8 @@ import { HotspotGrpcClient } from './erp/hotspot-grpc.client';
 import { VoucherBatchGrpcClient } from './erp/voucher-batch-grpc.client';
 import { VoucherGenerateGrpcClient } from './erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from './erp/voucher-type-grpc.client';
-import { ProxyService } from './proxy/proxy.service';
+import { BotGrpcClient } from './bot/bot-grpc.client';
+import { HttpProxyFallbackService } from './proxy/http-proxy-fallback.service';
 import { ViewService } from './view/view.service';
 import { SecurityMiddleware } from './security/security.middleware';
 
@@ -35,7 +36,8 @@ import { SecurityMiddleware } from './security/security.middleware';
     VoucherBatchGrpcClient,
     VoucherGenerateGrpcClient,
     VoucherTypeGrpcClient,
-    ProxyService,
+    BotGrpcClient,
+    HttpProxyFallbackService,
     ViewService,
   ],
 })
