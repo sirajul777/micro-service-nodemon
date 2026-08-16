@@ -2,7 +2,7 @@ import {
   All, Body, Controller, Headers, Param, Query, Req, Res, UnauthorizedException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { ProxyService } from './proxy.service';
+import { HttpProxyFallbackService } from './http-proxy-fallback.service';
 import { AuthService } from '../auth/auth.service';
 import { ErpGrpcClient } from '../erp/erp-grpc.client';
 import { ErpDashboardGrpcClient } from '../erp/erp-dashboard-grpc.client';
@@ -10,6 +10,8 @@ import { HotspotGrpcClient } from '../erp/hotspot-grpc.client';
 import { VoucherBatchGrpcClient } from '../erp/voucher-batch-grpc.client';
 import { VoucherGenerateGrpcClient } from '../erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from '../erp/voucher-type-grpc.client';
+import { BotGrpcClient } from '../bot/bot-grpc.client';
+import { handleBotGrpcRoute } from './bot.routes';
 
 type Target = 'auth' | 'erp' | 'payment' | 'bot';
 
@@ -22,7 +24,7 @@ const TARGETS: Record<string, Target> = {
 @Controller('api/:target')
 export class ProxyController {
   constructor(
-    private readonly proxyService: ProxyService,
+    private readonly fallback: HttpProxyFallbackService,
     private readonly authService: AuthService,
     private readonly erpGrpc: ErpGrpcClient,
     private readonly erpDashboardGrpc: ErpDashboardGrpcClient,
@@ -30,6 +32,7 @@ export class ProxyController {
     private readonly voucherBatchGrpc: VoucherBatchGrpcClient,
     private readonly voucherGenerateGrpc: VoucherGenerateGrpcClient,
     private readonly voucherTypeGrpc: VoucherTypeGrpcClient,
+    private readonly botGrpc: BotGrpcClient,
   ) {}
 
   @All(['', ':rest(.*)'])
@@ -49,6 +52,9 @@ export class ProxyController {
       if (!(session && this.authService.isAuthenticated(session))) throw new UnauthorizedException('Please login first');
       if (!(await this.authService.validate(session))) throw new UnauthorizedException('Session token tidak valid atau kadaluarsa');
     }
+
+    if ((targetRaw === 'resellers' || targetRaw === 'bot-resellers' || targetRaw === 'telegram') &&
+        await handleBotGrpcRoute(this.botGrpc, req, res, canonical, body, query)) return;
 
     if (targetRaw === 'sessions' && req.method === 'GET' && (canonical === '/sessions' || /^\/sessions\/[^/]+$/.test(canonical))) {
       try {
@@ -191,8 +197,8 @@ export class ProxyController {
 
     const token = isPublic ? null : this.authService.getToken(session);
     const method = req.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    const resp = await this.proxyService.forward(target, canonical, method, token, body, query);
-    const { status, body: data } = this.proxyService.respond(resp);
+    const resp = await this.fallback.forward(target, canonical, method, token, body, query);
+    const { status, body: data } = this.fallback.respond(resp);
     return res.status(status).json(data);
   }
 
