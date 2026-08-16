@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Query, UseGuards, InternalServerErrorException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermission } from '../auth/permissions.decorator';
 import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
@@ -96,29 +96,34 @@ export class ReportController {
   async live(@Param('session') session: string) {
     const now = new Date();
     const idhr = currentIdhr(now);
-    const scripts = await this.reportRouter.listScripts(session, { idbl: currentIdbl(now) });
+    try {
+      const scripts = await this.reportRouter.listScripts(session, { idbl: currentIdbl(now) });
 
-    let todayVouchers = 0;
-    let todayIncome = 0;
-    let monthIncome = 0;
-    for (const script of scripts) {
-      const parsed = parseScriptName(script.name);
-      monthIncome += parsed.price;
-      if (parsed.date === idhr) {
-        todayVouchers++;
-        todayIncome += parsed.price;
+      let todayVouchers = 0;
+      let todayIncome = 0;
+      let monthIncome = 0;
+      for (const script of scripts) {
+        const parsed = parseScriptName(script.name);
+        monthIncome += parsed.price;
+        if (parsed.date === idhr) {
+          todayVouchers++;
+          todayIncome += parsed.price;
+        }
       }
+
+      const sessionResp = await this.mikrotik.getSession(session).catch(() => null);
+      const currency = sessionResp?.session?.currency || 'Rp';
+
+      return {
+        today: { vouchers: todayVouchers, income: todayIncome },
+        month: { vouchers: scripts.length, income: monthIncome },
+        currency,
+        isIndo: INDO_CURRENCIES.includes(currency),
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new InternalServerErrorException(`live report failed: ${message}`);
     }
-
-    const sessionResp = await this.mikrotik.getSession(session).catch(() => null);
-    const currency = sessionResp?.session?.currency || 'Rp';
-
-    return {
-      today: { vouchers: todayVouchers, income: todayIncome },
-      month: { vouchers: scripts.length, income: monthIncome },
-      currency,
-      isIndo: INDO_CURRENCIES.includes(currency),
-    };
   }
 
   @Get(':session/resume')
