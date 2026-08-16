@@ -14,6 +14,11 @@ import (
 // /system/script/print, matching the monolith's report source.
 func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.ListSellingScriptsRequest) (*pb.ListSellingScriptsResponse, error) {
 	resp := &pb.ListSellingScriptsResponse{}
+	if req == nil || strings.TrimSpace(req.SessionId) == "" {
+		resp.Error = "session id wajib diisi"
+		return resp, nil
+	}
+
 	c, err := s.dial(ctx, req.SessionId)
 	if err != nil {
 		resp.Error = err.Error()
@@ -21,9 +26,9 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 	defer c.Close()
 
-	// For the live report, the caller already requests the current month via
-	// idbl. Avoid the extra /system/resource/print round-trip here; the month
-	// query itself is independent of ROS6/ROS7 and is the common hot path.
+	// The live report sends idbl (current month) and does not need ROS
+	// version detection. Only the historical idhr path needs the RouterOS 6
+	// compatibility check.
 	isROS7 := true
 	if req.Idhr != "" {
 		versionRows, versionErr := c.Run("/system/resource/print")
@@ -43,6 +48,14 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 
 	for _, row := range rows {
+		// Stop parsing promptly when the upstream deadline is reached.
+		select {
+		case <-ctx.Done():
+			resp.Error = ctx.Err().Error()
+			return resp, nil
+		default:
+		}
+
 		parts := strings.Split(row["name"], "-|-")
 		price := 0.0
 		if len(parts) > 3 {
@@ -89,6 +102,10 @@ func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string)
 		return c.Run("/system/script/print", "?source="+idhr)
 	}
 
+	// Live report path: idbl is already the current month owner (e.g.
+	// aug2026), so do not perform any additional RouterOS resource/version
+	// query. Keep the single owner-filtered script query for both ROS6/ROS7
+	// compatibility with the existing monolith data layout.
 	if idbl != "" {
 		return c.Run("/system/script/print", "?owner="+idbl)
 	}
