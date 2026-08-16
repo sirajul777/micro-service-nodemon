@@ -7,53 +7,35 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { AuthGrpcClient } from './auth-grpc.client';
 import { PERMISSIONS_KEY, PermissionKey } from './permissions.decorator';
 
-/**
- * JWT guard for the ERP service. Validates the bearer token against
- * auth-node-service and enforces feature permissions and router-session
- * tenancy. Admins may access all sessions; non-admin users must have an
- * explicit allowedSessions entry for a :session route.
- */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
   constructor(
-    private readonly http: HttpService,
+    private readonly authGrpc: AuthGrpcClient,
     private readonly reflector: Reflector,
   ) {}
-
-  private get authServiceUrl(): string {
-    return process.env.AUTH_SERVICE_URL || 'http://auth-node-service:3001';
-  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const auth = req.headers['authorization'] || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
-    if (!token) {
-      throw new UnauthorizedException('Bearer token diperlukan');
-    }
+    if (!token) throw new UnauthorizedException('Bearer token diperlukan');
 
     let payload: any;
     try {
-      const res = await firstValueFrom(
-        this.http.post(
-          `${this.authServiceUrl}/api/auth/validate-token`,
-          {},
-          {
-            headers: { authorization: `Bearer ${token}` },
-            timeout: 5000,
-          },
-        ),
-      );
-      payload = res.data?.payload || res.data;
+      const response = await this.authGrpc.validateToken(token);
+      if (!response?.success || !response?.payload) {
+        throw new UnauthorizedException(response?.message || 'Token tidak valid atau kadaluarsa');
+      }
+      payload = response.payload;
     } catch (e: any) {
-      this.logger.warn(`Token validation failed: ${e.message}`);
-      throw new UnauthorizedException('Token tidak valid atau kadaluarsa');
+      this.logger.warn(`Token validation via gRPC failed: ${e.message}`);
+      if (e instanceof UnauthorizedException) throw e;
+      throw new UnauthorizedException('Auth service tidak dapat dijangkau');
     }
 
     req.user = payload;
@@ -65,9 +47,7 @@ export class JwtAuthGuard implements CanActivate {
     if (required && required.length > 0 && payload.role !== 'admin') {
       const perms = payload.permissions || {};
       const allowed = required.some((p) => perms[p] === true);
-      if (!allowed) {
-        throw new ForbiddenException('Anda tidak memiliki akses ke fitur ini');
-      }
+      if (!allowed) throw new ForbiddenException('Anda tidak memiliki akses ke fitur ini');
     }
 
     const session = req.params?.session;
