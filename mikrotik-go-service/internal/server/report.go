@@ -21,19 +21,20 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 	defer c.Close()
 
-	versionRows, err := c.Run("/system/resource/print")
-	if err != nil {
-		resp.Error = err.Error()
-		return resp, nil
-	}
-	rosVersion := "7"
-	if len(versionRows) > 0 {
-		version := versionRows[0]["version"]
-		if len(version) > 0 {
-			rosVersion = version[:1]
+	// For the live report, the caller already requests the current month via
+	// idbl. Avoid the extra /system/resource/print round-trip here; the month
+	// query itself is independent of ROS6/ROS7 and is the common hot path.
+	isROS7 := true
+	if req.Idhr != "" {
+		versionRows, versionErr := c.Run("/system/resource/print")
+		if versionErr != nil {
+			resp.Error = versionErr.Error()
+			return resp, nil
+		}
+		if len(versionRows) > 0 && strings.HasPrefix(versionRows[0]["version"], "6") {
+			isROS7 = false
 		}
 	}
-	isROS7 := rosVersion != "6"
 
 	rows, err := s.getSellingRows(c, isROS7, req.Idhr, req.Idbl)
 	if err != nil {
