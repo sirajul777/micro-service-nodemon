@@ -7,6 +7,7 @@ import { AuthService } from '../auth/auth.service';
 import { ErpGrpcClient } from '../erp/erp-grpc.client';
 import { ErpDashboardGrpcClient } from '../erp/erp-dashboard-grpc.client';
 import { HotspotGrpcClient } from '../erp/hotspot-grpc.client';
+import { VoucherBatchGrpcClient } from '../erp/voucher-batch-grpc.client';
 
 type Target = 'auth' | 'erp' | 'payment' | 'bot';
 
@@ -24,6 +25,7 @@ export class ProxyController {
     private readonly erpGrpc: ErpGrpcClient,
     private readonly erpDashboardGrpc: ErpDashboardGrpcClient,
     private readonly hotspotGrpc: HotspotGrpcClient,
+    private readonly voucherBatchGrpc: VoucherBatchGrpcClient,
   ) {}
 
   @All(['', ':rest(.*)'])
@@ -105,14 +107,7 @@ export class ProxyController {
       try {
         const routerSession = decodeURIComponent(hotspotUserMatch[1]);
         const name = hotspotUserMatch[2];
-        const response = await this.hotspotGrpc.addUser({
-          sessionId: routerSession,
-          name: String(body?.name || name || ''),
-          password: String(body?.password || ''),
-          profile: String(body?.profile || ''),
-          comment: String(body?.comment || ''),
-          limitUptime: String(body?.limitUptime || body?.['limit-uptime'] || ''),
-        });
+        const response = await this.hotspotGrpc.addUser({ sessionId: routerSession, name: String(body?.name || name || ''), password: String(body?.password || ''), profile: String(body?.profile || ''), comment: String(body?.comment || ''), limitUptime: String(body?.limitUptime || body?.['limit-uptime'] || '') });
         return res.status(200).json(response || { success: false, error: 'AddHotspotUser failed' });
       } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
     }
@@ -140,15 +135,34 @@ export class ProxyController {
         const routerSession = decodeURIComponent(hotspotProfile[1]);
         const name = hotspotProfile[2] ? decodeURIComponent(hotspotProfile[2]) : String(body?.name || '');
         let response: any;
-        if (req.method === 'POST') {
-          response = await this.hotspotGrpc.addProfile({ sessionId: routerSession, name, onLogin: String(body?.onLogin || body?.['on-login'] || ''), sessionTimeout: String(body?.sessionTimeout || body?.['session-timeout'] || ''), idleTimeout: String(body?.idleTimeout || body?.['idle-timeout'] || ''), rateLimit: String(body?.rateLimit || body?.['rate-limit'] || ''), sharedUsers: String(body?.sharedUsers || body?.['shared-users'] || ''), addressPool: String(body?.addressPool || body?.['address-pool'] || '') });
-        } else if (req.method === 'PUT') {
-          response = await this.hotspotGrpc.updateProfile({ sessionId: routerSession, name, onLogin: String(body?.onLogin || body?.['on-login'] || ''), sessionTimeout: String(body?.sessionTimeout || body?.['session-timeout'] || ''), idleTimeout: String(body?.idleTimeout || body?.['idle-timeout'] || ''), rateLimit: String(body?.rateLimit || body?.['rate-limit'] || ''), sharedUsers: String(body?.sharedUsers || body?.['shared-users'] || ''), addressPool: String(body?.addressPool || body?.['address-pool'] || '') });
-        } else {
-          response = await this.hotspotGrpc.deleteProfile(routerSession, name);
-        }
+        if (req.method === 'POST') response = await this.hotspotGrpc.addProfile({ sessionId: routerSession, name, onLogin: String(body?.onLogin || body?.['on-login'] || ''), sessionTimeout: String(body?.sessionTimeout || body?.['session-timeout'] || ''), idleTimeout: String(body?.idleTimeout || body?.['idle-timeout'] || ''), rateLimit: String(body?.rateLimit || body?.['rate-limit'] || ''), sharedUsers: String(body?.sharedUsers || body?.['shared-users'] || ''), addressPool: String(body?.addressPool || body?.['address-pool'] || '') });
+        else if (req.method === 'PUT') response = await this.hotspotGrpc.updateProfile({ sessionId: routerSession, name, onLogin: String(body?.onLogin || body?.['on-login'] || ''), sessionTimeout: String(body?.sessionTimeout || body?.['session-timeout'] || ''), idleTimeout: String(body?.idleTimeout || body?.['idle-timeout'] || ''), rateLimit: String(body?.rateLimit || body?.['rate-limit'] || ''), sharedUsers: String(body?.sharedUsers || body?.['shared-users'] || ''), addressPool: String(body?.addressPool || body?.['address-pool'] || '') });
+        else response = await this.hotspotGrpc.deleteProfile(routerSession, name);
         return res.status(200).json(response || { success: false, error: 'Hotspot profile operation failed' });
       } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
+    }
+
+    const voucherBatchMatch = canonical.match(/^\/voucher\/batches\/([^/]+)(?:\/([^/]+)(?:\/(mark-used|sync-used|auto-sync-used))?)?$/);
+    if (targetRaw === 'batches' && voucherBatchMatch) {
+      try {
+        const routerSession = decodeURIComponent(voucherBatchMatch[1]);
+        const id = voucherBatchMatch[2] ? decodeURIComponent(voucherBatchMatch[2]) : '';
+        const action = voucherBatchMatch[3] || '';
+        let response: any;
+        if (req.method === 'GET' && !id) response = await this.voucherBatchGrpc.listBatches(routerSession);
+        else if (req.method === 'GET' && id && !action) response = await this.voucherBatchGrpc.getBatch(routerSession, id);
+        else if (req.method === 'POST' && !id) response = await this.voucherBatchGrpc.createBatch({ session: routerSession, batch: body });
+        else if (req.method === 'DELETE' && id) response = await this.voucherBatchGrpc.deleteBatch(routerSession, id, String(query?.deleteMikrotik || '') === 'true');
+        else if (req.method === 'POST' && id && action === 'mark-used') response = await this.voucherBatchGrpc.markUsed({ session: routerSession, id, username: String(body?.username || ''), usedBy: String(body?.usedBy || '') });
+        else if (req.method === 'POST' && id && action === 'sync-used') response = await this.voucherBatchGrpc.syncUsed(routerSession);
+        else if (req.method === 'POST' && id && action === 'auto-sync-used') response = await this.voucherBatchGrpc.autoSyncUsed(routerSession);
+        else response = null;
+        if (response) {
+          if (req.method === 'GET' && !id) return res.status(response.success === false ? 502 : 200).json(response.batches || []);
+          if (req.method === 'GET' && id) return res.status(response.success === false ? 404 : 200).json(response.batch || null);
+          return res.status(response.success === false ? 502 : 200).json(response);
+        }
+      } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
     }
 
     const token = isPublic ? null : this.authService.getToken(session);
