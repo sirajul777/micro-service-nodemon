@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package bot.internal;
+
+service BotInternalService {
+  rpc ListResellers(ListResellersRequest) returns (ResellersResponse);
+  rpc GetReseller(GetResellerRequest) returns (ResellerResponse);
+  rpc UpsertReseller(UpsertResellerRequest) returns (ResellerResponse);
+  rpc DeleteReseller(DeleteResellerRequest) returns (MutationResponse);
+  rpc TopupReseller(TopupResellerRequest) returns (ResellerMutationResponse);
+  rpc ListResellerLogs(ListResellerLogsRequest) returns (ResellerLogsResponse);
+
+  rpc ListTelegramConfigs(ListTelegramConfigsRequest) returns (TelegramConfigsResponse);
+  rpc GetTelegramConfig(GetTelegramConfigRequest) returns (TelegramConfigResponse);
+  rpc SaveTelegramConfig(SaveTelegramConfigRequest) returns (TelegramConfigResponse);
+  rpc DeleteTelegramConfig(DeleteTelegramConfigRequest) returns (MutationResponse);
+  rpc TestTelegram(TestTelegramRequest) returns (MutationResponse);
+  rpc ListTelegramLogs(ListTelegramLogsRequest) returns (TelegramLogsResponse);
+}
+
+message Reseller {
+  string id = 1;
+  string name = 2;
+  string username = 3;
+  string telegram_id = 4;
+  string session_id = 5;
+  double saldo = 6;
+  int32 total_voucher = 7;
+  double total_income = 8;
+  string status = 9;
+  double markup = 10;
+  double discount = 11;
+  string created_at = 12;
+  string last_active = 13;
+  string note = 14;
+}
+message ListResellersRequest { bool bot = 1; }
+message ResellersResponse { bool success = 1; string error = 2; repeated Reseller resellers = 3; }
+message GetResellerRequest { string id = 1; bool bot = 2; }
+message ResellerResponse { bool success = 1; string error = 2; Reseller reseller = 3; }
+message UpsertResellerRequest { Reseller reseller = 1; bool bot = 2; }
+message DeleteResellerRequest { string id = 1; bool bot = 2; }
+message TopupResellerRequest { string id = 1; double amount = 2; string note = 3; string by = 4; }
+message ResellerMutationResponse { bool success = 1; string error = 2; Reseller reseller = 3; }
+message ListResellerLogsRequest { string reseller_id = 1; int32 limit = 2; }
+message ResellerLog { int64 id = 1; string reseller_id = 2; double amount = 3; string type = 4; string note = 5; string by = 6; string at = 7; double balance_before = 8; double balance_after = 9; }
+message ResellerLogsResponse { bool success = 1; string error = 2; repeated ResellerLog logs = 3; }
+
+message TelegramConfig {
+  string id = 1;
+  string token = 2;
+  string chat_id = 3;
+  string session_id = 4;
+  bool notif_sale = 5;
+  bool notif_daily = 6;
+  string daily_time = 7;
+  bool bot_enabled = 8;
+  repeated string allowed_users = 9;
+  string default_profile = 10;
+  string welcome_msg = 11;
+}
+message ListTelegramConfigsRequest {}
+message TelegramConfigsResponse { bool success = 1; string error = 2; repeated TelegramConfig configs = 3; }
+message GetTelegramConfigRequest { string id = 1; }
+message TelegramConfigResponse { bool success = 1; string error = 2; TelegramConfig config = 3; }
+message SaveTelegramConfigRequest { TelegramConfig config = 1; }
+message DeleteTelegramConfigRequest { string id = 1; }
+message TestTelegramRequest { string id = 1; string chat_id = 2; string message = 3; }
+message ListTelegramLogsRequest {}
+message TelegramLog { string id = 1; string payload = 2; }
+message TelegramLogsResponse { bool success = 1; string error = 2; repeated TelegramLog logs = 3; }
+message MutationResponse { bool success = 1; string error = 2; string message = 3; }
