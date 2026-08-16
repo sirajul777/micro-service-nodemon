@@ -8,6 +8,8 @@ import { ErpGrpcClient } from '../erp/erp-grpc.client';
 import { ErpDashboardGrpcClient } from '../erp/erp-dashboard-grpc.client';
 import { HotspotGrpcClient } from '../erp/hotspot-grpc.client';
 import { VoucherBatchGrpcClient } from '../erp/voucher-batch-grpc.client';
+import { VoucherGenerateGrpcClient } from '../erp/voucher-generate-grpc.client';
+import { VoucherTypeGrpcClient } from '../erp/voucher-type-grpc.client';
 
 type Target = 'auth' | 'erp' | 'payment' | 'bot';
 
@@ -26,6 +28,8 @@ export class ProxyController {
     private readonly erpDashboardGrpc: ErpDashboardGrpcClient,
     private readonly hotspotGrpc: HotspotGrpcClient,
     private readonly voucherBatchGrpc: VoucherBatchGrpcClient,
+    private readonly voucherGenerateGrpc: VoucherGenerateGrpcClient,
+    private readonly voucherTypeGrpc: VoucherTypeGrpcClient,
   ) {}
 
   @All(['', ':rest(.*)'])
@@ -56,6 +60,27 @@ export class ProxyController {
         const response = await this.erpGrpc.getSession(canonical.split('/')[2]);
         if (!response?.success) return res.status(404).json({ error: response?.error || 'Router session tidak ditemukan' });
         return res.status(200).json(response.session || null);
+      } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
+    }
+
+    const voucherTypeMatch = canonical.match(/^\/voucher\/types(?:\/([^/]+)(?:\/(toggle))?)?$/);
+    if ((targetRaw === 'voucherTypes' || targetRaw === 'voucher-types') && voucherTypeMatch) {
+      try {
+        const id = voucherTypeMatch[1] ? decodeURIComponent(voucherTypeMatch[1]) : '';
+        const action = voucherTypeMatch[2] || '';
+        let response: any;
+        if (req.method === 'GET' && !id) response = await this.voucherTypeGrpc.list();
+        else if (req.method === 'GET' && id && !action) response = await this.voucherTypeGrpc.get(id);
+        else if (req.method === 'GET' && id && action === 'toggle') response = await this.voucherTypeGrpc.toggle(id);
+        else if (req.method === 'POST' && !id) response = await this.voucherTypeGrpc.create({ ...body, price: Number(body?.price) || 0 });
+        else if (req.method === 'PUT' && id) response = await this.voucherTypeGrpc.update({ ...body, id, price: Number(body?.price) || 0 });
+        else if (req.method === 'DELETE' && id) response = await this.voucherTypeGrpc.remove(id);
+        if (response) {
+          if (response.success === false) return res.status(id ? 404 : 502).json({ success: false, message: response.error || 'Voucher type gRPC failed' });
+          if (req.method === 'GET' && !id) return res.status(200).json(response.voucherTypes || []);
+          if (req.method === 'GET') return res.status(200).json(response.voucherType || null);
+          return res.status(200).json(response);
+        }
       } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
     }
 
@@ -156,7 +181,6 @@ export class ProxyController {
         else if (req.method === 'POST' && id && action === 'mark-used') response = await this.voucherBatchGrpc.markUsed({ session: routerSession, id, username: String(body?.username || ''), usedBy: String(body?.usedBy || '') });
         else if (req.method === 'POST' && id && action === 'sync-used') response = await this.voucherBatchGrpc.syncUsed(routerSession);
         else if (req.method === 'POST' && id && action === 'auto-sync-used') response = await this.voucherBatchGrpc.autoSyncUsed(routerSession);
-        else response = null;
         if (response) {
           if (req.method === 'GET' && !id) return res.status(response.success === false ? 502 : 200).json(response.batches || []);
           if (req.method === 'GET' && id) return res.status(response.success === false ? 404 : 200).json(response.batch || null);
