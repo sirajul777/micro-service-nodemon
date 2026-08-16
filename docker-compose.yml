@@ -1,9 +1,5 @@
 version: '3.8'
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MikHMon — Microservice Infrastructure
-# ─────────────────────────────────────────────────────────────────────────────
-
 services:
   redis-broker:
     image: redis:7-alpine
@@ -224,6 +220,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
       - USE_REDIS_STREAMS=true
       - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
+      - BOT_GRPC_ADDR=0.0.0.0:50055
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -231,6 +228,8 @@ services:
         condition: service_healthy
       mikrotik-go-service:
         condition: service_started
+    expose:
+      - "50055"
     networks:
       - net-mikrotik-cluster
     restart: on-failure
