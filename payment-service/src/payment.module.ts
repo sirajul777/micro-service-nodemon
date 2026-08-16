@@ -21,6 +21,7 @@ import { VoucherOrderController } from './voucher-order.controller';
 import { PayhookNotifierService } from './notifier.service';
 import { PayhookSchedulerService } from './payhook-scheduler.service';
 import { VoucherTypeClient } from './clients/voucher-type.client';
+import { GrpcVoucherTypeClient } from './erp/grpc-voucher-type.client';
 import { MikrotikGrpcClient } from './clients/mikrotik-grpc.client';
 import { RedisPublisherService } from './redis/redis-publisher.service';
 import { OutboxService } from './redis/outbox.service';
@@ -29,13 +30,13 @@ import { OutboxService } from './redis/outbox.service';
  * Payment & Billing module (Phase 3 — QRIS voucher-payment flow).
  *
  * Cross-service wiring:
- *   - VoucherTypeClient  → HTTP → erp-node-service (voucher catalogue)
+ *   - VoucherTypeClient → gRPC → erp-node-service (voucher catalogue)
  *   - MikrotikGrpcClient → gRPC → mikrotik-go-service (router provisioning)
- *   - OutboxService      → Redis pub/sub → bot-py-service (delivery/notify)
+ *   - OutboxService → Redis pub/sub → bot-py-service (delivery/notify)
  */
 @Module({
   imports: [
-TypeOrmModule.forFeature([
+    TypeOrmModule.forFeature([
       PaymentConfigEntity,
       VoucherOrderEntity,
       PayhookCallbackLogEntity,
@@ -55,6 +56,7 @@ TypeOrmModule.forFeature([
     PayhookNotifierService,
     PayhookSchedulerService,
     VoucherTypeClient,
+    GrpcVoucherTypeClient,
     MikrotikGrpcClient,
     RedisPublisherService,
     OutboxService,
@@ -71,7 +73,6 @@ export class PaymentModule implements OnModuleInit {
   constructor(private readonly outbox: OutboxService) {}
 
   onModuleInit() {
-    // Start the outbox relay loop (publishes pending events to Redis).
     this.outbox.start();
   }
 }
