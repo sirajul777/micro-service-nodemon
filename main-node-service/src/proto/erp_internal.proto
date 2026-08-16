@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package erp.internal;
+
+service ErpInternalService {
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+}
+
+message ListSessionsRequest {}
+
+message ErpSession {
+  string id = 1;
+  string name = 2;
+  string ip = 3;
+  int32 port = 4;
+  string user = 5;
+  string hotspot_name = 6;
+  string dns_name = 7;
+  string currency = 8;
+  int32 reload_interval = 9;
+  string iface = 10;
+  int32 idle_to = 11;
+  bool livereport = 12;
+}
+
+message ListSessionsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated ErpSession sessions = 3;
+}
+
+message GetSessionRequest { string id = 1; }
+
+message GetSessionResponse {
+  bool success = 1;
+  string error = 2;
+  ErpSession session = 3;
+}

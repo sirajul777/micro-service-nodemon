@@ -16,5 +16,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/views ./views
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/../auth-node-service/proto ./auth-proto
+COPY --from=builder /app/src/proto ./erp-proto
 EXPOSE 8080
 CMD ["node", "dist/main.js"]

@@ -7,6 +7,7 @@ import { SessionController } from './session/session.controller';
 import { HealthController } from './health/health.controller';
 import { AuthService } from './auth/auth.service';
 import { AuthGrpcClient } from './auth/auth-grpc.client';
+import { ErpGrpcClient } from './erp/erp-grpc.client';
 import { ProxyService } from './proxy/proxy.service';
 import { ViewService } from './view/view.service';
 import { SecurityMiddleware } from './security/security.middleware';
@@ -20,7 +21,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     PaymentWebhookController,
     HealthController,
   ],
-  providers: [AuthService, AuthGrpcClient, ProxyService, ViewService],
+  providers: [AuthService, AuthGrpcClient, ErpGrpcClient, ProxyService, ViewService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
