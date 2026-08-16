@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package erp.internal;
+
+service ErpInternalService {
+  rpc GetVoucherType(GetVoucherTypeRequest) returns (GetVoucherTypeResponse);
+}
+
+message GetVoucherTypeRequest { string id = 1; }
+
+message VoucherType {
+  string id = 1;
+  string name = 2;
+  double price = 3;
+  string profile = 4;
+  string duration = 5;
+  int32 code_length = 6;
+  string code_format = 7;
+  string user_type = 8;
+  bool active = 9;
+}
+
+message GetVoucherTypeResponse {
+  bool success = 1;
+  string error = 2;
+  VoucherType voucher_type = 3;
+}
