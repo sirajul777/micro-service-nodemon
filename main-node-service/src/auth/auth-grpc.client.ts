@@ -44,6 +44,14 @@ export class AuthGrpcClient implements OnModuleDestroy {
     return this.call('ValidateToken', { token });
   }
 
+  changePassword(token: string, oldPassword: string, newPassword: string) {
+    return this.call('ChangePassword', {
+      token,
+      oldPassword,
+      newPassword,
+    });
+  }
+
   close() {
     this.client?.close?.();
   }
