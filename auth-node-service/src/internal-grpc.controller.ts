@@ -53,14 +53,14 @@ export class InternalGrpcController {
   async changePassword(request: { token: string; oldPassword: string; newPassword: string }) {
     try {
       const payload = await this.authService.validateToken(request.token);
-      const success = await this.authService.changePassword(
+      const result = await this.authService.changePassword(
         payload.username,
         request.oldPassword,
         request.newPassword,
       );
       return {
-        success,
-        message: success ? 'Password berhasil diubah' : 'Password lama tidak sesuai',
+        success: !!result,
+        message: result ? 'Password berhasil diubah' : 'Password lama salah atau perubahan gagal',
       };
     } catch (error: any) {
       return { success: false, message: error?.message || 'Gagal mengubah password' };
