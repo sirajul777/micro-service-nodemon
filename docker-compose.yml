@@ -60,8 +60,8 @@ services:
 
   main-node-service:
     build:
-      context: ./main-node-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./main-node-service/Dockerfile
     container_name: ms_nestjs_main
     environment:
       - NODE_ENV=${NODE_ENV:-development}
