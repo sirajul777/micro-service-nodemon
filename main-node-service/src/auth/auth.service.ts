@@ -68,4 +68,18 @@ export class AuthService {
       }
     );
   }
+
+  async changePassword(
+    token: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const resp = await this.grpc.changePassword(token, oldPassword, newPassword);
+      return resp || { success: false, message: 'Auth service tidak merespons' };
+    } catch (e: any) {
+      this.logger.error(`auth gRPC change-password failed: ${e.message}`);
+      return { success: false, message: 'Auth service tidak dapat dijangkau' };
+    }
+  }
 }

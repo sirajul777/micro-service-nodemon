@@ -48,4 +48,22 @@ export class InternalGrpcController {
       return { success: false, message: error?.message || 'Token tidak valid', payload: null };
     }
   }
+
+  @GrpcMethod('AuthService', 'ChangePassword')
+  async changePassword(request: { token: string; oldPassword: string; newPassword: string }) {
+    try {
+      const payload = await this.authService.validateToken(request.token);
+      const result = await this.authService.changePassword(
+        payload.username,
+        request.oldPassword,
+        request.newPassword,
+      );
+      return {
+        success: !!result,
+        message: result ? 'Password berhasil diubah' : 'Password lama salah atau perubahan gagal',
+      };
+    } catch (error: any) {
+      return { success: false, message: error?.message || 'Gagal mengubah password' };
+    }
+  }
 }
