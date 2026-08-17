@@ -6,18 +6,13 @@ import {
   Post,
   Req,
   Res,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { ProxyService } from '../proxy/proxy.service';
 
 @Controller('api/auth')
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly proxyService: ProxyService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('login')
   async login(
@@ -51,8 +46,7 @@ export class AuthController {
     return {
       authenticated: true,
       ...this.authService.getUser(session),
-      allowedSessions:
-        (session.user?.allowedSessions as any) || [],
+      allowedSessions: (session.user?.allowedSessions as any) || [],
     };
   }
 
@@ -62,8 +56,7 @@ export class AuthController {
     @Res() res: Response,
     @Body() body: { oldPassword: string; newPassword: string },
   ) {
-    const session = (req as any).session;
-    const token = this.authService.getToken(session);
+    const token = this.authService.getToken((req as any).session);
     if (!token) {
       return res.status(401).json({ error: 'Tidak terautentikasi' });
     }
@@ -73,16 +66,13 @@ export class AuthController {
     if (body.newPassword.length < 4) {
       return res.status(400).json({ error: 'Password minimal 4 karakter' });
     }
-    const resp = await this.proxyService.forward(
-      'auth',
-      '/api/auth/change-password',
-      'POST',
+    const result = await this.authService.changePassword(
       token,
-      { oldPassword: body.oldPassword, newPassword: body.newPassword },
+      body.oldPassword,
+      body.newPassword,
     );
-    const { status, body: data } = this.proxyService.respond(resp);
-    return res.status(status).json(data);
+    return res.status(result?.success ? 200 : 400).json(
+      result || { success: false, message: 'Gagal mengubah password' },
+    );
   }
 }
-
-
