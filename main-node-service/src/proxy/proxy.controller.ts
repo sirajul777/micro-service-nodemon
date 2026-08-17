@@ -2,7 +2,7 @@ import {
   All, Body, Controller, Headers, Param, Query, Req, Res, UnauthorizedException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { ProxyService } from './proxy.service';
+import { HttpProxyFallbackService } from './http-proxy-fallback.service';
 import { AuthService } from '../auth/auth.service';
 import { ErpGrpcClient } from '../erp/erp-grpc.client';
 import { ErpDashboardGrpcClient } from '../erp/erp-dashboard-grpc.client';
@@ -24,7 +24,7 @@ const TARGETS: Record<string, Target> = {
 @Controller('api/:target')
 export class ProxyController {
   constructor(
-    private readonly proxyService: ProxyService,
+    private readonly fallback: HttpProxyFallbackService,
     private readonly authService: AuthService,
     private readonly erpGrpc: ErpGrpcClient,
     private readonly erpDashboardGrpc: ErpDashboardGrpcClient,
@@ -197,8 +197,8 @@ export class ProxyController {
 
     const token = isPublic ? null : this.authService.getToken(session);
     const method = req.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    const resp = await this.proxyService.forward(target, canonical, method, token, body, query);
-    const { status, body: data } = this.proxyService.respond(resp);
+    const resp = await this.fallback.forward(target, canonical, method, token, body, query);
+    const { status, body: data } = this.fallback.respond(resp);
     return res.status(status).json(data);
   }
 
