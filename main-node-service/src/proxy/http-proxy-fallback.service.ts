@@ -4,7 +4,10 @@ import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { ROUTER } from '../router.config';
 
-/** Transitional external/infrequent HTTP fallback. Internal service paths should use gRPC clients. */
+/**
+ * Transitional HTTP fallback. Only explicitly allow-listed legacy routes may use it.
+ * All internal service-to-service routes that have a gRPC client must stay on gRPC.
+ */
 @Injectable()
 export class HttpProxyFallbackService {
   private readonly logger = new Logger(HttpProxyFallbackService.name);
@@ -43,6 +46,11 @@ export class HttpProxyFallbackService {
     }
   }
 
+  private isAllowedLegacyRoute(target: 'auth' | 'erp' | 'payment' | 'bot', path: string, method: string): boolean {
+    if (target !== 'erp' || method !== 'GET') return false;
+    return /^\/report\/[^/]+\/live$/.test(path);
+  }
+
   async forward(
     target: 'auth' | 'erp' | 'payment' | 'bot',
     path: string,
@@ -51,22 +59,31 @@ export class HttpProxyFallbackService {
     body?: any,
     query?: any,
   ): Promise<AxiosResponse> {
+    if (!this.isAllowedLegacyRoute(target, path, method)) {
+      this.logger.error(`Blocked legacy HTTP fallback for ${method} ${target}${path}`);
+      throw new BadGatewayException(`Internal route ${method} ${target}${path} wajib menggunakan gRPC`);
+    }
+
     if (this.isOpen(target)) {
       throw new ServiceUnavailableException(`Layanan ${target} sedang dalam masa pemulihan, coba lagi beberapa saat lagi`);
     }
 
     const base = ROUTER[target];
     const url = `${base.replace(/\/+$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
-    const isLiveReport = target === 'erp' && /^\/report\/[^/]+\/live$/.test(path);
     const configuredLiveTimeout = Number.parseInt(process.env.ERP_LIVE_REPORT_PROXY_TIMEOUT_MS || '120000', 10);
     const liveTimeout = Number.isFinite(configuredLiveTimeout) && configuredLiveTimeout > 0 ? Math.min(configuredLiveTimeout, 180000) : 120000;
-    const config: AxiosRequestConfig = { method, url, timeout: isLiveReport ? liveTimeout : 20000, params: query, validateStatus: () => true };
+    const config: AxiosRequestConfig = {
+      method,
+      url,
+      timeout: liveTimeout,
+      params: query,
+      validateStatus: () => true,
+    };
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (token) headers.authorization = `Bearer ${token}`;
     config.headers = headers;
-    if (body !== undefined && (method === 'POST' || method === 'PUT' || method === 'PATCH')) config.data = body;
 
-    const idempotent = method === 'GET' || method === 'PUT' || method === 'DELETE';
+    const idempotent = method === 'GET';
     const attempts = idempotent ? HttpProxyFallbackService.MAX_RETRIES + 1 : 1;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
