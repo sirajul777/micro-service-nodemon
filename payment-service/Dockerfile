@@ -14,5 +14,5 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/proto ./proto
-EXPOSE 3002
+EXPOSE 3002 50054
 CMD ["node", "dist/main.js"]
