@@ -26,15 +26,6 @@ import { MikrotikGrpcClient } from './clients/mikrotik-grpc.client';
 import { RedisPublisherService } from './redis/redis-publisher.service';
 import { OutboxService } from './redis/outbox.service';
 
-/**
- * Payment & Billing module (Phase 3 — QRIS voucher-payment flow).
- *
- * Cross-service wiring:
- *   - VoucherTypeClient → gRPC → erp-node-service (voucher catalogue)
- *   - PaymentAuthGrpcClient → gRPC → auth-node-service (token validation)
- *   - MikrotikGrpcClient → gRPC → mikrotik-go-service (router provisioning)
- *   - OutboxService → Redis pub/sub → bot-py-service (delivery/notify)
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([

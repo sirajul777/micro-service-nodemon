@@ -5,7 +5,7 @@
   "scripts": {
     "start:dev": "nest start --watch",
     "build": "nest build && npm run copy:proto",
-    "copy:proto": "mkdir -p dist/proto && cp proto/router.proto dist/proto/router.proto",
+    "copy:proto": "mkdir -p dist/proto && cp proto/router.proto dist/proto/router.proto && cp proto/payment_internal.proto dist/proto/payment_internal.proto",
     "start": "node dist/main"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
     "@grpc/proto-loader": "^0.7.13",
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
+    "@nestjs/microservices": "^10.4.20",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/typeorm": "^11.0.3",
     "class-transformer": "^0.5.1",

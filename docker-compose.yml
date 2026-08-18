@@ -71,6 +71,8 @@ services:
       - ERP_SERVICE_URL=http://erp-node-service:3003
       - PAYMENT_SERVICE_URL=http://payment-service:3002
       - BOT_SERVICE_URL=http://bot-py-service:8082
+      - PAYMENT_GRPC_ADDR=payment-service:50054
+      - PAYMENT_GRPC_PROTO_PATH=/app/payment-proto/payment_internal.proto
       - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
       - SESSION_SECRET=${SESSION_SECRET:-mikhmon-session-secret}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-super_secure_redis_pass_123}@redis-broker:6379
@@ -152,6 +154,8 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3002
+      - INTERNAL_GRPC_PORT=50054
+      - PAYMENT_INTERNAL_GRPC_PROTO_PATH=/app/proto/payment_internal.proto
       - AUTH_GRPC_ADDR=auth-node-service:50052
       - AUTH_GRPC_PROTO_PATH=/app/proto/auth.proto
       - DB_HOST=postgres-db
@@ -173,6 +177,8 @@ services:
         condition: service_healthy
     ports:
       - "3002:3002"
+    expose:
+      - "50054"
     networks:
       - net-mikrotik-cluster
     restart: on-failure

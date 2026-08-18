@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package payment.internal;
+
+service PaymentInternalService {
+  rpc ListPayments(ListPaymentsRequest) returns (ListPaymentsResponse);
+  rpc GetPaymentStats(GetPaymentStatsRequest) returns (GetPaymentStatsResponse);
+  rpc GetPaymentConfig(GetPaymentConfigRequest) returns (GetPaymentConfigResponse);
+  rpc SavePaymentConfig(SavePaymentConfigRequest) returns (SavePaymentConfigResponse);
+  rpc CreatePaymentTest(CreatePaymentTestRequest) returns (CreatePaymentTestResponse);
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+  rpc CheckPayment(CheckPaymentRequest) returns (CheckPaymentResponse);
+}
+
+message Empty {}
+
+message ListPaymentsRequest { string status = 1; }
+message PaymentItem {
+  string id = 1;
+  string order_id = 2;
+  string gateway = 3;
+  string purpose = 4;
+  string reference_id = 5;
+  string method = 6;
+  string voucher_name = 7;
+  string profile = 8;
+  double amount = 9;
+  double price = 10;
+  string status = 11;
+  string customer_name = 12;
+  string phone = 13;
+  string created_at = 14;
+  string paid_at = 15;
+}
+message ListPaymentsResponse { bool success = 1; string error = 2; repeated PaymentItem transactions = 3; int32 total = 4; }
+
+message GetPaymentStatsRequest {}
+message GetPaymentStatsResponse { bool success = 1; string error = 2; int32 total = 3; int32 pending = 4; int32 processing = 5; int32 paid = 6; int32 expired = 7; int32 cancelled = 8; double revenue = 9; }
+
+message GetPaymentConfigRequest {}
+message PaymentConfig { string payhook_static_qris = 1; int32 payhook_unique_digits = 2; int32 payhook_qris_expiry_minutes = 3; int32 payhook_expired_retention_days = 4; }
+message GetPaymentConfigResponse { bool success = 1; string error = 2; PaymentConfig config = 3; }
+
+message SavePaymentConfigRequest { map<string,string> values = 1; }
+message SavePaymentConfigResponse { bool success = 1; string error = 2; PaymentConfig config = 3; }
+
+message CreatePaymentTestRequest { double amount = 1; string profile = 2; }
+message CreatePaymentTestResponse { bool success = 1; string error = 2; string order_id = 3; double amount = 4; string qr_string = 5; string qr_image = 6; string status = 7; }
+
+message GetPaymentRequest { string order_id = 1; }
+message GetPaymentResponse { bool success = 1; string error = 2; PaymentItem transaction = 3; }
+
+message CheckPaymentRequest { string order_id = 1; }
+message CheckPaymentResponse { bool success = 1; string error = 2; string order_id = 3; string status = 4; }

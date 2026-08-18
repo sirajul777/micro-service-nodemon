@@ -24,6 +24,7 @@ COPY --from=builder /app/shared-protos/auth ./auth-proto
 COPY --from=builder /app/shared-protos/bot ./bot-proto
 COPY --from=builder /app/src/proto ./erp-proto
 COPY --from=builder /app/src/proto/router.proto ./router-proto/router.proto
+COPY payment-service/proto ./payment-proto
 
 EXPOSE 8080
 CMD ["node", "dist/main.js"]
