@@ -242,9 +242,12 @@ export class ProxyController {
       } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
     }
 
-    const token = isPublic ? null : this.authService.getToken(session);
-    const method = req.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    const resp = await this.fallback.forward(target, canonical, method, token, body, query);
+    if (!(target === 'erp' && req.method === 'GET' && /^\/report\/[^/]+\/live$/.test(canonical))) {
+      return res.status(404).json({ success: false, message: `Route ${req.method} ${canonical} belum dimigrasikan ke gRPC` });
+    }
+
+    const token = this.authService.getToken(session);
+    const resp = await this.fallback.forward(target, canonical, 'GET', token, undefined, query);
     const { status, body: data } = this.fallback.respond(resp);
     return res.status(status).json(data);
   }
