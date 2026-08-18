@@ -11,6 +11,7 @@ import { VoucherBatchGrpcClient } from '../erp/voucher-batch-grpc.client';
 import { VoucherGenerateGrpcClient } from '../erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from '../erp/voucher-type-grpc.client';
 import { BotGrpcClient } from '../bot/bot-grpc.client';
+import { PaymentGrpcClient } from '../payment/payment-grpc.client';
 import { handleBotGrpcRoute } from './bot.routes';
 
 type Target = 'auth' | 'erp' | 'payment' | 'bot';
@@ -33,6 +34,7 @@ export class ProxyController {
     private readonly voucherGenerateGrpc: VoucherGenerateGrpcClient,
     private readonly voucherTypeGrpc: VoucherTypeGrpcClient,
     private readonly botGrpc: BotGrpcClient,
+    private readonly paymentGrpc: PaymentGrpcClient,
   ) {}
 
   @All(['', ':rest(.*)'])
@@ -51,6 +53,51 @@ export class ProxyController {
     if (!isPublic) {
       if (!(session && this.authService.isAuthenticated(session))) throw new UnauthorizedException('Please login first');
       if (!(await this.authService.validate(session))) throw new UnauthorizedException('Session token tidak valid atau kadaluarsa');
+    }
+
+    if (targetRaw === 'payments' && canonical.startsWith('/payments')) {
+      try {
+        if (req.method === 'GET' && canonical === '/payments') {
+          const response = await this.paymentGrpc.list(String(query?.status || ''));
+          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Payment gRPC list failed' });
+          return res.status(200).json({ success: true, transactions: response.transactions || [], total: Number(response.total || 0) });
+        }
+        if (req.method === 'GET' && canonical === '/payments/stats') {
+          const response = await this.paymentGrpc.stats();
+          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Payment gRPC stats failed' });
+          return res.status(200).json(response);
+        }
+        if (req.method === 'GET' && canonical === '/payments/config') {
+          const response = await this.paymentGrpc.getConfig();
+          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Payment gRPC config failed' });
+          return res.status(200).json({ success: true, config: response.config || null });
+        }
+        if (req.method === 'POST' && canonical === '/payments/config') {
+          const response = await this.paymentGrpc.saveConfig(Object.fromEntries(Object.entries(body || {}).map(([k, v]) => [k, String(v ?? '')])));
+          if (!response?.success) return res.status(400).json({ success: false, message: response?.error || 'Payment gRPC config save failed' });
+          return res.status(200).json({ success: true, config: response.config || null });
+        }
+        if (req.method === 'POST' && canonical === '/payments/test') {
+          const response = await this.paymentGrpc.test(Number(body?.amount) || 1000, String(body?.profile || 'test'));
+          if (!response?.success) return res.status(400).json({ success: false, message: response?.error || 'Payment gRPC test failed' });
+          return res.status(200).json({ success: true, orderId: response.orderId, amount: response.amount, qrString: response.qrString, qrImage: response.qrImage, status: response.status });
+        }
+        const detailMatch = canonical.match(/^\/payments\/([^/]+)$/);
+        const checkMatch = canonical.match(/^\/payments\/([^/]+)\/check$/);
+        if (req.method === 'GET' && detailMatch) {
+          const response = await this.paymentGrpc.get(decodeURIComponent(detailMatch[1]));
+          if (!response?.success) return res.status(404).json({ success: false, error: response?.error || 'Transaction not found' });
+          return res.status(200).json({ success: true, transaction: response.transaction || null });
+        }
+        if (req.method === 'POST' && checkMatch) {
+          const orderId = decodeURIComponent(checkMatch[1]);
+          const response = await this.paymentGrpc.check(orderId);
+          if (!response?.success) return res.status(404).json({ success: false, error: response?.error || 'Transaction not found' });
+          return res.status(200).json({ success: true, orderId, status: response.status });
+        }
+      } catch (err: any) {
+        return res.status(502).json({ success: false, message: `Payment gRPC unavailable: ${err?.message || err}` });
+      }
     }
 
     if ((targetRaw === 'resellers' || targetRaw === 'bot-resellers' || targetRaw === 'telegram') &&
