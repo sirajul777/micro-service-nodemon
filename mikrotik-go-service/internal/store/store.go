@@ -39,9 +39,21 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 	}
 	s := &Store{pool: pool}
 	if err := s.migrate(ctx); err != nil {
+		s.Close()
 		return nil, err
 	}
 	return s, nil
+}
+
+// NewWithoutMigration creates a Store without running startup migrations.
+// The pool still connects lazily and can recover once Postgres becomes reachable.
+func NewWithoutMigration(ctx context.Context, dsn string) *Store {
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		log.Printf("[mikrotik-go-service] postgres pool init failed: %v", err)
+		return nil
+	}
+	return &Store{pool: pool}
 }
 
 func (s *Store) migrate(ctx context.Context) error {
@@ -173,6 +185,9 @@ func (s *Store) Exists(ctx context.Context, id string) (bool, error) {
 
 // Close releases the pool.
 func (s *Store) Close() {
+	if s == nil || s.pool == nil {
+		return
+	}
 	s.pool.Close()
 	_ = log.Output(2, "store closed")
 }
