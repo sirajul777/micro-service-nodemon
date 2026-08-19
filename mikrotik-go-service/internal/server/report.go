@@ -4,11 +4,24 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mikhmon/mikrotik-go-service/internal/mikrotik"
 	pb "github.com/mikhmon/mikrotik-go-service/proto"
 )
+
+const (
+	scriptProplist = "=.proplist=.id,name"
+	liveReportCacheTTL = 10 * time.Second
+)
+
+type liveReportCacheEntry struct {
+	rows      []mikrotik.Sentence
+	expiresAt time.Time
+}
+
+var liveReportCache sync.Map
 
 // ListSellingScripts reads selling records directly from MikroTik
 // /system/script/print, matching the monolith's report source.
@@ -41,14 +54,20 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 		}
 	}
 
-	rows, err := s.getSellingRows(c, isROS7, req.Idhr, req.Idbl)
-	if err != nil {
-		resp.Error = err.Error()
-		return resp, nil
+	cacheKey := reportCacheKey(req.SessionId, req.Idhr, req.Idbl, isROS7)
+	rows, ok := getLiveReportCache(cacheKey)
+	if !ok {
+		rows, err = s.getSellingRows(c, isROS7, req.Idhr, req.Idbl)
+		if err != nil {
+			resp.Error = err.Error()
+			return resp, nil
+		}
+		if req.Idbl != "" {
+			setLiveReportCache(cacheKey, rows)
+		}
 	}
 
 	for _, row := range rows {
-		// Stop parsing promptly when the upstream deadline is reached.
 		select {
 		case <-ctx.Done():
 			resp.Error = ctx.Err().Error()
@@ -76,11 +95,29 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	return resp, nil
 }
 
-// scriptProplist limits RouterOS replies to the fields actually consumed by
-// the report path. This is especially important for the live month query,
-// where /system/script can contain many records with large descriptions or
-// other metadata that the report never uses.
-const scriptProplist = "=.proplist=.id,name"
+func reportCacheKey(sessionId, idhr, idbl string, isROS7 bool) string {
+	return strings.Join([]string{sessionId, idhr, idbl, strconv.FormatBool(isROS7)}, "|")
+}
+
+func getLiveReportCache(key string) ([]mikrotik.Sentence, bool) {
+	value, ok := liveReportCache.Load(key)
+	if !ok {
+		return nil, false
+	}
+	entry, ok := value.(liveReportCacheEntry)
+	if !ok || time.Now().After(entry.expiresAt) {
+		liveReportCache.Delete(key)
+		return nil, false
+	}
+	return entry.rows, true
+}
+
+func setLiveReportCache(key string, rows []mikrotik.Sentence) {
+	liveReportCache.Store(key, liveReportCacheEntry{
+		rows:      rows,
+		expiresAt: time.Now().Add(liveReportCacheTTL),
+	})
+}
 
 func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string) ([]mikrotik.Sentence, error) }, isROS7 bool, idhr, idbl string) ([]mikrotik.Sentence, error) {
 	var rows []mikrotik.Sentence
@@ -108,11 +145,6 @@ func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string)
 		return c.Run("/system/script/print", "?source="+idhr, scriptProplist)
 	}
 
-	// Live report path: idbl is already the current month owner (e.g.
-	// aug2026), so do not perform any additional RouterOS resource/version
-	// query. Keep the single owner-filtered script query for both ROS6/ROS7
-	// compatibility with the existing monolith data layout, while limiting
-	// each response record to the id and name fields the report consumes.
 	if idbl != "" {
 		return c.Run("/system/script/print", "?owner="+idbl, scriptProplist)
 	}
