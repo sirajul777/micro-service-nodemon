@@ -6,6 +6,7 @@ import { ProfileMetaEntity } from './entities/profile-meta.entity';
 import { VoucherBatchEntity } from './entities/voucher-batch.entity';
 import { OutboxEventEntity } from './entities/outbox-event.entity';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { AuthGrpcClient } from './auth/auth-grpc.client';
 import { MikrotikGrpcClient } from './clients/mikrotik-grpc.client';
 import { RedisPublisherService } from './redis/redis-publisher.service';
 import { VoucherTypeService } from './voucher-type/voucher-type.service';
@@ -30,7 +31,17 @@ import { InternalGrpcModule } from './internal-grpc.module';
     InternalGrpcModule,
   ],
   controllers: [VoucherTypeController, ProfileMetaController, VoucherBatchController, RouterSessionController, HotspotController, ReportController, VoucherGenerateController, PppoeController],
-  providers: [JwtAuthGuard, MikrotikGrpcClient, RedisPublisherService, OutboxService, VoucherBatchCreationService, VoucherTypeService, ProfileMetaService, VoucherBatchService],
+  providers: [
+    AuthGrpcClient,
+    JwtAuthGuard,
+    MikrotikGrpcClient,
+    RedisPublisherService,
+    OutboxService,
+    VoucherBatchCreationService,
+    VoucherTypeService,
+    ProfileMetaService,
+    VoucherBatchService,
+  ],
   exports: [VoucherTypeService, ProfileMetaService, VoucherBatchService],
 })
 export class ErpModule {}
