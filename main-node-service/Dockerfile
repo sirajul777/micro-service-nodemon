@@ -7,7 +7,7 @@ RUN npm install
 COPY main-node-service/ .
 COPY auth-node-service/proto ./shared-protos/auth
 COPY bot-py-service/proto ./shared-protos/bot
-COPY erp-node-service/src/proto ./shared-protos/erp
+COPY erp-node-service/proto ./shared-protos/erp
 COPY payment-service/proto ./shared-protos/payment
 
 RUN npm run build
