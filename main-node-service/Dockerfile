@@ -7,6 +7,8 @@ RUN npm install
 COPY main-node-service/ .
 COPY auth-node-service/proto ./shared-protos/auth
 COPY bot-py-service/proto ./shared-protos/bot
+COPY erp-node-service/src/proto ./shared-protos/erp
+COPY payment-service/proto ./shared-protos/payment
 
 RUN npm run build
 
@@ -22,9 +24,8 @@ COPY --from=builder /app/public ./public
 
 COPY --from=builder /app/shared-protos/auth ./auth-proto
 COPY --from=builder /app/shared-protos/bot ./bot-proto
-COPY --from=builder /app/src/proto ./erp-proto
-COPY --from=builder /app/src/proto/router.proto ./router-proto/router.proto
-COPY payment-service/proto ./payment-proto
+COPY --from=builder /app/shared-protos/erp ./erp-proto
+COPY --from=builder /app/shared-protos/payment ./payment-proto
 
 EXPOSE 8080
 CMD ["node", "dist/main.js"]
