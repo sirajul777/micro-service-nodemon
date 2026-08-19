@@ -14,10 +14,11 @@ import { VoucherTypeService } from './voucher-type/voucher-type.service';
 import { ProfileMetaService } from './profile-meta/profile-meta.service';
 import { VoucherBatchEntity } from './entities/voucher-batch.entity';
 import { ProfileMetaEntity } from './entities/profile-meta.entity';
+import { VoucherTypeEntity } from './entities/voucher-type.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([VoucherBatchEntity, ProfileMetaEntity]),
+    TypeOrmModule.forFeature([VoucherBatchEntity, ProfileMetaEntity, VoucherTypeEntity]),
   ],
   controllers: [
     InternalGrpcController,
