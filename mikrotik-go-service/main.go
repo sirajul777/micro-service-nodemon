@@ -134,7 +134,11 @@ func main() {
 	ctx := context.Background()
 	st, err := store.New(ctx, pgDSN)
 	if err != nil {
-		log.Fatalf("[mikrotik-go-service] store init failed: %v", err)
+		log.Printf("[mikrotik-go-service] store init failed: %v", err)
+		st = store.NewWithoutMigration(ctx, pgDSN)
+	}
+	if st == nil {
+		log.Fatalf("[mikrotik-go-service] store init failed and fallback connection unavailable")
 	}
 	defer st.Close()
 
