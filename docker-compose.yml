@@ -77,10 +77,14 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-mikhmon-session-secret}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-super_secure_redis_pass_123}@redis-broker:6379
     depends_on:
-      - auth-node-service
-      - erp-node-service
-      - payment-service
-      - redis-broker
+      auth-node-service:
+        condition: service_started
+      erp-node-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      redis-broker:
+        condition: service_healthy
     ports:
       - "8080:8080"
     networks:
