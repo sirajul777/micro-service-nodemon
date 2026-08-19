@@ -13,6 +13,7 @@ import { VoucherTypeGrpcClient } from '../erp/voucher-type-grpc.client';
 import { BotGrpcClient } from '../bot/bot-grpc.client';
 import { PaymentGrpcClient } from '../payment/payment-grpc.client';
 import { handleBotGrpcRoute } from './bot.routes';
+import { normalizePppoeActiveList } from './pppoe.active-normalizer';
 
 type Target = 'auth' | 'erp' | 'payment' | 'bot';
 
@@ -150,7 +151,7 @@ export class ProxyController {
         }
         const response = await this.erpDashboardGrpc.listPppActive(routerSession);
         if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC PPPoE active failed' });
-        return res.status(200).json(response.connections || []);
+        return res.status(200).json(normalizePppoeActiveList(response.connections));
       } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
     }
 
@@ -242,12 +243,9 @@ export class ProxyController {
       } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
     }
 
-    if (!(target === 'erp' && req.method === 'GET' && /^\/report\/[^/]+\/live$/.test(canonical))) {
-      return res.status(404).json({ success: false, message: `Route ${req.method} ${canonical} belum dimigrasikan ke gRPC` });
-    }
-
-    const token = this.authService.getToken(session);
-    const resp = await this.fallback.forward(target, canonical, 'GET', token, undefined, query);
+    const token = isPublic ? null : this.authService.getToken(session);
+    const method = req.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    const resp = await this.fallback.forward(target, canonical, method, token, body, query);
     const { status, body: data } = this.fallback.respond(resp);
     return res.status(status).json(data);
   }
