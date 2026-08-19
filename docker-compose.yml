@@ -246,6 +246,7 @@ services:
 
 networks:
   net-mikrotik-cluster:
+    name: mikrotik-service-net
     driver: bridge
 
 volumes:
