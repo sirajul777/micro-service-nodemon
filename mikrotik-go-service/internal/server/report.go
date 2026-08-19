@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	scriptProplist = "=.proplist=.id,name"
+	scriptProplist    = "=.proplist=.id,name"
 	liveReportCacheTTL = 10 * time.Second
 )
 
@@ -31,6 +32,8 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 		resp.Error = "session id wajib diisi"
 		return resp, nil
 	}
+
+	requestStarted := time.Now()
 
 	c, err := s.dial(ctx, req.SessionId)
 	if err != nil {
@@ -56,7 +59,11 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 
 	cacheKey := reportCacheKey(req.SessionId, req.Idhr, req.Idbl, isROS7)
 	rows, ok := getLiveReportCache(cacheKey)
-	if !ok {
+	cacheState := "miss"
+	queryStarted := time.Now()
+	if ok {
+		cacheState = "hit"
+	} else {
 		rows, err = s.getSellingRows(c, isROS7, req.Idhr, req.Idbl)
 		if err != nil {
 			resp.Error = err.Error()
@@ -66,7 +73,9 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 			setLiveReportCache(cacheKey, rows)
 		}
 	}
+	queryDuration := time.Since(queryStarted)
 
+	parseStarted := time.Now()
 	for _, row := range rows {
 		select {
 		case <-ctx.Done():
@@ -76,10 +85,11 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 		}
 
 		parts := strings.Split(row["name"], "-|-")
-		price := 0.0
-		if len(parts) > 3 {
-			price, _ = strconv.ParseFloat(parts[3], 64)
+		if len(parts) < 4 {
+			continue
 		}
+		price := 0.0
+		price, _ = strconv.ParseFloat(parts[3], 64)
 		resp.Scripts = append(resp.Scripts, &pb.SellingScript{
 			Id:       row[".id"],
 			Date:     valueAt(parts, 0),
@@ -90,6 +100,19 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 			Comment:  valueAt(parts, 8),
 		})
 	}
+	parseDuration := time.Since(parseStarted)
+
+	log.Printf("[report] session=%s idbl=%s idhr=%s cache=%s rows=%d parsed=%d query_ms=%d parse_ms=%d total_ms=%d",
+		req.SessionId,
+		req.Idbl,
+		req.Idhr,
+		cacheState,
+		len(rows),
+		len(resp.Scripts),
+		queryDuration.Milliseconds(),
+		parseDuration.Milliseconds(),
+		time.Since(requestStarted).Milliseconds(),
+	)
 
 	resp.Success = true
 	return resp, nil
