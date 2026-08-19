@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	scriptProplist    = "=.proplist=.id,name"
+	scriptProplist     = "=.proplist=.id,name"
 	liveReportCacheTTL = 10 * time.Second
 )
 
@@ -88,8 +88,7 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 		if len(parts) < 4 {
 			continue
 		}
-		price := 0.0
-		price, _ = strconv.ParseFloat(parts[3], 64)
+		price, _ := strconv.ParseFloat(parts[3], 64)
 		resp.Scripts = append(resp.Scripts, &pb.SellingScript{
 			Id:       row[".id"],
 			Date:     valueAt(parts, 0),
