@@ -31,7 +31,21 @@ export class ReportRouterClient {
     );
   }
 
-  private call(method: string, request: Record<string, string>, timeoutMs = 10000): Promise<any> {
+  private timeoutMsFor(method: string): number {
+    const defaults: Record<string, number> = {
+      ListSellingScripts: 30000,
+      DeleteSellingScripts: 15000,
+    };
+    const fallback = defaults[method] || 10000;
+    const raw = process.env.MIKROTIK_GRPC_TIMEOUT_MS;
+    if (!raw) return fallback;
+
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.min(parsed, 120000);
+  }
+
+  private call(method: string, request: Record<string, string>, timeoutMs = this.timeoutMsFor(method)): Promise<any> {
     return new Promise((resolve, reject) => {
       const deadline = new Date(Date.now() + timeoutMs);
       const fn = this.client?.[method];
@@ -46,29 +60,15 @@ export class ReportRouterClient {
     });
   }
 
-  private timeoutMsFor(method: string): number {
-    const fallback = method === 'ListSellingScripts' ? 30000 : 10000;
-    const raw = process.env.MIKROTIK_GRPC_TIMEOUT_MS;
-    if (!raw) return fallback;
-
-    const parsed = Number.parseInt(raw, 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-    return Math.min(parsed, 120000);
-  }
-
   async listScripts(
     sessionId: string,
     filter: { idhr?: string; idbl?: string } = {},
   ): Promise<ReportScript[]> {
-    const response = await this.call(
-      'ListSellingScripts',
-      {
-        sessionId,
-        idhr: filter.idhr || '',
-        idbl: filter.idbl || '',
-      },
-      this.timeoutMsFor('ListSellingScripts'),
-    );
+    const response = await this.call('ListSellingScripts', {
+      sessionId,
+      idhr: filter.idhr || '',
+      idbl: filter.idbl || '',
+    });
 
     return (response.scripts || []).map((row: any) => {
       const date = row.date || '';
@@ -94,7 +94,7 @@ export class ReportRouterClient {
       sessionId,
       idhr: filter.idhr || '',
       idbl: filter.idbl || '',
-    }, 15000);
+    });
     return { deleted: Number(response.deleted || 0) };
   }
 }
