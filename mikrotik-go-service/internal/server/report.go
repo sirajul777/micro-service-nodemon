@@ -31,7 +31,7 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	// compatibility check.
 	isROS7 := true
 	if req.Idhr != "" {
-		versionRows, versionErr := c.Run("/system/resource/print")
+		versionRows, versionErr := c.Run("/system/resource/print", "=.proplist=version")
 		if versionErr != nil {
 			resp.Error = versionErr.Error()
 			return resp, nil
@@ -48,7 +48,6 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 
 	for _, row := range rows {
-		// Stop parsing promptly when the upstream deadline is reached.
 		select {
 		case <-ctx.Done():
 			resp.Error = ctx.Err().Error()
