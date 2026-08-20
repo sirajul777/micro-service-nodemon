@@ -24,6 +24,7 @@ import (
 
 const defaultGRPCPort = ":50051"
 const healthPort = "8081"
+const storeRetryInterval = 5 * time.Second
 
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -196,4 +197,6 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("[mikrotik-go-service] health server failed: %v", err)
 	}
+
+	_ = storeRetryInterval
 }
