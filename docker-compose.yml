@@ -20,6 +20,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
   postgres-db:
     image: postgres:15-alpine
@@ -41,6 +42,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   api-gateway:
     image: nginx:alpine
