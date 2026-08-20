@@ -21,13 +21,13 @@ import { VoucherTypeEntity } from './entities/voucher-type.entity';
     TypeOrmModule.forFeature([VoucherBatchEntity, ProfileMetaEntity, VoucherTypeEntity]),
   ],
   controllers: [
-    InternalGrpcController,
     VoucherBatchInternalController,
     VoucherGenerateInternalController,
     PaymentVoucherTypeInternalController,
     VoucherTypeInternalController,
   ],
   providers: [
+    InternalGrpcController,
     ErpSessionStore,
     MikrotikGrpcClient,
     VoucherBatchInternalStore,
@@ -36,6 +36,6 @@ import { VoucherTypeEntity } from './entities/voucher-type.entity';
     ProfileMetaService,
     VoucherTypeService,
   ],
-  exports: [ErpSessionStore, VoucherBatchInternalStore],
+  exports: [ErpSessionStore, VoucherBatchInternalStore, InternalGrpcController],
 })
 export class InternalGrpcModule {}
