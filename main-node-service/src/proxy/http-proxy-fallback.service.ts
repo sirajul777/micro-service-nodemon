@@ -1,106 +1,55 @@
 import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { firstValueFrom } from 'rxjs';
-import { ROUTER } from '../router.config';
+import { AxiosResponse } from 'axios';
+import { ErpGrpcClient } from '../erp/erp-grpc.client';
 
 /**
- * Transitional HTTP fallback. Only explicitly allow-listed legacy routes may use it.
- * All internal service-to-service routes that have a gRPC client must stay on gRPC.
+ * Temporary compatibility adapter for routes that have not yet been moved to
+ * explicit gRPC handlers in ProxyController. It MUST NOT perform internal HTTP.
+ * The final remaining compatibility route, ERP report/live, is translated to
+ * the ERP internal gRPC contract. Every other internal route is rejected.
  */
 @Injectable()
 export class HttpProxyFallbackService {
   private readonly logger = new Logger(HttpProxyFallbackService.name);
-  private readonly breaker: Record<string, { failures: number; openUntil: number }> = {};
-  private static readonly THRESHOLD = 5;
-  private static readonly COOLDOWN_MS = 15000;
-  private static readonly MAX_RETRIES = 1;
 
-  constructor(private readonly http: HttpService) {}
-
-  private isOpen(target: string): boolean {
-    const b = this.breaker[target];
-    if (!b) return false;
-    if (b.failures >= HttpProxyFallbackService.THRESHOLD) {
-      if (Date.now() < b.openUntil) return true;
-      b.failures = 0;
-      return false;
-    }
-    return false;
-  }
-
-  private recordFailure(target: string): void {
-    const b = (this.breaker[target] ||= { failures: 0, openUntil: 0 });
-    b.failures += 1;
-    if (b.failures >= HttpProxyFallbackService.THRESHOLD) {
-      b.openUntil = Date.now() + HttpProxyFallbackService.COOLDOWN_MS;
-      this.logger.warn(`[breaker] ${target} circuit OPEN for ${HttpProxyFallbackService.COOLDOWN_MS}ms`);
-    }
-  }
-
-  private recordSuccess(target: string): void {
-    const b = this.breaker[target];
-    if (b && b.failures > 0) {
-      b.failures = 0;
-      this.logger.log(`[breaker] ${target} circuit CLOSED`);
-    }
-  }
-
-  private isAllowedLegacyRoute(target: 'auth' | 'erp' | 'payment' | 'bot', path: string, method: string): boolean {
-    if (target !== 'erp' || method !== 'GET') return false;
-    return /^\/report\/[^/]+\/live$/.test(path);
-  }
+  constructor(private readonly erpGrpc: ErpGrpcClient) {}
 
   async forward(
     target: 'auth' | 'erp' | 'payment' | 'bot',
     path: string,
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-    token: string | null,
-    body?: any,
-    query?: any,
+    _token: string | null,
+    _body?: any,
+    _query?: any,
   ): Promise<AxiosResponse> {
-    if (!this.isAllowedLegacyRoute(target, path, method)) {
-      this.logger.error(`Blocked legacy HTTP fallback for ${method} ${target}${path}`);
-      throw new BadGatewayException(`Internal route ${method} ${target}${path} wajib menggunakan gRPC`);
-    }
-
-    if (this.isOpen(target)) {
-      throw new ServiceUnavailableException(`Layanan ${target} sedang dalam masa pemulihan, coba lagi beberapa saat lagi`);
-    }
-
-    const base = ROUTER[target];
-    const url = `${base.replace(/\/+$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
-    const configuredLiveTimeout = Number.parseInt(process.env.ERP_LIVE_REPORT_PROXY_TIMEOUT_MS || '120000', 10);
-    const liveTimeout = Number.isFinite(configuredLiveTimeout) && configuredLiveTimeout > 0 ? Math.min(configuredLiveTimeout, 180000) : 120000;
-    const config: AxiosRequestConfig = {
-      method,
-      url,
-      timeout: liveTimeout,
-      params: query,
-      validateStatus: () => true,
-    };
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
-    if (token) headers.authorization = `Bearer ${token}`;
-    config.headers = headers;
-
-    const idempotent = method === 'GET';
-    const attempts = idempotent ? HttpProxyFallbackService.MAX_RETRIES + 1 : 1;
-    for (let attempt = 1; attempt <= attempts; attempt++) {
+    const match = path.match(/^\/report\/([^/]+)\/live$/);
+    if (target === 'erp' && method === 'GET' && match) {
       try {
-        const resp = await firstValueFrom(this.http.request(config));
-        if (resp.status >= 500) this.recordFailure(target); else this.recordSuccess(target);
-        return resp;
-      } catch (e: any) {
-        const ax = e as AxiosError;
-        if (attempt === attempts) {
-          this.recordFailure(target);
-          this.logger.error(`proxy ${target} ${path} failed: ${ax?.message}`, ax?.stack);
-          throw new BadGatewayException(`Downstream ${target} tidak dapat dijangkau`);
+        const response = await this.erpGrpc.getLiveReport(decodeURIComponent(match[1]));
+        if (!response?.success) {
+          throw new BadGatewayException(response?.error || 'ERP gRPC live report failed');
         }
-        this.logger.warn(`proxy ${target} ${path} attempt ${attempt} failed (${ax?.message}); retrying`);
+        this.logger.debug(`Translated legacy report/live route to ERP gRPC for session ${match[1]}`);
+        return {
+          status: 200,
+          statusText: 'OK',
+          data: {
+            today: { vouchers: Number(response.todayVouchers || 0), income: Number(response.todayIncome || 0) },
+            month: { vouchers: Number(response.monthVouchers || 0), income: Number(response.monthIncome || 0) },
+            currency: String(response.currency || 'Rp'),
+            isIndo: Boolean(response.isIndo),
+          },
+          headers: {},
+          config: {} as any,
+        } as AxiosResponse;
+      } catch (err: any) {
+        this.logger.error(`ERP gRPC report/live failed: ${err?.message || err}`, err?.stack);
+        if (err instanceof BadGatewayException) throw err;
+        throw new ServiceUnavailableException('ERP gRPC live report tidak tersedia');
       }
     }
-    throw new BadGatewayException(`Downstream ${target} tidak dapat dijangkau`);
+
+    throw new BadGatewayException(`Internal route ${method} ${target}${path} wajib menggunakan gRPC`);
   }
 
   respond(resp: AxiosResponse): { status: number; body: any } {
