@@ -4,8 +4,8 @@
   "description": "MikHMon ERP, Voucher & Report service",
   "scripts": {
     "start:dev": "nest start --watch",
-    "build": "nest build && npm run copy:proto",
-    "copy:proto": "mkdir -p dist/proto && cp proto/router.proto dist/proto/router.proto",
+    "build": "rm -rf dist && nest build && test -f dist/main.js && test -f dist/app.module.js && npm run copy:proto",
+    "copy:proto": "mkdir -p dist/proto && cp proto/router.proto dist/proto/router.proto && cp proto/report_router.proto dist/proto/report_router.proto",
     "start": "node dist/main"
   },
   "dependencies": {
