@@ -1,72 +1,44 @@
-import { All, Body, Controller, Param, Query, Req, Res } from '@nestjs/common';
-import { Request, Response } from 'express';
-import { ProxyService } from './proxy.service';
+import { All, Body, Controller, Param, Res } from '@nestjs/common';
+import { Response } from 'express';
+import { PaymentGrpcClient } from '../payment/payment-grpc.client';
 
 /**
- * Public payment/QRIS routes that must NOT require auth. These are normally
- * reached via nginx, which forwards `/payments/*` and `/qris/*` straight to
- * payment-service. When the BFF is exposed directly (e.g. GATEWAY_PORT=8080),
- * the BFF must route these public paths itself so the same endpoints keep
- * working without going through nginx.
- *
- * Handles (bare paths that the /api/:target ProxyController does NOT match):
- *   POST /payments/payhook/app-webhook   (PayHook Android app webhook)
- *   GET  /qris/status/:orderId          (checkout polling)
- *
- * NOTE: `/api/qris/*` admin + `/api/qris/orders` public routes are already
- * handled by ProxyController (target=qris → payment-service), so they are not
- * duplicated here (which would cause a NestJS route conflict).
+ * Public payment/QRIS routes. The client-facing HTTP boundary remains here,
+ * but every hop from the BFF to payment-service is now gRPC.
  */
 @Controller()
 export class PaymentWebhookController {
-  private readonly PAYMENT = 'payment';
-
-  constructor(private readonly proxyService: ProxyService) {}
+  constructor(private readonly paymentGrpc: PaymentGrpcClient) {}
 
   @All('payments/payhook/app-webhook')
-  async payhookWebhook(
-    @Req() req: Request,
-    @Res() res: Response,
-    @Body() body: any,
-    @Query() query: any,
-  ) {
-    return this.forwardPublic(
-      req,
-      res,
-      '/payments/payhook/app-webhook',
-      body,
-      query,
-    );
+  async payhookWebhook(@Res() res: Response, @Body() body: any) {
+    try {
+      const response = await this.paymentGrpc.processPayhookWebhook(body);
+      if (!response?.success) {
+        return res.status(502).json({ success: false, matched: false, error: response?.error || 'Payment gRPC webhook failed' });
+      }
+      return res.status(200).json({
+        success: true,
+        matched: Boolean(response.matched),
+        orderId: response.orderId || undefined,
+        status: response.status || undefined,
+        note: response.note || '',
+      });
+    } catch (error: any) {
+      return res.status(502).json({ success: false, matched: false, error: String(error?.message || error) });
+    }
   }
 
   @All('qris/status/:orderId')
-  async qrisStatus(
-    @Param('orderId') orderId: string,
-    @Req() req: Request,
-    @Res() res: Response,
-    @Body() body: any,
-    @Query() query: any,
-  ) {
-    return this.forwardPublic(req, res, `/qris/status/${orderId}`, body, query);
-  }
-
-  private async forwardPublic(
-    req: Request,
-    res: Response,
-    path: string,
-    body: any,
-    query: any,
-  ) {
-    const method = req.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    const resp = await this.proxyService.forward(
-      this.PAYMENT,
-      path,
-      method,
-      null, // public — no token
-      body,
-      query,
-    );
-    const { status, body: data } = this.proxyService.respond(resp);
-    return res.status(status).json(data);
+  async qrisStatus(@Param('orderId') orderId: string, @Res() res: Response) {
+    try {
+      const response = await this.paymentGrpc.check(decodeURIComponent(orderId));
+      if (!response?.success) {
+        return res.status(404).json({ success: false, error: response?.error || 'Transaction not found' });
+      }
+      return res.status(200).json({ success: true, orderId: response.orderId || orderId, status: response.status || '' });
+    } catch (error: any) {
+      return res.status(502).json({ success: false, error: String(error?.message || error) });
+    }
   }
 }
