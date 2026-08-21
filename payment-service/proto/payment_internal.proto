@@ -10,6 +10,7 @@ service PaymentInternalService {
   rpc CreatePaymentTest(CreatePaymentTestRequest) returns (CreatePaymentTestResponse);
   rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
   rpc CheckPayment(CheckPaymentRequest) returns (CheckPaymentResponse);
+  rpc ProcessPayhookWebhook(ProcessPayhookWebhookRequest) returns (ProcessPayhookWebhookResponse);
 }
 
 message Empty {}
@@ -52,3 +53,6 @@ message GetPaymentResponse { bool success = 1; string error = 2; PaymentItem tra
 
 message CheckPaymentRequest { string order_id = 1; }
 message CheckPaymentResponse { bool success = 1; string error = 2; string order_id = 3; string status = 4; }
+
+message ProcessPayhookWebhookRequest { string payload_json = 1; }
+message ProcessPayhookWebhookResponse { bool success = 1; bool matched = 2; string order_id = 3; string status = 4; string note = 5; string error = 6; }
