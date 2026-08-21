@@ -70,11 +70,12 @@ services:
       - PORT=8080
       - AUTH_GRPC_ADDR=auth-node-service:50052
       - AUTH_GRPC_PROTO_PATH=/app/auth-proto/auth.proto
-      - ERP_SERVICE_URL=http://erp-node-service:3003
-      - PAYMENT_SERVICE_URL=http://payment-service:3002
-      - BOT_SERVICE_URL=http://bot-py-service:8082
+      - ERP_GRPC_ADDR=erp-node-service:50053
+      - ERP_GRPC_PROTO_PATH=/app/erp-proto/erp_internal.proto
       - PAYMENT_GRPC_ADDR=payment-service:50054
       - PAYMENT_GRPC_PROTO_PATH=/app/payment-proto/payment_internal.proto
+      - BOT_GRPC_ADDR=bot-py-service:50055
+      - BOT_GRPC_PROTO_PATH=/app/bot-proto/bot_internal.proto
       - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
       - SESSION_SECRET=${SESSION_SECRET:-mikhmon-session-secret}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-super_secure_redis_pass_123}@redis-broker:6379
@@ -84,6 +85,8 @@ services:
       erp-node-service:
         condition: service_started
       payment-service:
+        condition: service_started
+      bot-py-service:
         condition: service_started
       redis-broker:
         condition: service_healthy
@@ -127,6 +130,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3003
+      - ERP_GRPC_PORT=50053
       - AUTH_GRPC_ADDR=auth-node-service:50052
       - AUTH_GRPC_PROTO_PATH=/app/proto/auth.proto
       - DB_HOST=postgres-db
@@ -138,6 +142,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
       - MIKROTIK_GRPC_ADDR=mikrotik-go-service:50051
+      - ROUTER_PROTO_PATH=/app/proto/router.proto
       - USE_REDIS_STREAMS=true
     depends_on:
       auth-node-service:
@@ -146,8 +151,12 @@ services:
         condition: service_healthy
       redis-broker:
         condition: service_healthy
+      mikrotik-go-service:
+        condition: service_started
     ports:
       - "3003:3003"
+    expose:
+      - "50053"
     networks:
       - net-mikrotik-cluster
     restart: on-failure
