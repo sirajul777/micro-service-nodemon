@@ -2,9 +2,39 @@ package server
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	pb "github.com/mikhmon/mikrotik-go-service/proto"
 )
+
+var hotspotProfilesCache sync.Map
+const hotspotProfilesCacheTTL = 30 * time.Second
+
+type hotspotProfilesCacheEntry struct {
+	profiles  []*pb.HotspotProfile
+	expiresAt time.Time
+}
+
+func getHotspotProfilesCache(key string) ([]*pb.HotspotProfile, bool) {
+	value, ok := hotspotProfilesCache.Load(key)
+	if !ok {
+		return nil, false
+	}
+	entry, ok := value.(hotspotProfilesCacheEntry)
+	if !ok || time.Now().After(entry.expiresAt) {
+		hotspotProfilesCache.Delete(key)
+		return nil, false
+	}
+	return entry.profiles, true
+}
+
+func setHotspotProfilesCache(key string, profiles []*pb.HotspotProfile) {
+	hotspotProfilesCache.Store(key, hotspotProfilesCacheEntry{
+		profiles:  profiles,
+		expiresAt: time.Now().Add(hotspotProfilesCacheTTL),
+	})
+}
 
 func (s *RouterServiceServer) ListHotspotUsers(ctx context.Context, req *pb.ListHotspotUsersRequest) (*pb.ListHotspotUsersResponse, error) {
 	resp := &pb.ListHotspotUsersResponse{}
@@ -39,6 +69,13 @@ func (s *RouterServiceServer) ListHotspotUsers(ctx context.Context, req *pb.List
 
 func (s *RouterServiceServer) ListHotspotProfiles(ctx context.Context, req *pb.ListProfilesRequest) (*pb.ListProfilesResponse, error) {
 	resp := &pb.ListProfilesResponse{}
+	cacheKey := req.SessionId
+	if profiles, ok := getHotspotProfilesCache(cacheKey); ok {
+		resp.Profiles = profiles
+		resp.Success = true
+		return resp, nil
+	}
+
 	c, err := s.dial(ctx, req.SessionId)
 	if err != nil {
 		resp.Error = err.Error()
@@ -46,21 +83,22 @@ func (s *RouterServiceServer) ListHotspotProfiles(ctx context.Context, req *pb.L
 	}
 	defer c.Close()
 
-	// Restrict the RouterOS response to fields consumed by the ERP/BFF.
-	// This avoids transferring unrelated profile attributes over the API.
 	rows, err := c.RunContext(ctx, "/ip/hotspot/user/profile/print",
 		"=.proplist=.id,name,on-login,session-timeout,idle-timeout,rate-limit,shared-users,address-pool")
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, nil
 	}
+	profiles := make([]*pb.HotspotProfile, 0, len(rows))
 	for _, r := range rows {
-		resp.Profiles = append(resp.Profiles, &pb.HotspotProfile{
+		profiles = append(profiles, &pb.HotspotProfile{
 			Id: r[".id"], Name: r["name"], OnLogin: r["on-login"], SessionTimeout: r["session-timeout"],
 			IdleTimeout: r["idle-timeout"], RateLimit: r["rate-limit"], SharedUsers: r["shared-users"],
 			AddressPool: r["address-pool"],
 		})
 	}
+	setHotspotProfilesCache(cacheKey, profiles)
+	resp.Profiles = profiles
 	resp.Success = true
 	return resp, nil
 }
