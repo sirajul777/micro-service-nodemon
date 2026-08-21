@@ -48,15 +48,27 @@ source_has_column() {
   sqlite3 "$DB" "SELECT 1 FROM pragma_table_info('$table') WHERE name='$col' LIMIT 1;" | grep -q '^1$'
 }
 
-validate_columns() {
+filter_existing_columns() {
   local table="$1" colspec="$2" col
+  local -a kept=()
+  local -a cols=()
   IFS=',' read -ra cols <<< "$colspec"
+
   for col in "${cols[@]}"; do
-    if ! source_has_column "$table" "$col"; then
-      echo "ERROR: source table '$table' is missing column '$col' required by migration remap" >&2
-      exit 1
+    if source_has_column "$table" "$col"; then
+      kept+=("$col")
+    else
+      echo "  ℹ skip missing source column '$table.$col' (target will use its PostgreSQL default/null)" >&2
     fi
   done
+
+  if [ "${#kept[@]}" -eq 0 ]; then
+    echo "ERROR: no migratable columns remain for source table '$table'" >&2
+    exit 1
+  fi
+
+  local IFS=,
+  printf '%s' "${kept[*]}"
 }
 
 emit() {
@@ -73,12 +85,15 @@ emit() {
   local remap=""
   if remap=$(remap_for "$table" 2>/dev/null); then
     IFS='|' read -r _source target cols <<< "$remap"
-    validate_columns "$table" "$cols"
+    cols=$(filter_existing_columns "$table" "$cols")
     select_expr=$(select_cols "$cols")
   else
     target="$table"
     cols=$(sqlite3 "$DB" "SELECT group_concat(name, ',') FROM pragma_table_info('$table') ORDER BY cid;")
-    validate_columns "$table" "$cols"
+    if [ -z "$cols" ]; then
+      echo "ERROR: source table '$table' has no columns" >&2
+      exit 1
+    fi
     select_expr=$(select_cols "$cols")
   fi
 
@@ -135,4 +150,5 @@ for f in "$OUT"/db_*.sql; do
 done
 
 echo "✔ Column-order validation passed for every remapped source table."
+echo "  Missing source columns were omitted; target PostgreSQL defaults/nullability will apply."
 echo "  Load only after the target services have created their PostgreSQL schema."
