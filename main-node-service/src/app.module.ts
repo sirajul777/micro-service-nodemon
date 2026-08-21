@@ -9,6 +9,7 @@ import { SessionController } from './session/session.controller';
 import { HealthController } from './health/health.controller';
 import { HotspotGrpcController } from './erp/hotspot-grpc.controller';
 import { PppoeGrpcController } from './erp/pppoe-grpc.controller';
+import { PppoeWriteController } from './erp/pppoe-write.controller';
 import { VoucherBatchGrpcController } from './erp/voucher-batch-grpc.controller';
 import { AuthService } from './auth/auth.service';
 import { AuthGrpcClient } from './auth/auth-grpc.client';
@@ -36,6 +37,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     QrisGrpcController,
     HotspotGrpcController,
     PppoeGrpcController,
+    PppoeWriteController,
     VoucherBatchGrpcController,
     PaymentWebhookController,
     ProxyController,
