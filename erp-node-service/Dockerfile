@@ -14,5 +14,9 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/proto ./proto
+RUN test -f /app/proto/erp_internal.proto
+RUN test -f /app/proto/report_internal.proto
 EXPOSE 3003
+EXPOSE 50053
+EXPOSE 50056
 CMD ["node", "dist/main.js"]
