@@ -16,6 +16,7 @@ import { VoucherGenerateGrpcClient } from './erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from './erp/voucher-type-grpc.client';
 import { BotGrpcClient } from './bot/bot-grpc.client';
 import { PaymentGrpcClient } from './payment/payment-grpc.client';
+import { ProxyService } from './proxy/proxy.service';
 import { HttpProxyFallbackService } from './proxy/http-proxy-fallback.service';
 import { ViewService } from './view/view.service';
 import { SecurityMiddleware } from './security/security.middleware';
@@ -41,6 +42,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     VoucherTypeGrpcClient,
     BotGrpcClient,
     PaymentGrpcClient,
+    ProxyService,
     HttpProxyFallbackService,
     ViewService,
   ],
