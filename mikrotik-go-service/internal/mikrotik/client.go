@@ -8,6 +8,7 @@ package mikrotik
 
 import (
 	"bufio"
+	"context"
 	"crypto/md5"
 	"encoding/binary"
 	"errors"
@@ -50,15 +51,21 @@ func WithTimeout(d time.Duration) Option {
 	return func(o *options) { o.timeout = d }
 }
 
-// Dial connects and authenticates to a RouterOS router.
+// Dial connects and authenticates to a RouterOS router using a background context.
 func Dial(host, user, password string, opts ...Option) (*Client, error) {
+	return DialContext(context.Background(), host, user, password, opts...)
+}
+
+// DialContext connects and authenticates to a RouterOS router while honoring ctx.
+func DialContext(ctx context.Context, host, user, password string, opts ...Option) (*Client, error) {
 	o := &options{port: 8728, timeout: 15 * time.Second}
 	for _, fn := range opts {
 		fn(o)
 	}
 
 	addr := net.JoinHostPort(host, strconv.Itoa(o.port))
-	conn, err := net.DialTimeout("tcp", addr, o.timeout)
+	dialer := net.Dialer{Timeout: o.timeout}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("dial %s: %w", addr, err)
 	}
@@ -68,11 +75,47 @@ func Dial(host, user, password string, opts ...Option) (*Client, error) {
 		r:    bufio.NewReader(conn),
 		w:    bufio.NewWriter(conn),
 	}
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
 	if err := c.login(host, user, password); err != nil {
 		conn.Close()
 		return nil, err
 	}
 	return c, nil
+}
+
+// RunContext executes a RouterOS command while honoring ctx cancellation/deadlines.
+func (c *Client) RunContext(ctx context.Context, cmd string, words ...string) ([]Sentence, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := c.conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
+	}
+	defer func() {
+		// Remove the temporary deadline so callers using the same connection for
+		// subsequent non-contextual operations retain the client's normal behavior.
+		_ = c.conn.SetDeadline(time.Time{})
+	}()
+
+	if err := c.runSentence(cmd, words...); err != nil {
+		return nil, err
+	}
+	return c.readReplies("!done")
+}
+
+// Run executes a RouterOS command with optional query/set words and returns
+// all reply sentences. Words may be formatted as "?key=value" (query) or
+// "=key=value" (set attribute).
+func (c *Client) Run(cmd string, words ...string) ([]Sentence, error) {
+	return c.RunContext(context.Background(), cmd, words...)
 }
 
 // login performs RouterOS authentication. It first tries the modern
@@ -293,16 +336,6 @@ func (c *Client) readLen() (int, error) {
 		}
 		return int(binary.BigEndian.Uint32(buf[:])), nil
 	}
-}
-
-// Run executes a RouterOS command with optional query/set words and returns
-// all reply sentences. Words may be formatted as "?key=value" (query) or
-// "=key=value" (set attribute).
-func (c *Client) Run(cmd string, words ...string) ([]Sentence, error) {
-	if err := c.runSentence(cmd, words...); err != nil {
-		return nil, err
-	}
-	return c.readReplies("!done")
 }
 
 // Close gracefully terminates the connection.
