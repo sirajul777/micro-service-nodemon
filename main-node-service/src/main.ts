@@ -3,14 +3,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { resolve } from 'path';
 import * as express from 'express';
 import { Eta } from 'eta';
+import { RedisStore } from 'connect-redis';
 import * as Redis from 'redis';
 import { AppModule } from './app.module';
 
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
-// connect-redis 6 exports a factory that receives the express-session module.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const RedisStoreFactory = require('connect-redis');
 
 const PORT = Number(process.env.PORT || 8080);
 
@@ -28,12 +26,13 @@ function buildSessionStore() {
     client.on('error', (e: any) =>
       console.error('[session-redis] error:', e?.message),
     );
-    if (typeof client.connect === 'function') client.connect().catch((e: any) =>
-      console.error('[session-redis] connect error:', e?.message),
-    );
+    if (typeof client.connect === 'function') {
+      client.connect().catch((e: any) =>
+        console.error('[session-redis] connect error:', e?.message),
+      );
+    }
 
-    const RedisStoreCtor = RedisStoreFactory(session);
-    return new RedisStoreCtor({ client, prefix: 'mikhmon:ses:' });
+    return new RedisStore({ client, prefix: 'mikhmon:ses:' });
   }
   console.warn('[session] REDIS_URL not set — using in-memory MemoryStore (single-instance only)');
   return undefined; // express-session falls back to MemoryStore
