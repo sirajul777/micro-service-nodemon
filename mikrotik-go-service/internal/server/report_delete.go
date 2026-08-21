@@ -16,7 +16,7 @@ func (s *RouterServiceServer) DeleteSellingScripts(ctx context.Context, req *pb.
 	}
 	defer c.Close()
 
-	versionRows, err := c.Run("/system/resource/print")
+	versionRows, err := c.RunContext(ctx, "/system/resource/print")
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, nil
@@ -26,15 +26,19 @@ func (s *RouterServiceServer) DeleteSellingScripts(ctx context.Context, req *pb.
 		ros7 = false
 	}
 
-	rows, err := s.getSellingRows(c, ros7, req.Idhr, req.Idbl)
+	rows, err := s.getSellingRows(ctx, c, ros7, req.Idhr, req.Idbl)
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, nil
 	}
 
 	for _, row := range rows {
+		if err := ctx.Err(); err != nil {
+			resp.Error = err.Error()
+			return resp, nil
+		}
 		if id := row[".id"]; id != "" {
-			if _, err := c.Run("/system/script/remove", "=.id="+id); err != nil {
+			if _, err := c.RunContext(ctx, "/system/script/remove", "=.id="+id); err != nil {
 				resp.Error = err.Error()
 				return resp, nil
 			}
