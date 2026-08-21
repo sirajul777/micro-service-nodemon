@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AuthController } from './auth/auth.controller';
 import { ProxyController } from './proxy/proxy.controller';
 import { PaymentWebhookController } from './proxy/payment-webhook.controller';
+import { QrisGrpcController } from './payment/qris-grpc.controller';
 import { SessionController } from './session/session.controller';
 import { HealthController } from './health/health.controller';
 import { AuthService } from './auth/auth.service';
@@ -29,6 +30,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     SessionController,
     ProxyController,
     PaymentWebhookController,
+    QrisGrpcController,
     HealthController,
   ],
   providers: [
