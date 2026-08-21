@@ -1,3 +1,4 @@
+import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { VoucherBatchService, VoucherBatch } from '../voucher-batch/voucher-batch.service';
 
@@ -31,6 +32,7 @@ function randomCode(len: number, format: 'upper+digit' | 'digit' | 'upper'): str
   return s;
 }
 
+@Controller()
 export class VoucherGenerateInternalController {
   constructor(private readonly batchService: VoucherBatchService) {}
 
