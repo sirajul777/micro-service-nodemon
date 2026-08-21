@@ -6,6 +6,7 @@ import { AppModule } from './app.module';
 
 const PORT = Number(process.env.PORT || 3003);
 const GRPC_PORT = Number(process.env.ERP_GRPC_PORT || 50053);
+const REPORT_GRPC_PORT = Number(process.env.REPORT_GRPC_PORT || 50056);
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,9 +23,19 @@ async function bootstrap() {
     },
   });
 
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package: 'report.internal',
+      protoPath: join(__dirname, '..', 'proto', 'report_internal.proto'),
+      url: `0.0.0.0:${REPORT_GRPC_PORT}`,
+    },
+  });
+
   await app.startAllMicroservices();
   await app.listen(PORT);
   console.log(`[erp-node-service] running on http://localhost:${PORT}`);
   console.log(`[erp-node-service] internal gRPC on 0.0.0.0:${GRPC_PORT}`);
+  console.log(`[erp-node-service] report gRPC on 0.0.0.0:${REPORT_GRPC_PORT}`);
 }
 bootstrap();
