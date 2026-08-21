@@ -52,6 +52,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
+      - mikhmon-web
       - main-node-service
       - auth-node-service
       - erp-node-service
@@ -59,6 +60,19 @@ services:
     networks:
       - net-mikrotik-cluster
     restart: always
+
+  mikhmon-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ms_mikhmon_web
+    depends_on:
+      - main-node-service
+    expose:
+      - "80"
+    networks:
+      - net-mikrotik-cluster
+    restart: on-failure
 
   main-node-service:
     build:
