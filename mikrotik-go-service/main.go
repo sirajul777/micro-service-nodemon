@@ -1,6 +1,7 @@
 // MikHMon — MikroTik Control Service (Phase 2)
 //
-// gRPC server exposing RouterService RPCs and consuming voucher batch events.
+// gRPC server exposing RouterService and the dedicated report RouterService,
+// plus consuming voucher batch events.
 package main
 
 import (
@@ -19,6 +20,7 @@ import (
 	"github.com/mikhmon/mikrotik-go-service/internal/redis"
 	"github.com/mikhmon/mikrotik-go-service/internal/server"
 	"github.com/mikhmon/mikrotik-go-service/internal/store"
+	reportpb "github.com/mikhmon/mikrotik-go-service/proto/reportproto"
 	pb "github.com/mikhmon/mikrotik-go-service/proto"
 )
 
@@ -144,6 +146,7 @@ func main() {
 	defer st.Close()
 
 	routerServer := server.NewRouterServiceServer(st)
+	reportServer := server.NewReportRouterService(routerServer)
 
 	redisHost := envOr("REDIS_HOST", "localhost")
 	redisPass := envOr("REDIS_PASSWORD", "")
@@ -172,6 +175,7 @@ func main() {
 	serviceToken := os.Getenv("GRPC_SERVICE_TOKEN")
 	gs := grpc.NewServer(grpc.UnaryInterceptor(server.ServiceAuthInterceptor(serviceToken)))
 	pb.RegisterRouterServiceServer(gs, routerServer)
+	reportpb.RegisterReportRouterServiceServer(gs, reportServer)
 
 	log.Printf("[mikrotik-go-service] gRPC listener ready on %s (service auth: %t)", grpcAddr, serviceToken != "")
 	go func() {
