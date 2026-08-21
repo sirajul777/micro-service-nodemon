@@ -17,22 +17,11 @@ export class HotspotGrpcClient implements OnModuleDestroy {
     ].filter(Boolean) as string[];
     const protoPath = candidates.find((path) => existsSync(path));
     if (!protoPath) throw new Error(`Router gRPC proto not found; checked: ${candidates.join(', ')}`);
-
-    const packageDef = loadSync(protoPath, {
-      keepCase: false,
-      longs: String,
-      enums: String,
-      defaults: true,
-      oneofs: true,
-    });
+    const packageDef = loadSync(protoPath, { keepCase: false, longs: String, enums: String, defaults: true, oneofs: true });
     const pkg = loadPackageDefinition(packageDef) as any;
     const Service = pkg.router?.RouterService;
     if (!Service) throw new Error('RouterService gRPC definition not found');
-
-    this.client = new Service(
-      process.env.MIKROTIK_GRPC_SERVER || process.env.MIKROTIK_GRPC_ADDR || 'mikrotik-go-service:50051',
-      credentials.createInsecure(),
-    );
+    this.client = new Service(process.env.MIKROTIK_GRPC_SERVER || process.env.MIKROTIK_GRPC_ADDR || 'mikrotik-go-service:50051', credentials.createInsecure());
   }
 
   private call(method: string, request: Record<string, any>, timeoutMs = 15000): Promise<any> {
@@ -46,6 +35,11 @@ export class HotspotGrpcClient implements OnModuleDestroy {
       });
     });
   }
+
+  listActiveUsers(sessionId: string, server = '') { return this.call('ListActiveHotspotUsers', { sessionId, server }, 30000); }
+  listUsers(params: { sessionId: string; profile?: string; comment?: string }) { return this.call('ListHotspotUsers', { sessionId: params.sessionId, profile: params.profile || '', comment: params.comment || '' }, 30000); }
+  listProfiles(sessionId: string) { return this.call('ListHotspotProfiles', { sessionId }, 15000); }
+  getProfile(sessionId: string, name: string) { return this.call('GetHotspotProfile', { sessionId, name }, 15000); }
 
   addUser(params: Record<string, any>) { return this.call('AddHotspotUser', params); }
   removeUser(sessionId: string, name: string) { return this.call('RemoveHotspotUser', { sessionId, name }); }
