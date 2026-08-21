@@ -22,7 +22,7 @@ func NewRouterServiceServer(st *store.Store) *RouterServiceServer {
 	return &RouterServiceServer{store: st}
 }
 
-// dial opens a RouterOS client for the given session id.
+// dial opens a RouterOS client for the given session id and honors the gRPC context.
 func (s *RouterServiceServer) dial(ctx context.Context, sessionID string) (*mikrotik.Client, error) {
 	rs, err := s.store.Get(ctx, sessionID)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s *RouterServiceServer) dial(ctx context.Context, sessionID string) (*mikr
 	if port == 0 {
 		port = 8728
 	}
-	return mikrotik.Dial(rs.IP, rs.User, rs.Password, mikrotik.WithPort(port))
+	return mikrotik.DialContext(ctx, rs.IP, rs.User, rs.Password, mikrotik.WithPort(port))
 }
 
 func (s *RouterServiceServer) SetupExpiryScheduler(ctx context.Context, req *pb.SetupExpirySchedulerRequest) (*pb.SetupExpirySchedulerResponse, error) {
@@ -43,20 +43,20 @@ func (s *RouterServiceServer) SetupExpiryScheduler(ctx context.Context, req *pb.
 
 	const schedulerName = "mikhmon-cleanup-expired"
 	script := cleanupScriptROS7
-	if replies, e := c.Run("/system/resource/print"); e == nil && len(replies) > 0 && strings.HasPrefix(replies[0]["version"], "6") {
+	if replies, e := c.RunContext(ctx, "/system/resource/print"); e == nil && len(replies) > 0 && strings.HasPrefix(replies[0]["version"], "6") {
 		script = cleanupScriptROS6
 	}
 
-	existing, err := c.Run("/system/scheduler/print", "?name="+schedulerName)
+	existing, err := c.RunContext(ctx, "/system/scheduler/print", "?name="+schedulerName)
 	if err != nil { resp.Error = err.Error(); return resp, nil }
 	if len(existing) > 0 {
 		id := existing[0][".id"]
 		if id == "" { resp.Error = "scheduler cleanup tidak memiliki id"; return resp, nil }
-		if _, err := c.Run("/system/scheduler/set", "=.id="+id, "=interval=2h", "=start-time=00:00:00", "=on-event="+script, "=comment=mikhmon-auto-cleanup", "=disabled=no"); err != nil {
+		if _, err := c.RunContext(ctx, "/system/scheduler/set", "=.id="+id, "=interval=2h", "=start-time=00:00:00", "=on-event="+script, "=comment=mikhmon-auto-cleanup", "=disabled=no"); err != nil {
 			resp.Error = err.Error(); return resp, nil
 		}
 	} else {
-		if _, err := c.Run("/system/scheduler/add", "=name="+schedulerName, "=interval=2h", "=start-time=00:00:00", "=on-event="+script, "=comment=mikhmon-auto-cleanup", "=disabled=no"); err != nil {
+		if _, err := c.RunContext(ctx, "/system/scheduler/add", "=name="+schedulerName, "=interval=2h", "=start-time=00:00:00", "=on-event="+script, "=comment=mikhmon-auto-cleanup", "=disabled=no"); err != nil {
 			resp.Error = err.Error(); return resp, nil
 		}
 	}
