@@ -45,7 +45,17 @@ export const router = {
 
 export const voucher = {
   batches: (session?: string) => api(session ? `/api/batches/${sessionPath(session)}` : '/api/batches'),
+  createBatch: (session: string, batch: Record<string, unknown>) => api(`/api/batches/${sessionPath(session)}`, json(batch)),
+  deleteBatch: (session: string, id: string, deleteMikrotik = false) => api(`/api/batches/${sessionPath(session)}/${encodeURIComponent(id)}?deleteMikrotik=${deleteMikrotik}`, { method: 'DELETE' }),
+  markUsed: (session: string, id: string, username: string, usedBy = '') => api(`/api/batches/${sessionPath(session)}/${encodeURIComponent(id)}/mark-used`, json({ username, usedBy })),
+  syncUsed: (session: string) => api(`/api/batches/${sessionPath(session)}/sync-used`, json({})),
+  autoSyncUsed: (session: string) => api(`/api/batches/${sessionPath(session)}/auto-sync-used`, json({})),
   voucherTypes: () => api('/api/voucher-types'),
+  getVoucherType: (id: string) => api(`/api/voucher-types/${encodeURIComponent(id)}`),
+  createVoucherType: (body: Record<string, unknown>) => api('/api/voucher-types', json(body)),
+  updateVoucherType: (id: string, body: Record<string, unknown>) => api(`/api/voucher-types/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteVoucherType: (id: string) => api(`/api/voucher-types/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  toggleVoucherType: (id: string) => api(`/api/voucher-types/${encodeURIComponent(id)}/toggle`),
 };
 
 export const qris = {
