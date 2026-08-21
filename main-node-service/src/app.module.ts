@@ -8,12 +8,14 @@ import { QrisGrpcController } from './payment/qris-grpc.controller';
 import { SessionController } from './session/session.controller';
 import { HealthController } from './health/health.controller';
 import { HotspotGrpcController } from './erp/hotspot-grpc.controller';
+import { PppoeGrpcController } from './erp/pppoe-grpc.controller';
 import { VoucherBatchGrpcController } from './erp/voucher-batch-grpc.controller';
 import { AuthService } from './auth/auth.service';
 import { AuthGrpcClient } from './auth/auth-grpc.client';
 import { ErpGrpcClient } from './erp/erp-grpc.client';
 import { ErpDashboardGrpcClient } from './erp/erp-dashboard-grpc.client';
 import { HotspotGrpcClient } from './erp/hotspot-grpc.client';
+import { PppoeGrpcClient } from './erp/pppoe-grpc.client';
 import { VoucherBatchGrpcClient } from './erp/voucher-batch-grpc.client';
 import { VoucherGenerateGrpcClient } from './erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from './erp/voucher-type-grpc.client';
@@ -33,6 +35,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     SessionController,
     QrisGrpcController,
     HotspotGrpcController,
+    PppoeGrpcController,
     VoucherBatchGrpcController,
     PaymentWebhookController,
     ProxyController,
@@ -44,6 +47,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     ErpGrpcClient,
     ErpDashboardGrpcClient,
     HotspotGrpcClient,
+    PppoeGrpcClient,
     VoucherBatchGrpcClient,
     VoucherGenerateGrpcClient,
     VoucherTypeGrpcClient,
