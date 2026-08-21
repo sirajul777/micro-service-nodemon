@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,12 +46,21 @@ func (s *RouterServiceServer) ListHotspotUsers(ctx context.Context, req *pb.List
 	}
 	defer c.Close()
 
-	args := []string{}
-	if req.Profile != "" {
-		args = append(args, "?profile="+req.Profile)
+	// Empty profile means all profiles. Treat the UI sentinel `all` the same
+	// way defensively, so the RouterOS layer never receives a literal filter
+	// for a profile named "all".
+	profile := strings.TrimSpace(req.Profile)
+	if strings.EqualFold(profile, "all") {
+		profile = ""
 	}
-	if req.Comment != "" {
-		args = append(args, "?comment="+req.Comment)
+	comment := strings.TrimSpace(req.Comment)
+
+	args := []string{}
+	if profile != "" {
+		args = append(args, "?profile="+profile)
+	}
+	if comment != "" {
+		args = append(args, "?comment="+comment)
 	}
 	rows, err := c.RunContext(ctx, "/ip/hotspot/user/print", args...)
 	if err != nil {
