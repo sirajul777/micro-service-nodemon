@@ -59,6 +59,10 @@ export class ErpGrpcClient implements OnModuleDestroy {
     return this.call('GetSession', { id }, 10000);
   }
 
+  async getLiveReport(session: string) {
+    return this.call('GetLiveReport', { session }, 35000);
+  }
+
   close() {
     this.client?.close?.();
   }
