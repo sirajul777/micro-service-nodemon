@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import './table-controls.css';
 
-type TableControlsProps = { rows: Record<string, any>[]; searchable?: boolean; pageSize?: number; onPageChange?: (page: number) => void };
+type Row = Record<string, unknown>;
 
-export function useTableControls({ rows, pageSize = 25 }: Pick<TableControlsProps, 'rows' | 'pageSize'>) {
+export function useTableControls({ rows, pageSize = 25 }: { rows: Row[]; pageSize?: number }) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const normalized = query.trim().toLowerCase();
@@ -23,9 +23,11 @@ export function useTableControls({ rows, pageSize = 25 }: Pick<TableControlsProp
   };
 }
 
-export function TableControlBar({ query, onQueryChange, page, totalPages, totalRows, onPrevious, onNext }: { query: string; onQueryChange: (value: string) => void; page: number; totalPages: number; totalRows: number; onPrevious: () => void; onNext: () => void }) {
+export function TableControlBar({ query, onQueryChange, page, totalPages, totalRows, pageSize, onPrevious, onNext }: { query: string; onQueryChange: (value: string) => void; page: number; totalPages: number; totalRows: number; pageSize: number; onPrevious: () => void; onNext: () => void }) {
+  const first = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, totalRows);
   return <div className="table-controls">
-    <div className="table-search"><Search size={15} /><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search records..." /></div>
-    <div className="table-pagination"><span>{totalRows} records · Page {page} / {totalPages}</span><button className="icon tiny" disabled={page <= 1} onClick={onPrevious} aria-label="Previous page"><ChevronLeft size={15} /></button><button className="icon tiny" disabled={page >= totalPages} onClick={onNext} aria-label="Next page"><ChevronRight size={15} /></button></div>
+    <div className="table-search"><Search size={15} /><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search records..." aria-label="Search records" /></div>
+    <div className="table-pagination"><span>{first}-{last} of {totalRows} · Page {page}/{totalPages}</span><button className="icon tiny" disabled={page <= 1} onClick={onPrevious} aria-label="Previous page"><ChevronLeft size={15} /></button><button className="icon tiny" disabled={page >= totalPages} onClick={onNext} aria-label="Next page"><ChevronRight size={15} /></button></div>
   </div>;
 }
