@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
 import { HotspotGrpcClient } from './hotspot-grpc.client';
@@ -17,7 +17,7 @@ export class HotspotGrpcController {
   async active(@Req() req: Request, @Param('session') session: string) {
     await this.requireSession(req);
     const response = await this.hotspot.listActiveUsers(decodeURIComponent(session));
-    if (!response?.success) return { success: false, error: response?.error || 'Router gRPC active users failed' };
+    if (!response?.success) throw new ServiceUnavailableException(response?.error || 'Router gRPC active users failed');
     return response.users || [];
   }
 
@@ -25,7 +25,7 @@ export class HotspotGrpcController {
   async users(@Req() req: Request, @Param('session') session: string, @Query('profile') profile?: string, @Query('comment') comment?: string) {
     await this.requireSession(req);
     const response = await this.hotspot.listUsers({ sessionId: decodeURIComponent(session), profile: profile || '', comment: comment || '' });
-    if (!response?.success) return { success: false, error: response?.error || 'Router gRPC hotspot users failed' };
+    if (!response?.success) throw new ServiceUnavailableException(response?.error || 'Router gRPC hotspot users failed');
     return response.users || [];
   }
 
@@ -33,7 +33,7 @@ export class HotspotGrpcController {
   async profiles(@Req() req: Request, @Param('session') session: string) {
     await this.requireSession(req);
     const response = await this.hotspot.listProfiles(decodeURIComponent(session));
-    if (!response?.success) return { success: false, error: response?.error || 'Router gRPC hotspot profiles failed' };
+    if (!response?.success) throw new ServiceUnavailableException(response?.error || 'Router gRPC hotspot profiles failed');
     return response.profiles || [];
   }
 }
