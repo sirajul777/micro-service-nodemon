@@ -22,9 +22,27 @@ export class HotspotGrpcController {
   }
 
   @Get(':session/hotspot/users')
-  async users(@Req() req: Request, @Param('session') session: string, @Query('profile') profile?: string, @Query('comment') comment?: string) {
+  async users(
+    @Req() req: Request,
+    @Param('session') session: string,
+    @Query('profile') profile?: string,
+    @Query('comment') comment?: string,
+  ) {
     await this.requireSession(req);
-    const response = await this.hotspot.listUsers({ sessionId: decodeURIComponent(session), profile: profile || '', comment: comment || '' });
+
+    // `profile=all` means no profile filter. Do not forward the literal
+    // "all" to RouterOS, otherwise it searches for a profile named "all".
+    const normalizedProfile = String(profile || '').trim();
+    const profileFilter = normalizedProfile && normalizedProfile.toLowerCase() !== 'all'
+      ? normalizedProfile
+      : '';
+
+    const normalizedComment = String(comment || '').trim();
+    const response = await this.hotspot.listUsers({
+      sessionId: decodeURIComponent(session),
+      profile: profileFilter,
+      comment: normalizedComment,
+    });
     if (!response?.success) throw new ServiceUnavailableException(response?.error || 'Router gRPC hotspot users failed');
     return response.users || [];
   }
