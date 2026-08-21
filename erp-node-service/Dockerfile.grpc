@@ -9,7 +9,18 @@ COPY erp-node-service/ ./
 COPY mikrotik-go-service/proto/router.proto ./proto/router.proto
 COPY mikrotik-go-service/proto/reportproto/report_router.proto ./proto/report_router.proto
 
+RUN test -f src/main.ts
+RUN test -f src/app.module.ts
+RUN test -f src/report/report-internal.controller.ts
+RUN test -f proto/erp_internal.proto
+RUN test -f proto/report_internal.proto
+RUN test -f proto/router.proto
+RUN test -f proto/report_router.proto
+
 RUN npm run build
+RUN test -f dist/main.js
+RUN test -f dist/app.module.js
+RUN test -f dist/report/report-internal.controller.js
 
 FROM node:22-alpine
 WORKDIR /app
@@ -18,6 +29,8 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/proto ./proto
+RUN test -f /app/dist/main.js
+RUN test -f /app/dist/app.module.js
 RUN test -f /app/proto/erp_internal.proto
 RUN test -f /app/proto/report_internal.proto
 RUN test -f /app/proto/router.proto
