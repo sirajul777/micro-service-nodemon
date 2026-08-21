@@ -1,6 +1,8 @@
+import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { VoucherTypeService } from '../voucher-type/voucher-type.service';
 
+@Controller()
 export class VoucherTypeInternalController {
   constructor(private readonly service: VoucherTypeService) {}
 
