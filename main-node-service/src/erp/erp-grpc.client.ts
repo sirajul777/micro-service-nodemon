@@ -60,7 +60,9 @@ export class ErpGrpcClient implements OnModuleDestroy {
   }
 
   async getLiveReport(session: string) {
-    return this.call('GetLiveReport', { session }, 35000);
+    const raw = Number.parseInt(process.env.ERP_LIVE_REPORT_TIMEOUT_MS || '90000', 10);
+    const timeoutMs = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 120000) : 90000;
+    return this.call('GetLiveReport', { session }, timeoutMs);
   }
 
   close() {
