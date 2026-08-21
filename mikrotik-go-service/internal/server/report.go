@@ -22,7 +22,7 @@ type liveReportCacheEntry struct {
 	expiresAt time.Time
 }
 
-type liveReportInflight struct {
+type liveReportFlight struct {
 	done chan struct{}
 	rows []mikrotik.Sentence
 	err  error
@@ -49,11 +49,11 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	if ok {
 		cacheState = "hit"
 	} else {
-		flight := &liveReportInflight{done: make(chan struct{})}
+		flight := &liveReportFlight{done: make(chan struct{})}
 		actual, loaded := liveReportInflight.LoadOrStore(cacheKey, flight)
 		if loaded {
 			cacheState = "wait"
-			f := actual.(*liveReportInflight)
+			f := actual.(*liveReportFlight)
 			select {
 			case <-f.done:
 				rows, ok = f.rows, f.err == nil
