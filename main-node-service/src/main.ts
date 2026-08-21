@@ -3,9 +3,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { resolve } from 'path';
 import * as express from 'express';
 import { Eta } from 'eta';
-import RedisStore from 'connect-redis';
-import * as Redis from 'redis';
 import { AppModule } from './app.module';
+import { RedisSessionStore } from './redis-session.store';
 
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
@@ -14,28 +13,20 @@ const PORT = Number(process.env.PORT || 8080);
 
 /**
  * Build the session store.
- * Prefers a shared Redis store (so multiple BFF pods can share sessions);
- * falls back to the in-memory MemoryStore when REDIS_URL is unset (dev).
+ * Uses a small native ioredis-backed session adapter so the BFF does not depend
+ * on connect-redis / node-redis version-specific APIs.
  */
 function buildSessionStore() {
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
-    const client = (Redis as any).createClient
-      ? (Redis as any).createClient({ url: redisUrl })
-      : new (Redis as any).default({ url: redisUrl });
-    client.on('error', (e: any) =>
-      console.error('[session-redis] error:', e?.message),
-    );
-    if (typeof client.connect === 'function') {
-      client.connect().catch((e: any) =>
-        console.error('[session-redis] connect error:', e?.message),
-      );
-    }
-
-    return new RedisStore({ client, prefix: 'mikhmon:ses:' });
+    return new RedisSessionStore({
+      url: redisUrl,
+      prefix: 'mikhmon:ses:',
+    });
   }
+
   console.warn('[session] REDIS_URL not set — using in-memory MemoryStore (single-instance only)');
-  return undefined; // express-session falls back to MemoryStore
+  return undefined;
 }
 
 async function bootstrap() {
