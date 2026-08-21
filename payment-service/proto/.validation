@@ -1,0 +1,1 @@
+Auth proto is copied into the runtime image and validated by Dockerfile.
