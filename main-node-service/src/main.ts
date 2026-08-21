@@ -32,6 +32,17 @@ function buildSessionStore() {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // API responses are dynamic and must not be turned into empty 304 responses
+  // by Express conditional GET/ETag handling. Browser caching can otherwise
+  // hide the current RouterOS data behind a cached response.
+  app.set('etag', false);
+  app.use('/api', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  });
+
   const viewsDir = resolve(process.cwd(), 'views');
 
   const eta = new Eta({ views: viewsDir, cache: false });
