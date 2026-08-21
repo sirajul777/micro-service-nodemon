@@ -38,7 +38,12 @@ export class HotspotGrpcClient implements OnModuleDestroy {
 
   listActiveUsers(sessionId: string, server = '') { return this.call('ListActiveHotspotUsers', { sessionId, server }, 30000); }
   listUsers(params: { sessionId: string; profile?: string; comment?: string }) { return this.call('ListHotspotUsers', { sessionId: params.sessionId, profile: params.profile || '', comment: params.comment || '' }, 30000); }
-  listProfiles(sessionId: string) { return this.call('ListHotspotProfiles', { sessionId }, 15000); }
+  listProfiles(sessionId: string) {
+    return this.call('ListHotspotProfiles', { sessionId }, 30000).catch((err: any) => ({
+      success: false,
+      error: `gRPC ListHotspotProfiles failed: ${err?.message || err}`,
+    }));
+  }
   getProfile(sessionId: string, name: string) { return this.call('GetHotspotProfile', { sessionId, name }, 15000); }
 
   addUser(params: Record<string, any>) { return this.call('AddHotspotUser', params); }
