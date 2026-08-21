@@ -13,27 +13,29 @@ RUN go mod download
 
 COPY . .
 
-# router.proto is the single source of truth. Do not trust checked-in generated files.
+# router.proto is the canonical RouterService contract.
+RUN grep -q 'rpc ListSellingScripts(ListSellingScriptsRequest) returns (ListSellingScriptsResponse);' proto/router.proto
 RUN grep -q 'rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);' proto/router.proto
-RUN grep -q 'rpc ListDhcpLeases(ListDhcpLeasesRequest) returns (ListDhcpLeasesResponse);' proto/router.proto
-RUN grep -q 'rpc ListSchedulers(ListSchedulersRequest) returns (ListSchedulersResponse);' proto/router.proto
-RUN grep -q 'rpc ListLogs(ListLogsRequest) returns (ListLogsResponse);' proto/router.proto
 
 RUN rm -f proto/router.pb.go proto/router_grpc.pb.go
+RUN rm -f proto/reportproto/report_router.pb.go proto/reportproto/report_router_grpc.pb.go
 RUN protoc \
       --go_out=. \
       --go_opt=paths=source_relative \
       --go-grpc_out=. \
       --go-grpc_opt=paths=source_relative \
       proto/router.proto
+RUN protoc \
+      --go_out=. \
+      --go_opt=paths=source_relative \
+      --go-grpc_out=. \
+      --go-grpc_opt=paths=source_relative \
+      proto/reportproto/report_router.proto
 
-# Validate generated protobuf API without depending on whitespace/formatting.
 RUN grep -q 'type UnimplementedRouterServiceServer struct' proto/router_grpc.pb.go
-RUN grep -q 'ListSessions' proto/router_grpc.pb.go
-RUN grep -q 'ListDhcpLeases' proto/router_grpc.pb.go
-RUN grep -q 'ListSchedulers' proto/router_grpc.pb.go
-RUN grep -q 'ListLogs' proto/router_grpc.pb.go
-RUN grep -q '_RouterService_ListSessions_Handler' proto/router_grpc.pb.go
+RUN grep -q 'ListSellingScripts' proto/router_grpc.pb.go
+RUN grep -q 'type UnimplementedReportRouterServiceServer struct' proto/reportproto/report_router_grpc.pb.go
+RUN grep -q 'ListSellingScripts' proto/reportproto/report_router_grpc.pb.go
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o mikrotik-service .
 
