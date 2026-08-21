@@ -125,7 +125,7 @@ services:
   erp-node-service:
     build:
       context: .
-      dockerfile: ./erp-node-service/Dockerfile
+      dockerfile: ./erp-node-service/Dockerfile.grpc
     container_name: ms_nestjs_erp
     environment:
       - NODE_ENV=${NODE_ENV:-development}
@@ -144,7 +144,8 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
       - MIKROTIK_GRPC_ADDR=mikrotik-go-service:50051
       - ROUTER_PROTO_PATH=/app/proto/router.proto
-      - REPORT_PROTO_PATH=/app/report-proto/report_internal.proto
+      - REPORT_ROUTER_PROTO_PATH=/app/proto/report_router.proto
+      - REPORT_PROTO_PATH=/app/proto/report_internal.proto
       - USE_REDIS_STREAMS=true
     depends_on:
       auth-node-service:
