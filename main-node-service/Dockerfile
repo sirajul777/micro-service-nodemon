@@ -34,8 +34,10 @@ COPY --from=builder /app/shared-protos/bot ./bot-proto
 COPY --from=builder /app/shared-protos/erp ./erp-proto
 COPY --from=builder /app/shared-protos/payment ./payment-proto
 COPY --from=builder /app/shared-protos/router ./router-proto
+COPY --from=builder /app/shared-protos/erp/report_internal.proto ./report-proto/report_internal.proto
 
 RUN test -f /app/erp-proto/erp_internal.proto
+RUN test -f /app/report-proto/report_internal.proto
 RUN test -f /app/auth-proto/auth.proto
 RUN test -f /app/payment-proto/payment_internal.proto
 RUN test -f /app/router-proto/router.proto
