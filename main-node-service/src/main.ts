@@ -3,7 +3,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { resolve } from 'path';
 import * as express from 'express';
 import { Eta } from 'eta';
-import { RedisStore } from 'connect-redis';
+import RedisStore from 'connect-redis';
 import * as Redis from 'redis';
 import { AppModule } from './app.module';
 
@@ -43,7 +43,6 @@ async function bootstrap() {
 
   const viewsDir = resolve(process.cwd(), 'views');
 
-  // 1. Eta v3 view engine (mirrors the monolith's main.ts).
   const eta = new Eta({ views: viewsDir, cache: false });
   app.engine('eta', (path: string, opts: any, callback: any) => {
     try {
@@ -57,10 +56,8 @@ async function bootstrap() {
   app.setBaseViewsDir(viewsDir);
   app.setViewEngine('eta');
 
-  // Static assets (CSS/JS) — ported from the monolith in Phase 6.
   app.useStaticAssets(resolve(process.cwd(), 'public'), { prefix: '/' });
 
-  // Body parsing (capture rawBody for downstream webhook HMAC verification).
   app.use(
     express.json({
       limit: '50mb',
@@ -72,7 +69,6 @@ async function bootstrap() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.use(cookieParser());
 
-  // Cookie-based session that stores the downstream JWT after login.
   app.use(
     session({
       store: buildSessionStore() as any,
@@ -81,7 +77,7 @@ async function bootstrap() {
       saveUninitialized: false,
       rolling: true,
       cookie: {
-        maxAge: 1000 * 60 * 60 * 24, // 1 day
+        maxAge: 1000 * 60 * 60 * 24,
         secure: false,
         httpOnly: true,
         sameSite: 'lax',
@@ -89,7 +85,6 @@ async function bootstrap() {
       },
     }),
   );
-  // Behind nginx reverse-proxy — honour X-Forwarded-For / X-Forwarded-Proto.
   app.set('trust proxy', 1);
 
   app.enableCors({ origin: true, credentials: true });
