@@ -7,6 +7,8 @@ import { PaymentWebhookController } from './proxy/payment-webhook.controller';
 import { QrisGrpcController } from './payment/qris-grpc.controller';
 import { SessionController } from './session/session.controller';
 import { HealthController } from './health/health.controller';
+import { HotspotGrpcController } from './erp/hotspot-grpc.controller';
+import { VoucherBatchGrpcController } from './erp/voucher-batch-grpc.controller';
 import { AuthService } from './auth/auth.service';
 import { AuthGrpcClient } from './auth/auth-grpc.client';
 import { ErpGrpcClient } from './erp/erp-grpc.client';
@@ -29,6 +31,8 @@ import { SecurityMiddleware } from './security/security.middleware';
     AuthController,
     SessionController,
     QrisGrpcController,
+    HotspotGrpcController,
+    VoucherBatchGrpcController,
     PaymentWebhookController,
     ProxyController,
     HealthController,
