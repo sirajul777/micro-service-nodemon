@@ -26,6 +26,8 @@ service ErpInternalService {
   rpc UpdateVoucherType(UpdateVoucherTypeRequest) returns (VoucherTypeMutationResponse);
   rpc DeleteVoucherType(DeleteVoucherTypeRequest) returns (VoucherTypeMutationResponse);
   rpc ToggleVoucherType(ToggleVoucherTypeRequest) returns (VoucherTypeMutationResponse);
+
+  rpc GetLiveReport(GetLiveReportRequest) returns (GetLiveReportResponse);
 }
 
 message ListSessionsRequest {}
@@ -93,3 +95,15 @@ message UpdateVoucherTypeRequest { VoucherTypeData voucher_type = 1; }
 message DeleteVoucherTypeRequest { string id = 1; }
 message ToggleVoucherTypeRequest { string id = 1; }
 message VoucherTypeMutationResponse { bool success = 1; string error = 2; bool deleted = 3; VoucherTypeData voucher_type = 4; }
+
+message GetLiveReportRequest { string session = 1; }
+message GetLiveReportResponse {
+  bool success = 1;
+  string error = 2;
+  int32 today_vouchers = 3;
+  double today_income = 4;
+  int32 month_vouchers = 5;
+  double month_income = 6;
+  string currency = 7;
+  bool is_indo = 8;
+}
