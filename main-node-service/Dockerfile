@@ -9,6 +9,7 @@ COPY auth-node-service/proto ./shared-protos/auth
 COPY bot-py-service/proto ./shared-protos/bot
 COPY erp-node-service/proto ./shared-protos/erp
 COPY payment-service/proto ./shared-protos/payment
+COPY mikrotik-go-service/proto ./shared-protos/router
 
 # Always compile from a clean TypeScript incremental state.
 RUN rm -f tsconfig.tsbuildinfo
@@ -32,10 +33,12 @@ COPY --from=builder /app/shared-protos/auth ./auth-proto
 COPY --from=builder /app/shared-protos/bot ./bot-proto
 COPY --from=builder /app/shared-protos/erp ./erp-proto
 COPY --from=builder /app/shared-protos/payment ./payment-proto
+COPY --from=builder /app/shared-protos/router ./router-proto
 
 RUN test -f /app/erp-proto/erp_internal.proto
 RUN test -f /app/auth-proto/auth.proto
 RUN test -f /app/payment-proto/payment_internal.proto
+RUN test -f /app/router-proto/router.proto
 
 EXPOSE 8080
 CMD ["node", "dist/main.js"]
