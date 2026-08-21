@@ -47,7 +47,7 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	// compatibility check.
 	isROS7 := true
 	if req.Idhr != "" {
-		versionRows, versionErr := c.Run("/system/resource/print")
+		versionRows, versionErr := c.RunContext(ctx, "/system/resource/print")
 		if versionErr != nil {
 			resp.Error = versionErr.Error()
 			return resp, nil
@@ -64,7 +64,7 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	if ok {
 		cacheState = "hit"
 	} else {
-		rows, err = s.getSellingRows(c, isROS7, req.Idhr, req.Idbl)
+		rows, err = s.getSellingRows(ctx, c, isROS7, req.Idhr, req.Idbl)
 		if err != nil {
 			resp.Error = err.Error()
 			return resp, nil
@@ -141,7 +141,7 @@ func setLiveReportCache(key string, rows []mikrotik.Sentence) {
 	})
 }
 
-func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string) ([]mikrotik.Sentence, error) }, isROS7 bool, idhr, idbl string) ([]mikrotik.Sentence, error) {
+func (s *RouterServiceServer) getSellingRows(ctx context.Context, c *mikrotik.Client, isROS7 bool, idhr, idbl string) ([]mikrotik.Sentence, error) {
 	var rows []mikrotik.Sentence
 	var err error
 
@@ -152,7 +152,7 @@ func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string)
 		}
 		monthOwner := parts[0] + parts[2]
 		if isROS7 {
-			rows, err = c.Run("/system/script/print", "?owner="+monthOwner, scriptProplist)
+			rows, err = c.RunContext(ctx, "/system/script/print", "?owner="+monthOwner, scriptProplist)
 			if err != nil {
 				return nil, err
 			}
@@ -164,20 +164,20 @@ func (s *RouterServiceServer) getSellingRows(c interface{ Run(string, ...string)
 			}
 			return filtered, nil
 		}
-		return c.Run("/system/script/print", "?source="+idhr, scriptProplist)
+		return c.RunContext(ctx, "/system/script/print", "?source="+idhr, scriptProplist)
 	}
 
 	if idbl != "" {
-		return c.Run("/system/script/print", "?owner="+idbl, scriptProplist)
+		return c.RunContext(ctx, "/system/script/print", "?owner="+idbl, scriptProplist)
 	}
 
 	now := time.Now()
 	months := [...]string{"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"}
 	monthOwner := months[now.Month()-1] + strconv.Itoa(now.Year())
 	if isROS7 {
-		return c.Run("/system/script/print", "?owner="+monthOwner, scriptProplist)
+		return c.RunContext(ctx, "/system/script/print", "?owner="+monthOwner, scriptProplist)
 	}
-	return c.Run("/system/script/print", "?comment=mikhmon", scriptProplist)
+	return c.RunContext(ctx, "/system/script/print", "?comment=mikhmon", scriptProplist)
 }
 
 type reportError struct{ message string }
