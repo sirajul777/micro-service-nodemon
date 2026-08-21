@@ -5,7 +5,7 @@ import { auth, qris, reports, reseller, router, voucher } from './api';
 type Session = { id: string; name?: string; ip?: string; port?: number };
 type Page = 'dashboard' | 'hotspot-users' | 'hotspot-profiles' | 'pppoe-active' | 'pppoe-profiles' | 'pppoe-secrets' | 'interfaces' | 'voucher-batches' | 'voucher-types' | 'qris' | 'resellers' | 'live-report';
 type Item = Record<string, any>;
-type ModalKind = 'user' | 'profile' | 'ppp-profile' | 'ppp-secret' | null;
+type ModalKind = 'user' | 'profile' | 'ppp-profile' | 'ppp-secret' | 'voucher-batch' | 'voucher-type' | null;
 const nav: [string, Page, any][] = [
   ['Overview', 'dashboard', CircleGauge], ['Hotspot Users', 'hotspot-users', Users], ['Hotspot Profiles', 'hotspot-profiles', Network],
   ['PPPoE Active', 'pppoe-active', Activity], ['PPPoE Profiles', 'pppoe-profiles', Server], ['PPPoE Secrets', 'pppoe-secrets', Users],
@@ -17,49 +17,35 @@ export default function App() {
   const [me, setMe] = useState<any>(); const [sessions, setSessions] = useState<Session[]>([]); const [session, setSession] = useState('');
   const [page, setPage] = useState<Page>('dashboard'); const [open, setOpen] = useState(false); const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(); const [error, setError] = useState(''); const [login, setLogin] = useState(false);
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
-  const [modal, setModal] = useState<ModalKind>(null); const [editing, setEditing] = useState<Item | null>(null);
-  const current = useMemo(() => sessions.find((s) => s.id === session), [sessions, session]);
-  const title = nav.find((n) => n[1] === page)?.[0] || 'Overview';
+  const [credentials, setCredentials] = useState({ username: '', password: '' }); const [modal, setModal] = useState<ModalKind>(null); const [editing, setEditing] = useState<Item | null>(null);
+  const current = useMemo(() => sessions.find((s) => s.id === session), [sessions, session]); const title = nav.find((n) => n[1] === page)?.[0] || 'Overview';
 
   const load = async () => {
-    if (!session && page !== 'qris') return; setLoading(true); setError('');
-    try {
-      let result: any;
+    if (!session && page !== 'qris' && page !== 'voucher-types') return; setLoading(true); setError('');
+    try { let result: any;
       switch (page) {
-        case 'dashboard': result = await router.dashboard(session); break;
-        case 'hotspot-users': result = await router.hotspotUsers(session, 'all'); break;
-        case 'hotspot-profiles': result = await router.hotspotProfiles(session); break;
-        case 'pppoe-active': result = await router.pppActive(session); break;
-        case 'pppoe-profiles': result = await router.pppProfiles(session); break;
-        case 'pppoe-secrets': result = await router.pppSecrets(session); break;
-        case 'interfaces': result = await router.interfaces(session); break;
-        case 'voucher-batches': result = await voucher.batches(session); break;
-        case 'voucher-types': result = await voucher.voucherTypes(); break;
-        case 'qris': result = await Promise.all([qris.stats(), qris.orders(), qris.callbacks(50)]); break;
-        case 'resellers': result = await reseller.session(session); break;
-        case 'live-report': result = await reports.live(session); break;
+        case 'dashboard': result = await router.dashboard(session); break; case 'hotspot-users': result = await router.hotspotUsers(session, 'all'); break;
+        case 'hotspot-profiles': result = await router.hotspotProfiles(session); break; case 'pppoe-active': result = await router.pppActive(session); break;
+        case 'pppoe-profiles': result = await router.pppProfiles(session); break; case 'pppoe-secrets': result = await router.pppSecrets(session); break;
+        case 'interfaces': result = await router.interfaces(session); break; case 'voucher-batches': result = await voucher.batches(session); break;
+        case 'voucher-types': result = await voucher.voucherTypes(); break; case 'qris': result = await Promise.all([qris.stats(), qris.orders(), qris.callbacks(50)]); break;
+        case 'resellers': result = await reseller.session(session); break; case 'live-report': result = await reports.live(session); break;
       }
       setData(result);
     } catch (e: any) { setError(e?.message === 'UNAUTHORIZED' ? 'Session expired.' : e?.message || 'Unable to load data.'); }
     finally { setLoading(false); }
   };
-  const boot = async () => {
-    try { const m = await auth.me(); setMe(m); const r = await router.sessions(); const rows = (r?.sessions ?? r ?? []) as Session[]; setSessions(rows); setSession(rows[0]?.id || ''); setLogin(false); }
-    catch { setLogin(true); }
-  };
+  const boot = async () => { try { const m = await auth.me(); setMe(m); const r = await router.sessions(); const rows = (r?.sessions ?? r ?? []) as Session[]; setSessions(rows); setSession(rows[0]?.id || ''); setLogin(false); } catch { setLogin(true); } };
   const runMutation = async (action: () => Promise<any>) => { setLoading(true); setError(''); try { const result = await action(); if (result?.success === false) throw new Error(result.error || result.message || 'Operation failed'); await load(); } catch (e: any) { setError(e?.message || 'Operation failed'); } finally { setLoading(false); } };
   useEffect(() => { void boot(); }, []); useEffect(() => { if (!login) void load(); }, [page, session, login]);
   if (login) return <Login c={credentials} setC={setCredentials} error={error} onDone={boot} />;
 
-  const addKind: ModalKind = page === 'hotspot-users' ? 'user' : page === 'hotspot-profiles' ? 'profile' : page === 'pppoe-profiles' ? 'ppp-profile' : page === 'pppoe-secrets' ? 'ppp-secret' : null;
-  const crud = ['hotspot-users', 'hotspot-profiles', 'pppoe-profiles', 'pppoe-secrets'].includes(page);
+  const addKind: ModalKind = page === 'hotspot-users' ? 'user' : page === 'hotspot-profiles' ? 'profile' : page === 'pppoe-profiles' ? 'ppp-profile' : page === 'pppoe-secrets' ? 'ppp-secret' : page === 'voucher-batches' ? 'voucher-batch' : page === 'voucher-types' ? 'voucher-type' : null;
+  const crud = ['hotspot-users', 'hotspot-profiles', 'pppoe-profiles', 'pppoe-secrets', 'voucher-batches', 'voucher-types'].includes(page);
 
   return <div className="app-shell">
     <aside className={open ? 'sidebar open' : 'sidebar'}><Brand close={() => setOpen(false)} />
-      <div className="router-box"><span>ACTIVE ROUTER</span><select value={session} onChange={async (e) => { setSession(e.target.value); await router.set(e.target.value); }}>
-        {sessions.map((s) => <option key={s.id} value={s.id}>{s.name || s.id}</option>)}
-      </select><small>{current?.ip || 'No address'}{current?.port ? `:${current.port}` : ''}</small></div>
+      <div className="router-box"><span>ACTIVE ROUTER</span><select value={session} onChange={async (e) => { setSession(e.target.value); await router.set(e.target.value); }}>{sessions.map((s) => <option key={s.id} value={s.id}>{s.name || s.id}</option>)}</select><small>{current?.ip || 'No address'}{current?.port ? `:${current.port}` : ''}</small></div>
       <nav>{nav.map(([label, key, Icon]) => <button key={key} className={page === key ? 'nav active' : 'nav'} onClick={() => { setPage(key); setOpen(false); }}><Icon size={17} />{label}</button>)}</nav>
       <div className="sidebar-foot"><div className="user-mini"><div className="avatar">{String(me?.username || 'A')[0].toUpperCase()}</div><div><b>{me?.username || 'Admin'}</b><span>Administrator</span></div></div><button className="logout" onClick={async () => { await auth.logout(); setLogin(true); }}><LogOut size={16} /></button></div>
     </aside>
@@ -69,51 +55,45 @@ export default function App() {
         if (page === 'hotspot-profiles' && window.confirm(`Delete profile ${row.name}?`)) void runMutation(() => router.deleteHotspotProfile(session, String(row.name)));
         if (page === 'pppoe-secrets' && window.confirm(`Delete PPPoE secret ${row.name}?`)) void runMutation(() => router.deletePppSecret(session, String(row.name)));
         if (page === 'pppoe-profiles' && window.confirm(`Delete PPPoE profile ${row.name}?`)) void runMutation(() => router.deletePppProfile(session, String(row.name)));
-      }} onToggle={(row) => { const fn = String(row.disabled) === 'true' || String(row.disabled) === 'yes' ? router.enablePppSecret : router.disablePppSecret; void runMutation(() => fn(session, String(row.name))); }} onDisconnect={(row) => void runMutation(() => router.disconnectPppActive(session, String(row.name)))} />}</section>
+        if (page === 'voucher-batches' && window.confirm(`Delete voucher batch ${row.id || row.name}?`)) void runMutation(() => voucher.deleteBatch(session, String(row.id || row.name), false));
+        if (page === 'voucher-types' && window.confirm(`Delete voucher type ${row.id || row.name}?`)) void runMutation(() => voucher.deleteVoucherType(String(row.id || row.name)));
+      }} onToggle={(row) => { if (page === 'pppoe-secrets') { const fn = String(row.disabled) === 'true' || String(row.disabled) === 'yes' ? router.enablePppSecret : router.disablePppSecret; void runMutation(() => fn(session, String(row.name))); } if (page === 'voucher-types') void runMutation(() => voucher.toggleVoucherType(String(row.id))); }} onDisconnect={(row) => void runMutation(() => router.disconnectPppActive(session, String(row.name)))} onBatchAction={(action, row) => { if (action === 'mark-used') { const username = window.prompt('Username to mark used'); if (username) void runMutation(() => voucher.markUsed(session, String(row.id), username, String(me?.username || ''))); } if (action === 'sync') void runMutation(() => voucher.syncUsed(session)); if (action === 'auto-sync') void runMutation(() => voucher.autoSyncUsed(session)); }} />}</section>
     </main>
     {modal && <CrudModal kind={modal} session={session} editing={editing} onClose={() => setModal(null)} onSaved={() => { setModal(null); setEditing(null); void load(); }} />}
   </div>;
 }
 
 function Brand({ close }: { close: () => void }) { return <div className="brand"><div className="brand-mark"><RouterIcon size={18} /></div><div><b>NODEMON</b><span>NETWORK CONTROL</span></div><button className="icon mobile-only" onClick={close}><X size={18} /></button></div>; }
-function Login({ c, setC, error, onDone }: any) { return <div className="login"><div className="login-card"><Brand close={() => {}} /><h1>Welcome back</h1><p>Sign in to manage routers and services.</p><form onSubmit={async (e) => { e.preventDefault(); try { await auth.login(c.username, c.password); await onDone(); } catch (err: any) { setC(c); } }}><label>Username<input value={c.username} onChange={(e) => setC({ ...c, username: e.target.value })} /></label><label>Password<input type="password" value={c.password} onChange={(e) => setC({ ...c, password: e.target.value })} /></label>{error && <div className="error">{error}</div>}<button className="primary">Sign in</button></form></div></div>; }
+function Login({ c, setC, error, onDone }: any) { return <div className="login"><div className="login-card"><Brand close={() => {}} /><h1>Welcome back</h1><p>Sign in to manage routers and services.</p><form onSubmit={async (e) => { e.preventDefault(); try { await auth.login(c.username, c.password); await onDone(); } catch { setC(c); } }}><label>Username<input value={c.username} onChange={(e) => setC({ ...c, username: e.target.value })} /></label><label>Password<input type="password" value={c.password} onChange={(e) => setC({ ...c, password: e.target.value })} /></label>{error && <div className="error">{error}</div>}<button className="primary">Sign in</button></form></div></div>; }
 function Dashboard({ data, session }: any) { const stats: any[] = [['Active Hotspot', data?.activeHotspotUsers ?? '—', Users], ['Total Hotspot', data?.totalHotspotUsers ?? '—', Network], ['CPU Load', data?.cpuLoad ? `${data.cpuLoad}%` : '—', Cpu], ['Free Memory', data?.freeMemory || '—', Database]]; return <><div className="hero"><div><span className="eyebrow">LIVE ROUTER</span><h3>{session?.name || session?.id || 'Router'}</h3><p>{session?.ip || 'No address'} · RouterOS monitoring</p></div><div className="status"><i />Connected</div></div><div className="stats">{stats.map(([label, value, Icon]) => <div className="stat" key={label}><div className="stat-icon"><Icon size={18} /></div><div><span>{label}</span><strong>{value}</strong></div></div>)}</div><div className="panel"><div className="panel-head"><div><h3>System snapshot</h3><span>Current router telemetry</span></div><span className="badge">LIVE</span></div><div className="grid"><Metric n="RouterOS" v={data?.rosVersion || data?.version || '—'} /><Metric n="Uptime" v={data?.uptime || '—'} /><Metric n="Free HDD" v={data?.freeHdd || '—'} /><Metric n="Interfaces" v={data?.interfaces || '—'} /></div></div></>; }
 const Metric = ({ n, v }: any) => <div className="metric"><span>{n}</span><b>{String(v)}</b></div>;
 
-function TablePage({ page, data, loading, session, crud, onAdd, onEdit, onDelete, onToggle, onDisconnect }: any) {
+function TablePage({ page, data, loading, session, crud, onAdd, onEdit, onDelete, onToggle, onDisconnect, onBatchAction }: any) {
   let rows: Item[] = data?.users || data?.profiles || data?.connections || data?.secrets || data?.batches || data?.voucherTypes || data?.resellers || data || [];
   if (!Array.isArray(rows)) rows = data?.data && Array.isArray(data.data) ? data.data : [];
-  const cols: Record<string, string[]> = {
-    'hotspot-users': ['name', 'profile', 'comment', 'disabled'], 'hotspot-profiles': ['name', 'rateLimit', 'sharedUsers', 'addressPool'],
-    'pppoe-active': ['name', 'address', 'uptime', 'service'], 'pppoe-profiles': ['name', 'localAddress', 'remoteAddress', 'rateLimit', 'dns'],
-    'pppoe-secrets': ['name', 'service', 'profile', 'remoteAddress', 'disabled'], interfaces: ['name', 'type', 'macAddress', 'tx', 'rx', 'running'],
-    'voucher-batches': ['id', 'name', 'status', 'profile', 'qty', 'createdAt'], 'voucher-types': ['id', 'name', 'price', 'duration', 'profile'],
-    resellers: ['id', 'name', 'username', 'sessionId', 'status'],
-  };
+  const cols: Record<string, string[]> = { 'hotspot-users': ['name', 'profile', 'comment', 'disabled'], 'hotspot-profiles': ['name', 'rateLimit', 'sharedUsers', 'addressPool'], 'pppoe-active': ['name', 'address', 'uptime', 'service'], 'pppoe-profiles': ['name', 'localAddress', 'remoteAddress', 'rateLimit', 'dns'], 'pppoe-secrets': ['name', 'service', 'profile', 'remoteAddress', 'disabled'], interfaces: ['name', 'type', 'macAddress', 'tx', 'rx', 'running'], 'voucher-batches': ['id', 'name', 'status', 'profile', 'qty', 'createdAt'], 'voucher-types': ['id', 'name', 'price', 'duration', 'profile', 'enabled'], resellers: ['id', 'name', 'username', 'sessionId', 'status'] };
   const columns = cols[page] || Object.keys(rows[0] || {}).slice(0, 8);
-  return <div className="panel"><div className="panel-head"><div><h3>{nav.find((n) => n[1] === page)?.[0]}</h3><span>{rows.length} records</span></div><div className="panel-actions"><span className="badge">{loading ? 'LOADING' : 'LIVE'}</span>{crud && <button className="primary small" onClick={onAdd}><Plus size={14} /> Add</button>}</div></div><div className="table-wrap"><table><thead><tr>{columns.map((c) => <th key={c}>{humanize(c)}</th>)}{crud && <th>Actions</th>}{page === 'pppoe-active' && <th>Actions</th>}</tr></thead><tbody>{rows.map((r, i) => <tr key={String(r.id || r.name || i)}>{columns.map((c) => <td key={c}>{formatCell(r[c])}</td>)}{crud && <td><div className="row-actions">{(page === 'hotspot-profiles' || page === 'pppoe-profiles' || page === 'pppoe-secrets') && <button className="icon tiny" title="Edit" onClick={() => onEdit(r)}>✎</button>}{page === 'pppoe-secrets' && <button className="icon tiny" title={String(r.disabled) === 'true' || String(r.disabled) === 'yes' ? 'Enable' : 'Disable'} onClick={() => onToggle(r)}>{String(r.disabled) === 'true' || String(r.disabled) === 'yes' ? '▶' : 'Ⅱ'}</button>}<button className="icon tiny danger" title="Delete" onClick={() => onDelete(r)}><Trash2 size={14} /></button></div></td>}{page === 'pppoe-active' && <td><button className="icon tiny danger" title="Disconnect" onClick={() => onDisconnect(r)}>×</button></td>}</tr>)}</tbody></table>{!rows.length && <div className="empty">No records found.</div>}</div></div>;
+  return <div className="panel"><div className="panel-head"><div><h3>{nav.find((n) => n[1] === page)?.[0]}</h3><span>{rows.length} records</span></div><div className="panel-actions"><span className="badge">{loading ? 'LOADING' : 'LIVE'}</span>{crud && <button className="primary small" onClick={onAdd}><Plus size={14} /> Add</button>}{page === 'voucher-batches' && <><button className="button secondary" onClick={() => onBatchAction('sync', {})}>Sync</button><button className="button secondary" onClick={() => onBatchAction('auto-sync', {})}>Auto-sync</button></>}</div></div><div className="table-wrap"><table><thead><tr>{columns.map((c) => <th key={c}>{humanize(c)}</th>)}{crud && <th>Actions</th>}{page === 'pppoe-active' && <th>Actions</th>}</tr></thead><tbody>{rows.map((r, i) => <tr key={String(r.id || r.name || i)}>{columns.map((c) => <td key={c}>{formatCell(r[c])}</td>)}{crud && <td><div className="row-actions">{(page === 'hotspot-profiles' || page === 'pppoe-profiles' || page === 'pppoe-secrets' || page === 'voucher-types') && <button className="icon tiny" title="Edit" onClick={() => onEdit(r)}>✎</button>}{page === 'pppoe-secrets' && <button className="icon tiny" title="Enable/Disable" onClick={() => onToggle(r)}>{String(r.disabled) === 'true' || String(r.disabled) === 'yes' ? '▶' : 'Ⅱ'}</button>}{page === 'voucher-types' && <button className="icon tiny" title="Toggle" onClick={() => onToggle(r)}>{String(r.enabled) === 'false' ? '▶' : 'Ⅱ'}</button>}{page === 'voucher-batches' && <button className="icon tiny" title="Mark used" onClick={() => onBatchAction('mark-used', r)}>✓</button>}<button className="icon tiny danger" title="Delete" onClick={() => onDelete(r)}><Trash2 size={14} /></button></div></td>}{page === 'pppoe-active' && <td><button className="icon tiny danger" title="Disconnect" onClick={() => onDisconnect(r)}>×</button></td>}</tr>)}</tbody></table>{!rows.length && <div className="empty">No records found.</div>}</div></div>;
 }
 
 function CrudModal({ kind, session, editing, onClose, onSaved }: { kind: Exclude<ModalKind, null>; session: string; editing: Item | null; onClose: () => void; onSaved: () => void }) {
-  const isUser = kind === 'user'; const isHotspotProfile = kind === 'profile'; const isPppProfile = kind === 'ppp-profile';
+  const isUser = kind === 'user', isHotspotProfile = kind === 'profile', isPppProfile = kind === 'ppp-profile', isPppSecret = kind === 'ppp-secret', isBatch = kind === 'voucher-batch', isVoucherType = kind === 'voucher-type';
   const [form, setForm] = useState<Record<string, string>>(() => {
     if (isUser) return { name: editing?.name || '', password: '', profile: editing?.profile || '', comment: editing?.comment || '', limitUptime: editing?.limitUptime || '' };
     if (isHotspotProfile) return { name: editing?.name || '', onLogin: editing?.onLogin || '', sessionTimeout: editing?.sessionTimeout || '', idleTimeout: editing?.idleTimeout || '', rateLimit: editing?.rateLimit || '', sharedUsers: editing?.sharedUsers || '', addressPool: editing?.addressPool || '' };
     if (isPppProfile) return { name: editing?.name || '', localAddress: editing?.localAddress || '', remoteAddress: editing?.remoteAddress || '', rateLimit: editing?.rateLimit || '', dns: editing?.dns || '', bridge: editing?.bridge || '', onlyOne: editing?.onlyOne || '', changeTcpMss: editing?.changeTcpMss || '' };
-    return { name: editing?.name || '', password: '', service: editing?.service || 'pppoe', profile: editing?.profile || '', localAddress: editing?.localAddress || '', remoteAddress: editing?.remoteAddress || '', comment: editing?.comment || '' };
+    if (isPppSecret) return { name: editing?.name || '', password: '', service: editing?.service || 'pppoe', profile: editing?.profile || '', localAddress: editing?.localAddress || '', remoteAddress: editing?.remoteAddress || '', comment: editing?.comment || '' };
+    if (isBatch) return { name: editing?.name || '', profile: editing?.profile || '', qty: editing?.qty || '1' };
+    return { name: editing?.name || '', price: editing?.price || '0', duration: editing?.duration || '', profile: editing?.profile || '', enabled: String(editing?.enabled ?? true) };
   });
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const set = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
-  const submit = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setError(''); try {
-    let result: any;
-    if (isUser) result = await router.addHotspotUser(session, form);
-    else if (isHotspotProfile) result = editing ? await router.updateHotspotProfile(session, editing.name, form) : await router.addHotspotProfile(session, form);
-    else if (isPppProfile) result = editing ? await router.updatePppProfile(session, editing.name, form) : await router.addPppProfile(session, form);
-    else result = editing ? await router.updatePppSecret(session, editing.name, form) : await router.addPppSecret(session, form);
-    if (result?.success === false) throw new Error(result.error || 'Operation failed'); onSaved();
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  const submit = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setError(''); try { let result: any;
+    if (isUser) result = await router.addHotspotUser(session, form); else if (isHotspotProfile) result = editing ? await router.updateHotspotProfile(session, editing.name, form) : await router.addHotspotProfile(session, form); else if (isPppProfile) result = editing ? await router.updatePppProfile(session, editing.name, form) : await router.addPppProfile(session, form); else if (isPppSecret) result = editing ? await router.updatePppSecret(session, editing.name, form) : await router.addPppSecret(session, form); else if (isBatch) result = await voucher.createBatch(session, { ...form, qty: Number(form.qty) || 1 }); else result = editing ? await voucher.updateVoucherType(editing.id, { ...form, id: editing.id, price: Number(form.price) || 0 }) : await voucher.createVoucherType({ ...form, price: Number(form.price) || 0 });
+    if (result?.success === false) throw new Error(result.error || result.message || 'Operation failed'); onSaved();
   } catch (err: any) { setError(err?.message || 'Operation failed'); } finally { setBusy(false); } };
-  const fields = isUser ? [['name', 'Username'], ['password', 'Password'], ['profile', 'Profile'], ['comment', 'Comment'], ['limitUptime', 'Limit uptime']] : isHotspotProfile ? [['name', 'Name'], ['onLogin', 'On login'], ['sessionTimeout', 'Session timeout'], ['idleTimeout', 'Idle timeout'], ['rateLimit', 'Rate limit'], ['sharedUsers', 'Shared users'], ['addressPool', 'Address pool']] : isPppProfile ? [['name', 'Name'], ['localAddress', 'Local address'], ['remoteAddress', 'Remote address'], ['rateLimit', 'Rate limit'], ['dns', 'DNS'], ['bridge', 'Bridge'], ['onlyOne', 'Only one'], ['changeTcpMss', 'Change TCP MSS']] : [['name', 'Username'], ['password', 'Password'], ['service', 'Service'], ['profile', 'Profile'], ['localAddress', 'Local address'], ['remoteAddress', 'Remote address'], ['comment', 'Comment']];
-  const title = isUser ? 'Hotspot User' : isHotspotProfile ? 'Hotspot Profile' : isPppProfile ? 'PPPoE Profile' : 'PPPoE Secret';
-  return <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="modal"><div className="modal-head"><div><span className="eyebrow">ROUTER CONFIGURATION</span><h3>{editing ? 'Edit' : 'Add'} {title}</h3></div><button className="icon" onClick={onClose}><X size={17} /></button></div><form onSubmit={submit}><div className="form-grid">{fields.map(([key, label]) => <label key={key}>{label}<input type={key === 'password' ? 'password' : 'text'} value={form[key] || ''} onChange={(e) => set(key, e.target.value)} disabled={Boolean(editing && key === 'name')} required={key === 'name'} /></label>)}</div>{error && <div className="error">{error}</div>}<div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div></form></div></div>;
+  const fields = isUser ? [['name', 'Username'], ['password', 'Password'], ['profile', 'Profile'], ['comment', 'Comment'], ['limitUptime', 'Limit uptime']] : isHotspotProfile ? [['name', 'Name'], ['onLogin', 'On login'], ['sessionTimeout', 'Session timeout'], ['idleTimeout', 'Idle timeout'], ['rateLimit', 'Rate limit'], ['sharedUsers', 'Shared users'], ['addressPool', 'Address pool']] : isPppProfile ? [['name', 'Name'], ['localAddress', 'Local address'], ['remoteAddress', 'Remote address'], ['rateLimit', 'Rate limit'], ['dns', 'DNS'], ['bridge', 'Bridge'], ['onlyOne', 'Only one'], ['changeTcpMss', 'Change TCP MSS']] : isPppSecret ? [['name', 'Username'], ['password', 'Password'], ['service', 'Service'], ['profile', 'Profile'], ['localAddress', 'Local address'], ['remoteAddress', 'Remote address'], ['comment', 'Comment']] : isBatch ? [['name', 'Batch name'], ['profile', 'Profile'], ['qty', 'Quantity']] : [['name', 'Name'], ['price', 'Price'], ['duration', 'Duration'], ['profile', 'Profile'], ['enabled', 'Enabled (true/false)']];
+  const modalTitle = isUser ? 'Hotspot User' : isHotspotProfile ? 'Hotspot Profile' : isPppProfile ? 'PPPoE Profile' : isPppSecret ? 'PPPoE Secret' : isBatch ? 'Voucher Batch' : 'Voucher Type';
+  return <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="modal"><div className="modal-head"><div><span className="eyebrow">CONFIGURATION</span><h3>{editing ? 'Edit' : 'Add'} {modalTitle}</h3></div><button className="icon" onClick={onClose}><X size={17} /></button></div><form onSubmit={submit}><div className="form-grid">{fields.map(([key, label]) => <label key={key}>{label}<input type={key === 'password' ? 'password' : key === 'price' || key === 'qty' ? 'number' : 'text'} value={form[key] || ''} onChange={(e) => set(key, e.target.value)} disabled={Boolean(editing && key === 'name')} required={['name', 'qty'].includes(key)} /></label>)}</div>{error && <div className="error">{error}</div>}<div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div></form></div></div>;
 }
 
 function QrisPage({ data, loading }: any) { const [stats, orders, callbacks] = Array.isArray(data) ? data : [null, [], []]; return <><div className="stats"><MetricCard title="Orders" value={orders?.length ?? stats?.totalOrders ?? '—'} /><MetricCard title="Success" value={stats?.success ?? stats?.paid ?? '—'} /><MetricCard title="Pending" value={stats?.pending ?? '—'} /><MetricCard title="Callbacks" value={callbacks?.length ?? '—'} /></div><div className="panel"><div className="panel-head"><div><h3>QRIS Orders</h3><span>Recent orders and callbacks</span></div><span className="badge">{loading ? 'LOADING' : 'LIVE'}</span></div><div className="table-wrap"><table><thead><tr>{['orderId', 'amount', 'status', 'createdAt'].map((c) => <th key={c}>{humanize(c)}</th>)}</tr></thead><tbody>{(orders || []).map((r: any, i: number) => <tr key={r.orderId || r.id || i}>{['orderId', 'amount', 'status', 'createdAt'].map((c) => <td key={c}>{formatCell(r?.[c])}</td>)}</tr>)}</tbody></table></div></div></>; }
