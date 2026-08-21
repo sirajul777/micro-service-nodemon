@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -56,35 +55,6 @@ func Dial(host, user, password string, opts ...Option) (*Client, error) {
 	return DialContext(context.Background(), host, user, password, opts...)
 }
 
-// DialContext connects and authenticates to a RouterOS router while honoring ctx.
-func DialContext(ctx context.Context, host, user, password string, opts ...Option) (*Client, error) {
-	o := &options{port: 8728, timeout: 15 * time.Second}
-	for _, fn := range opts {
-		fn(o)
-	}
-
-	addr := net.JoinHostPort(host, strconv.Itoa(o.port))
-	dialer := net.Dialer{Timeout: o.timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("dial %s: %w", addr, err)
-	}
-
-	c := &Client{
-		conn: conn,
-		r:    bufio.NewReader(conn),
-		w:    bufio.NewWriter(conn),
-	}
-	if deadline, ok := ctx.Deadline(); ok {
-		_ = conn.SetDeadline(deadline)
-	}
-	if err := c.login(host, user, password); err != nil {
-		conn.Close()
-		return nil, err
-	}
-	return c, nil
-}
-
 // RunContext executes a RouterOS command while honoring ctx cancellation/deadlines.
 func (c *Client) RunContext(ctx context.Context, cmd string, words ...string) ([]Sentence, error) {
 	if ctx == nil {
@@ -100,8 +70,6 @@ func (c *Client) RunContext(ctx context.Context, cmd string, words ...string) ([
 		}
 	}
 	defer func() {
-		// Remove the temporary deadline so callers using the same connection for
-		// subsequent non-contextual operations retain the client's normal behavior.
 		_ = c.conn.SetDeadline(time.Time{})
 	}()
 
@@ -121,27 +89,19 @@ func (c *Client) Run(cmd string, words ...string) ([]Sentence, error) {
 // login performs RouterOS authentication. It first tries the modern
 // challenge/response (api-version 2) and falls back to plaintext (v1).
 func (c *Client) login(host, user, password string) error {
-	// Try challenge/response login.
 	if err := c.runSentence("/login", "=name="+user, "=password="+password); err != nil {
 		return err
 	}
-	// The first /login returns a sentence with either "ret" (v1 challenge)
-	// or a "!done" (v2 already authenticated). We inspect the reply.
 	sentences, err := c.readReplies("!done")
 	if err != nil {
 		return err
 	}
-	// Look for the ret token (challenge). If present, do the MD5 handshake.
 	for _, s := range sentences {
 		if ret, ok := s["ret"]; ok {
 			c.apiVersion = 1
-			// MD5 combine: password + (password + challenge) hex
-			h1 := md5.Sum([]byte(""))
-			_ = h1
 			stage2 := md5Of(password + challengeHex(ret))
 			ch := md5.Sum([]byte(stage2))
 			resp := fmt.Sprintf("00%x", ch)
-			// Send the hashed response.
 			if err := c.runSentence("/login", "=name="+user, "=response="+resp); err != nil {
 				return err
 			}
@@ -160,13 +120,11 @@ func (c *Client) login(host, user, password string) error {
 			return nil
 		}
 	}
-	// If no challenge was returned, login succeeded (v2).
 	c.apiVersion = 2
 	return nil
 }
 
 func challengeHex(ret string) string {
-	// ret is already a hex string of the challenge.
 	return ret
 }
 
@@ -175,7 +133,6 @@ func md5Of(s string) string {
 	return fmt.Sprintf("%x", h)
 }
 
-// runSentence writes a command sentence (command + words) to the wire.
 func (c *Client) runSentence(cmd string, words ...string) error {
 	if err := c.writeWord(cmd); err != nil {
 		return err
@@ -191,7 +148,6 @@ func (c *Client) runSentence(cmd string, words ...string) error {
 	return c.writeWord("")
 }
 
-// writeWord writes a single length-prefixed word.
 func (c *Client) writeWord(word string) error {
 	if err := c.writeLen(len(word)); err != nil {
 		return err
@@ -202,7 +158,6 @@ func (c *Client) writeWord(word string) error {
 	return c.w.Flush()
 }
 
-// writeLen writes a RouterOS length prefix.
 func (c *Client) writeLen(l int) error {
 	var buf []byte
 	switch {
@@ -222,7 +177,6 @@ func (c *Client) writeLen(l int) error {
 	return err
 }
 
-// readReplies reads sentences until the given terminator (e.g. "!done").
 func (c *Client) readReplies(terminator string) ([]Sentence, error) {
 	var out []Sentence
 	for {
@@ -234,7 +188,6 @@ func (c *Client) readReplies(terminator string) ([]Sentence, error) {
 			return out, nil
 		}
 		if word == "!trap" {
-			// Collect the error message.
 			msg := ""
 			for {
 				w, err := c.readWord()
@@ -277,7 +230,6 @@ func (c *Client) readReplies(terminator string) ([]Sentence, error) {
 	}
 }
 
-// readWord reads a single length-prefixed word.
 func (c *Client) readWord() (string, error) {
 	l, err := c.readLen()
 	if err != nil {
@@ -290,7 +242,6 @@ func (c *Client) readWord() (string, error) {
 	return string(buf), nil
 }
 
-// readLen reads a RouterOS length prefix.
 func (c *Client) readLen() (int, error) {
 	b, err := c.r.ReadByte()
 	if err != nil {
@@ -338,7 +289,6 @@ func (c *Client) readLen() (int, error) {
 	}
 }
 
-// Close gracefully terminates the connection.
 func (c *Client) Close() {
 	if c.conn != nil {
 		_ = c.conn.Close()
