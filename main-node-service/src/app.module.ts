@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { AppController } from './app.controller';
 import { AuthController } from './auth/auth.controller';
 import { ProxyController } from './proxy/proxy.controller';
@@ -20,6 +21,7 @@ import { ViewService } from './view/view.service';
 import { SecurityMiddleware } from './security/security.middleware';
 
 @Module({
+  imports: [HttpModule],
   controllers: [
     AppController,
     AuthController,
