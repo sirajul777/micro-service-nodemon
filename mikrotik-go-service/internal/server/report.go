@@ -14,7 +14,7 @@ import (
 
 const (
 	scriptProplist     = "=.proplist=.id,name"
-	liveReportCacheTTL = 10 * time.Second
+	liveReportCacheTTL = 60 * time.Second
 )
 
 type liveReportCacheEntry struct {
@@ -22,10 +22,15 @@ type liveReportCacheEntry struct {
 	expiresAt time.Time
 }
 
-var liveReportCache sync.Map
+type liveReportInflight struct {
+	done chan struct{}
+	rows []mikrotik.Sentence
+	err  error
+}
 
-// ListSellingScripts reads selling records directly from MikroTik
-// /system/script/print, matching the monolith's report source.
+var liveReportCache sync.Map
+var liveReportInflight sync.Map
+
 func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.ListSellingScriptsRequest) (*pb.ListSellingScriptsResponse, error) {
 	resp := &pb.ListSellingScriptsResponse{}
 	if req == nil || strings.TrimSpace(req.SessionId) == "" {
@@ -34,47 +39,73 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 
 	requestStarted := time.Now()
-
-	c, err := s.dial(ctx, req.SessionId)
-	if err != nil {
-		resp.Error = err.Error()
-		return resp, nil
-	}
-	defer c.Close()
-
-	// The live report sends idbl (current month) and does not need ROS
-	// version detection. Only the historical idhr path needs the RouterOS 6
-	// compatibility check.
 	isROS7 := true
-	if req.Idhr != "" {
-		versionRows, versionErr := c.RunContext(ctx, "/system/resource/print")
-		if versionErr != nil {
-			resp.Error = versionErr.Error()
-			return resp, nil
-		}
-		if len(versionRows) > 0 && strings.HasPrefix(versionRows[0]["version"], "6") {
-			isROS7 = false
-		}
-	}
-
 	cacheKey := reportCacheKey(req.SessionId, req.Idhr, req.Idbl, isROS7)
+
 	rows, ok := getLiveReportCache(cacheKey)
 	cacheState := "miss"
 	queryStarted := time.Now()
+
 	if ok {
 		cacheState = "hit"
 	} else {
-		rows, err = s.getSellingRows(ctx, c, isROS7, req.Idhr, req.Idbl)
-		if err != nil {
-			resp.Error = err.Error()
-			return resp, nil
-		}
-		if req.Idbl != "" {
-			setLiveReportCache(cacheKey, rows)
+		flight := &liveReportInflight{done: make(chan struct{})}
+		actual, loaded := liveReportInflight.LoadOrStore(cacheKey, flight)
+		if loaded {
+			cacheState = "wait"
+			f := actual.(*liveReportInflight)
+			select {
+			case <-f.done:
+				rows, ok = f.rows, f.err == nil
+				if f.err != nil {
+					resp.Error = f.err.Error()
+					return resp, nil
+				}
+			case <-ctx.Done():
+				resp.Error = ctx.Err().Error()
+				return resp, nil
+			}
+		} else {
+			defer liveReportInflight.Delete(cacheKey)
+			defer close(flight.done)
+
+			c, err := s.dial(ctx, req.SessionId)
+			if err != nil {
+				flight.err = err
+				resp.Error = err.Error()
+				return resp, nil
+			}
+			defer c.Close()
+
+			// Historical requests need RouterOS version detection; current-month
+			// requests can query directly without the extra round trip.
+			if req.Idhr != "" {
+				versionRows, versionErr := c.RunContext(ctx, "/system/resource/print")
+				if versionErr != nil {
+					flight.err = versionErr
+					resp.Error = versionErr.Error()
+					return resp, nil
+				}
+				if len(versionRows) > 0 && strings.HasPrefix(versionRows[0]["version"], "6") {
+					isROS7 = false
+					cacheKey = reportCacheKey(req.SessionId, req.Idhr, req.Idbl, isROS7)
+				}
+			}
+
+			rows, err = s.getSellingRows(ctx, c, isROS7, req.Idhr, req.Idbl)
+			if err != nil {
+				flight.err = err
+				resp.Error = err.Error()
+				return resp, nil
+			}
+			flight.rows = rows
+			if req.Idbl != "" {
+				setLiveReportCache(cacheKey, rows)
+			}
 		}
 	}
-	queryDuration := time.Since(queryStarted)
 
+	queryDuration := time.Since(queryStarted)
 	parseStarted := time.Now()
 	for _, row := range rows {
 		select {
@@ -181,12 +212,9 @@ func (s *RouterServiceServer) getSellingRows(ctx context.Context, c *mikrotik.Cl
 }
 
 type reportError struct{ message string }
-
 func (e *reportError) Error() string { return e.message }
 
 func valueAt(parts []string, index int) string {
-	if index < 0 || index >= len(parts) {
-		return ""
-	}
+	if index < 0 || index >= len(parts) { return "" }
 	return parts[index]
 }
