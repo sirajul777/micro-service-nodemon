@@ -1,3 +1,4 @@
+import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { ErpSessionStore } from './internal-grpc.store';
 import { MikrotikGrpcClient } from './clients/mikrotik-grpc.client';
@@ -19,6 +20,7 @@ function currentIdhr(date = new Date()): string {
   return `${MONTHS[date.getMonth()]}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
+@Controller()
 export class InternalGrpcController {
   private readonly reportRouter = new ReportRouterClient();
 
