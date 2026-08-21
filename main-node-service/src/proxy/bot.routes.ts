@@ -16,6 +16,19 @@ export async function handleBotGrpcRoute(
   try {
     if (root === 'resellers' || root === 'bot-resellers') {
       const isBot = root === 'bot-resellers';
+
+      // Legacy parity route: GET /resellers/session/:session
+      // The old REST service returns plain resellers filtered by router session.
+      if (!isBot && req.method === 'GET' && parts.length === 3 && parts[1] === 'session') {
+        const sessionId = decodeURIComponent(parts[2]);
+        const response = await bot.listResellers(false);
+        if (response.success === false) {
+          return res.status(502).json({ success: false, message: response.error || 'Bot gRPC reseller list failed' });
+        }
+        const filtered = (response.resellers || []).filter((row: any) => String(row.sessionId || '') === sessionId);
+        return res.status(200).json(filtered);
+      }
+
       if (req.method === 'GET' && parts.length === 1) {
         const response = await bot.listResellers(isBot);
         return res.status(response.success === false ? 502 : 200).json(response.resellers || []);
