@@ -27,8 +27,9 @@ COPY --from=builder /app/shared-protos/bot ./bot-proto
 COPY --from=builder /app/shared-protos/erp ./erp-proto
 COPY --from=builder /app/shared-protos/payment ./payment-proto
 
-# Keep the ERP proto at the exact path used by legacy ERP gRPC clients.
 RUN test -f /app/erp-proto/erp_internal.proto
+RUN test -f /app/auth-proto/auth.proto
+RUN test -f /app/payment-proto/payment_internal.proto
 
 EXPOSE 8080
 CMD ["node", "dist/main.js"]
