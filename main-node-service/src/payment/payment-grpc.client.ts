@@ -52,6 +52,9 @@ export class PaymentGrpcClient implements OnModuleDestroy {
   test(amount: number, profile: string) { return this.call('CreatePaymentTest', { amount, profile }, 15000); }
   get(orderId: string) { return this.call('GetPayment', { orderId }); }
   check(orderId: string) { return this.call('CheckPayment', { orderId }); }
+  processPayhookWebhook(payload: unknown) {
+    return this.call('ProcessPayhookWebhook', { payloadJson: JSON.stringify(payload ?? {}) }, 15000);
+  }
 
   close() { this.client?.close?.(); }
   onModuleDestroy() { this.close(); }
