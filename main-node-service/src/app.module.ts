@@ -28,9 +28,9 @@ import { SecurityMiddleware } from './security/security.middleware';
     AppController,
     AuthController,
     SessionController,
-    ProxyController,
-    PaymentWebhookController,
     QrisGrpcController,
+    PaymentWebhookController,
+    ProxyController,
     HealthController,
   ],
   providers: [
