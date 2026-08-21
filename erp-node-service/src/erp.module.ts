@@ -19,6 +19,7 @@ import { VoucherBatchController } from './voucher-batch/voucher-batch.controller
 import { RouterSessionController } from './router-session/router-session.controller';
 import { HotspotController } from './hotspot/hotspot.controller';
 import { ReportController } from './report/report.controller';
+import { ReportInternalController } from './report/report-internal.controller';
 import { VoucherGenerateController } from './voucher-generate/voucher-generate.controller';
 import { PppoeController } from './pppoe/pppoe.controller';
 import { OutboxService } from './outbox/outbox.service';
@@ -30,7 +31,7 @@ import { InternalGrpcModule } from './internal-grpc.module';
     HttpModule,
     InternalGrpcModule,
   ],
-  controllers: [VoucherTypeController, ProfileMetaController, VoucherBatchController, RouterSessionController, HotspotController, ReportController, VoucherGenerateController, PppoeController],
+  controllers: [VoucherTypeController, ProfileMetaController, VoucherBatchController, RouterSessionController, HotspotController, ReportController, ReportInternalController, VoucherGenerateController, PppoeController],
   providers: [
     AuthGrpcClient,
     JwtAuthGuard,
@@ -42,6 +43,6 @@ import { InternalGrpcModule } from './internal-grpc.module';
     ProfileMetaService,
     VoucherBatchService,
   ],
-  exports: [VoucherTypeService, ProfileMetaService, VoucherBatchService],
+  exports: [VoucherTypeService, ProfileMetaService, VoucherBatchService, MikrotikGrpcClient],
 })
 export class ErpModule {}
