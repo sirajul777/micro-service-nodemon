@@ -10,7 +10,13 @@ COPY bot-py-service/proto ./shared-protos/bot
 COPY erp-node-service/proto ./shared-protos/erp
 COPY payment-service/proto ./shared-protos/payment
 
+# Always compile from a clean TypeScript incremental state.
+RUN rm -f tsconfig.tsbuildinfo
 RUN npm run build
+
+# Fail the image build instead of shipping a broken dist tree.
+RUN test -f dist/app.module.js
+RUN test -f dist/proxy/payment-webhook.controller.js
 
 FROM node:22-alpine
 WORKDIR /app
