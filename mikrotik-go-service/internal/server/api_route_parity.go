@@ -22,7 +22,7 @@ func (s *RouterServiceServer) ListHotspotUsers(ctx context.Context, req *pb.List
 	if req.Comment != "" {
 		args = append(args, "?comment="+req.Comment)
 	}
-	rows, err := c.Run("/ip/hotspot/user/print", args...)
+	rows, err := c.RunContext(ctx, "/ip/hotspot/user/print", args...)
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, nil
@@ -46,7 +46,10 @@ func (s *RouterServiceServer) ListHotspotProfiles(ctx context.Context, req *pb.L
 	}
 	defer c.Close()
 
-	rows, err := c.Run("/ip/hotspot/user/profile/print")
+	// Restrict the RouterOS response to fields consumed by the ERP/BFF.
+	// This avoids transferring unrelated profile attributes over the API.
+	rows, err := c.RunContext(ctx, "/ip/hotspot/user/profile/print",
+		"=.proplist=.id,name,on-login,session-timeout,idle-timeout,rate-limit,shared-users,address-pool")
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, nil
@@ -71,7 +74,8 @@ func (s *RouterServiceServer) GetHotspotProfile(ctx context.Context, req *pb.Get
 	}
 	defer c.Close()
 
-	rows, err := c.Run("/ip/hotspot/user/profile/print", "?name="+req.Name)
+	rows, err := c.RunContext(ctx, "/ip/hotspot/user/profile/print", "?name="+req.Name,
+		"=.proplist=.id,name,on-login,session-timeout,idle-timeout,rate-limit,shared-users,address-pool")
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, nil
@@ -99,7 +103,7 @@ func (s *RouterServiceServer) ListPppActive(ctx context.Context, req *pb.ListPpp
 	}
 	defer c.Close()
 
-	rows, err := c.Run("/ppp/active/print")
+	rows, err := c.RunContext(ctx, "/ppp/active/print")
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, nil
