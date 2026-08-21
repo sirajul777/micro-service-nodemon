@@ -1,18 +1,16 @@
 import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { AxiosResponse } from 'axios';
-import { ErpGrpcClient } from '../erp/erp-grpc.client';
+import { ReportGrpcClient } from '../erp/report-grpc.client';
 
 /**
- * Temporary compatibility adapter for routes that have not yet been moved to
- * explicit gRPC handlers in ProxyController. It MUST NOT perform internal HTTP.
- * The final remaining compatibility route, ERP report/live, is translated to
- * the ERP internal gRPC contract. Every other internal route is rejected.
+ * Compatibility adapter for legacy routes. Internal service communication
+ * remains gRPC-only; this class never performs internal HTTP requests.
  */
 @Injectable()
 export class HttpProxyFallbackService {
   private readonly logger = new Logger(HttpProxyFallbackService.name);
 
-  constructor(private readonly erpGrpc: ErpGrpcClient) {}
+  constructor(private readonly reportGrpc: ReportGrpcClient) {}
 
   async forward(
     target: 'auth' | 'erp' | 'payment' | 'bot',
@@ -25,11 +23,11 @@ export class HttpProxyFallbackService {
     const match = path.match(/^\/report\/([^/]+)\/live$/);
     if (target === 'erp' && method === 'GET' && match) {
       try {
-        const response = await this.erpGrpc.getLiveReport(decodeURIComponent(match[1]));
+        const response = await this.reportGrpc.getLiveReport(decodeURIComponent(match[1]));
         if (!response?.success) {
-          throw new BadGatewayException(response?.error || 'ERP gRPC live report failed');
+          throw new BadGatewayException(response?.error || 'ERP report gRPC failed');
         }
-        this.logger.debug(`Translated legacy report/live route to ERP gRPC for session ${match[1]}`);
+        this.logger.debug(`Translated legacy report/live route to ReportInternalService gRPC for session ${match[1]}`);
         return {
           status: 200,
           statusText: 'OK',
@@ -43,9 +41,9 @@ export class HttpProxyFallbackService {
           config: {} as any,
         } as AxiosResponse;
       } catch (err: any) {
-        this.logger.error(`ERP gRPC report/live failed: ${err?.message || err}`, err?.stack);
+        this.logger.error(`Report gRPC live report failed: ${err?.message || err}`, err?.stack);
         if (err instanceof BadGatewayException) throw err;
-        throw new ServiceUnavailableException('ERP gRPC live report tidak tersedia');
+        throw new ServiceUnavailableException('Report gRPC live report tidak tersedia');
       }
     }
 
