@@ -1,6 +1,8 @@
+import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { VoucherBatchInternalStore } from './voucher-batch.store';
 
+@Controller()
 export class VoucherBatchInternalController {
   constructor(private readonly store: VoucherBatchInternalStore) {}
 
