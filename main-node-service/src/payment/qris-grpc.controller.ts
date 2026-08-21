@@ -27,13 +27,6 @@ export class QrisGrpcController {
     return { success: true, qrString: response.qrString, qrImage: response.qrImage || null };
   }
 
-  @Get('status/:orderId')
-  async status(@Param('orderId') orderId: string) {
-    const response = await this.payment.getQrisStatus(orderId);
-    if (!response?.success) return { success: false, error: response?.error || 'Order not found', status: response?.status || 'unknown' };
-    return response;
-  }
-
   @Get('orders')
   async listOrders(@Req() req: Request, @Query('status') status?: string) {
     await this.requireSession(req);
