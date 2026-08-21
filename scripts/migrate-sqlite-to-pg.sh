@@ -60,7 +60,9 @@ validate_columns() {
 }
 
 emit() {
-  local db="$1" table="$2" out="$OUT/$db.sql"
+  local db="$1"
+  local table="$2"
+  local out="$OUT/$db.sql"
 
   if ! sqlite3 "$DB" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='$table' LIMIT 1;" | grep -q '^1$'; then
     echo "  ℹ skip $table (not present in source SQLite)"
