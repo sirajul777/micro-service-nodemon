@@ -13,6 +13,7 @@ ENV NODE_ENV=production
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/proto ./proto
+COPY --from=builder /app/proto/erp_internal.proto /app/erp-proto/erp_internal.proto
+RUN test -f /app/erp-proto/erp_internal.proto
 EXPOSE 3002 50054
 CMD ["node", "dist/main.js"]
