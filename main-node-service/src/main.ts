@@ -3,12 +3,14 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { resolve } from 'path';
 import * as express from 'express';
 import { Eta } from 'eta';
-import * as RedisStore from 'connect-redis';
 import * as Redis from 'redis';
 import { AppModule } from './app.module';
 
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
+// connect-redis 6 exports a factory that receives the express-session module.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const RedisStoreFactory = require('connect-redis');
 
 const PORT = Number(process.env.PORT || 8080);
 
@@ -20,21 +22,17 @@ const PORT = Number(process.env.PORT || 8080);
 function buildSessionStore() {
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
-    // connect-redis v10 requires the `redis` (node-redis) client API, NOT
-    // ioredis. The `redis` package is a CJS module exporting `createClient`.
     const client = (Redis as any).createClient
       ? (Redis as any).createClient({ url: redisUrl })
       : new (Redis as any).default({ url: redisUrl });
     client.on('error', (e: any) =>
       console.error('[session-redis] error:', e?.message),
     );
-    if (typeof client.connect === 'function') client.connect();
-// connect-redis v10 CJS entry does `exports.RedisStore = RedisStore` (a
-    // named export, no `.default`). Resolve the class regardless of how the
-    // bundler/interop shapes it.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-    const RedisStoreCtor =
-      ((RedisStore as any).RedisStore || (RedisStore as any).default) as any;
+    if (typeof client.connect === 'function') client.connect().catch((e: any) =>
+      console.error('[session-redis] connect error:', e?.message),
+    );
+
+    const RedisStoreCtor = RedisStoreFactory(session);
     return new RedisStoreCtor({ client, prefix: 'mikhmon:ses:' });
   }
   console.warn('[session] REDIS_URL not set — using in-memory MemoryStore (single-instance only)');
