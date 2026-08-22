@@ -1,202 +1,48 @@
 # MikHMon — Microservice Migration Checklist
 
-> Companion to `ARCHITECTURE.md`. Tracks all steps needed to convert the monolith
-> (`../nodemon/`) into the microservice architecture. Update checkboxes as work progresses.
+> Companion to `ARCHITECTURE.md`. Tracks migration work and remaining verification. Keep source-of-truth items aligned with the current codebase.
 
-## Phase 0 — Infrastructure (no business logic)
-- [x] Fix `docker-compose.yml` service names & build contexts to match real folders
-      (`auth-node-service`, `bot-py-service`, `mikrotik-go-service`, add `main-node-service`, `erp-node-service`)
-- [x] Add `nginx.conf` (reverse proxy, TLS, route table to each service)
-- [x] Add per-service Postgres databases (init scripts / one `POSTGRES_DB` per service container)
-- [x] Add Redis with auth (broker + cache)
-- [x] Add local dev `.env.example` (shared env template)
-- [x] Scaffold minimal runnable stubs for all 6 services (health checks)
-- [x] Verify `docker compose config` resolves all 9 services (EXIT=0)
-- [x] Verify Go service compiles (`go build ./...` → EXIT=0)
-- [x] Verify Python service compiles (`py_compile` → OK)
-- [x] `docker compose up` — bring up all infra containers healthy (9/9 up; postgres + redis healthy)
+## Current architecture status
 
-## Phase 1 — Auth & User Management (`auth-node-service`)
-- [x] Scaffold NestJS + TypeORM; DB `db_auth`
-- [x] Entities: `users`, `app_config`, `mobile_user_tokens`
-- [x] `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/validate-token`, `POST /api/auth/change-password`
-- [x] JWT signing (@nestjs/jwt, shared secret via `JWT_SECRET`)
-- [x] Port user-management module (CRUD, permissions, roles, last-admin guard)
-- [x] Mobile token flow (`/api/mobile-auth/*`) ported
-- [x] Seed default admin (`mikhmon`/`1234`)
-- [x] Build verified (`nest build` → EXIT=0)
-- [ ] BFF login/session wired to auth-service (Phase 6)
+### Frontend
+- [x] React/Vite frontend added as the primary admin UI.
+- [x] Docker/Nginx serves React at `/` while `/api/*` remains on the BFF.
+- [x] Hotspot CRUD migrated to React.
+- [x] PPPoE CRUD migrated to React.
+- [x] Voucher Batch and Voucher Type CRUD migrated to React.
+- [x] Payment and QRIS operations migrated to React.
+- [x] Shared search/pagination table controls added.
 
-## Phase 2 — MikroTik Control (`mikrotik-go-service`)
-- [x] Scaffold Go gRPC server; DB `db_router`
-- [x] Entity: `router_sessions` (password encrypted at rest)
-- [x] gRPC methods: `AddHotspotUser`, `RemoveHotspotUser`, `GetDashboard`,
-      `ListActiveHotspotUsers`, `ListHotspotUsers`, `ListHotspotProfiles`,
-      `GetHotspotProfile`, `GetSystemResource`, `GetInterfaces`, `TestConnect`
-- [x] Port logic from `mikrotik.service.ts` (node-routeros) → `internal/mikrotik/client.go`
-      (RouterOS binary API: login MD5 challenge, length-prefixed frames, sentences)
-- [x] Health + metrics endpoints (`:8081/healthz`)
-- [x] Redis consumer wired (`voucher.batch.created`) → `internal/redis/consumer.go`
-- [x] Postgres store wired (`internal/store/store.go`, `db_router`)
-- [x] Build verified (`go build ./...` → EXIT=0) and `go vet` clean
-- [ ] PPPoE ops (pppoe.service.ts) — port pending
-- [ ] `voucher.batch.created` consumer → actually call `AddHotspotUser` per user (Phase 4 producer)
+### Internal service communication
+- [x] Main BFF routes migrated internal report/live access through gRPC; legacy HTTP fallback no longer performs internal HTTP calls.
+- [x] ERP auth guard validates tokens through AuthService gRPC.
+- [x] Payment auth guard validates tokens through AuthService gRPC.
+- [x] Bot ERP client migrated from HTTP to ERP gRPC.
+- [x] Bot auth validation migrated from HTTP to AuthService gRPC.
+- [x] MikroTik Go service remains the RouterOS boundary and exposes Router/Report APIs over gRPC.
+- [x] ERP build consumes canonical Router/Report proto contracts from `mikrotik-go-service` and validates wire-level parity during Docker build.
 
-## Phase 3 — Payment & Billing (`payment-service`)
-- [x] Scaffold NestJS + TypeORM; DB `db_payment`
-- [x] Entities (QRIS core): `payment_config`, `voucher_orders`, `payhook_callback_logs`, `payment_outbox`
-- [x] Port `payment-config.*`, QRIS/payhook flow (`VoucherOrderService`), scheduler, notifier
-- [x] Replace direct Mikrotik/Telegram/VoucherType calls with gRPC → Go, Redis outbox → bot, REST → erp
-- [x] Implement outbox publisher on settle (`payment.order.paid` / `payment.order.settled`)
-- [x] Admin verify / stats / callback monitor endpoints
-- [x] Build verified (`nest build` → EXIT=0, JS emitted, proto copied to `dist/proto`)
-- [ ] Billing/reseller entities (`billing_customers`, `invoices`, `settlements`,
-      `resellers`, `topup_requests`) — deferred to a later sub-step
-- [ ] Midtrans/Duitku gateway modules — deferred
+### ETL / PostgreSQL migration
+- [x] SQLite migration generator emits runnable PostgreSQL `COPY ... FROM STDIN` files.
+- [x] Column order is explicit and validated against `REMAP_*` mappings.
+- [x] Missing source columns are skipped so newer PostgreSQL schema fields use defaults/NULL.
+- [x] Migration produces `out/migration_row_counts.tsv` for source row counts.
+- [x] Restore script performs source-vs-target row-count verification.
+- [ ] Final restore verification must still be run against the operator's local `mikhmon.db` and PostgreSQL instance; repository code cannot claim those runtime counts until the command output is available.
 
-## Phase 4 — ERP / Voucher / Report (`erp-node-service`)
-- [x] Scaffold NestJS + TypeORM; DB `db_erp`
-- [x] Entities: `voucher_types`, `voucher_batches`, `profile_meta`
-- [x] Port voucher-types, voucher-batch, profile-meta modules (report deferred)
-- [x] Publish `voucher.batch.created` → Go pushes to router (Redis)
-- [x] gRPC → Go for router ops (TestConnect, ListHotspotUsers, RemoveHotspotUser, ListHotspotProfiles)
-- [x] JWT guard validates via auth-node-service (`POST /auth/validate-token`)
-- [x] Build verified (`nest build` → EXIT=0, JS emitted, proto copied to `dist/proto`)
-- [ ] Report module (selling/live/resume) — deferred; needs raw `/system/script` gRPC access
-- [ ] Consume `payment.order.paid` to decrement voucher stock — pending (event-driven, Phase 7)
+## Known remaining engineering work
 
-## Phase 5 — Bot / Telegram / WA (`bot-py-service`) ✅
-- [x] Scaffold Python service; DB `db_bot`
-- [x] Models: `BotReseller`, `TopupLog`, `TelegramConfig` (SQLAlchemy, `db.py` + `models.py`)
-- [x] `services/reseller_service.py` — CRUD, saldo topup/deduct, topup logs (port of `BotResellerService`)
-- [x] `services/tg_config_service.py` — DB-backed telegram configs + in-memory topup-request store
-- [x] `services/tg_api.py` — Telegram Bot API client (`sendMessage`, `editMessage`, `answerCallback`, `getUpdates`)
-- [x] `services/notifier.py` — WhatsApp voucher delivery (Fonnte/Wablas) with fallback (port of `PayhookNotifierService`)
-- [x] `services/redis_consumer.py` — consumes `payment.order.paid/settled/failed`, `billing.invoice.overdue`
-- [x] `services/tg_bot.py` — full Telegram long-polling bot: reseller + admin commands, inline flows, topup approve/reject
-- [x] `clients/erp_client.py` — HTTP → erp-service for active voucher types
-- [x] `clients/mikrotik_grpc.py` — gRPC → Go (degraded gracefully until stubs generated)
-- [x] `config.py` — env-driven (Redis, Postgres, health port, cross-service endpoints, WA defaults)
-- [x] `main.py` — bootstrap, Redis consumer thread, Telegram bot polling, HTTP health endpoint
-- [x] `Dockerfile` — python:3.11-slim, builds and runs
-- [x] `requirements.txt` — redis, psycopg2-binary, SQLAlchemy, requests, grpcio(+tools)
-- [x] **Verification** — `python3 -m py_compile` on all modules → EXIT=0
+### Runtime report/live verification
+- [ ] Rebuild/recreate `mikrotik-go-service`, `erp-node-service`, and `main-node-service` together after proto-contract changes.
+- [ ] Verify `/api/report/<session>/live` returns successfully in the deployed stack.
+- [ ] If `invalid wire type` persists after a clean rebuild, inspect the active container image/binary and RouterOS `getSellingRows()` path rather than changing the already-synced protobuf contract speculatively.
 
-## Phase 6 — Gateway / BFF (`main-node-service`) ✅
-- [x] Scaffold NestJS + Eta views (stateless)
-- [x] Move views + static assets from `nodemon/`
-- [x] Replace direct service calls with REST/gRPC/Redis (aggregate proxy)
-- [x] Wire auth guard to validate JWT from auth-service (session + validate-token)
-- [x] Remove all `@Optional()` cross-module injections (BFF holds no DB; proxy only)
-- [ ] Full app.js API-path mapping to the BFF proxy (deferred → Phase 7)
-- [ ] In-memory session → Redis store for horizontal scaling (deferred)
+### Deployment validation
+- [ ] Run `docker compose config` and full build on the deployment host.
+- [ ] Run `scripts/verify-e2e.sh` after the latest migration changes.
+- [ ] Validate `nginx -t`, Redis-backed session behavior with multiple BFF replicas, and shadow traffic before production cutover.
 
-## Phase 7 — Cutover & Cleanup (in progress)
-- [x] Verify all 6 services build: 4× Node `nest build` EXIT 0, Go `go build ./...` OK, Python `py_compile` OK
-- [x] Create per-service Postgres seed extractor (`scripts/migrate-sqlite-to-pg.sh`) → `out/db_{auth,erp,payment,router,bot}.sql`
-- [x] Row-preservation check: admin `USR-ADMIN` extracted from `nodemon/data/mikhmon.db` (1 user, 1 payment_config, remainder empty)
-- [x] Docker smoke test — `docker compose up` and verify nginx → BFF → services health
-- [ ] Shadow traffic / parallel run (monolith + microservices)
-- [ ] Full ETL: wrap the CSV extracts into per-entity COPY/INSERT matching each service's exact schema
-- [ ] Remove monolith, shared SQLite, `.patch` files
-- [ ] Final verification + smoke tests
-
-## Phase 8 — Optimization & Hardening ✅
-- [x] Security headers + correlation-id/latency logging middleware in BFF
-      (`src/security/security.middleware.ts`)
-- [x] Proxy resilience: per-target circuit breaker + idempotent retry +
-      reduced timeout (`src/proxy/proxy.service.ts`)
-- [x] Redis-backed session store (`connect-redis` + `ioredis`) with in-memory
-      fallback; `trust proxy` enabled (`src/main.ts`)
-- [x] Apply security middleware to all BFF routes (`src/app.module.ts`)
-- [x] nginx hardening: rate-limit zones (api 30r/s, login 5r/m) + security
-      headers on every response (`nginx/nginx.conf`)
-- [x] BFF env template documenting `REDIS_URL` / `SESSION_SECRET` / downstream
-      endpoints (`main-node-service/.env.example`)
-- [x] BFF `npm run build` → EXIT 0
-- [ ] Live: `nginx -t`, multi-BFF Redis session, and shadow-traffic validation
-
-## Phase 9 — Live Orchestration & End-to-End Verification ✅ (wiring & tooling)
-- [x] Wire Phase 8 `REDIS_URL` + `BOT_SERVICE_URL` into `main-node-service` in
-      compose; add `depends_on: redis-broker`; `docker compose config` EXIT=0
-- [x] Re-verify full build chain: 4× Node `nest build`, Go `go build`+`go vet`,
-      Python `py_compile` — all clean; Go gRPC stubs regenerated and compiling
-- [x] Upgrade `scripts/migrate-sqlite-to-pg.sh` to emit **runnable Postgres
-      `COPY ... FROM STDIN`** (quoted column headers from `pragma_table_info`,
-      `\N` NULL handling) into `out/db_{auth,erp,payment,router,bot}.sql`
-      (db_payment → 10 COPY blocks)
-- [x] Add `scripts/verify-e2e.sh`: nginx/BFF health, login→session→me, auth-guard
-      rejection, proxied payment-config, QRIS webhook routing, Redis reachability,
-      security headers, rate-limit smoke test
-- [x] Docs: `TODO-PHASE9.md` + this section
-- [x] Live: `docker compose up -d --build` → all containers healthy (Phase 12)
-- [x] Live: `scripts/verify-e2e.sh` → **15/15 pass** (Phase 12)
-- [x] Live: load `out/*.sql` into Postgres; db_auth/db_erp/db_router/db_bot row
-      counts match `mikhmon.db`; db_payment has known column-mapping caveat (Phase 12)
-- [x] Live: confirm `payment.order.*` / `billing.invoice.*` Redis events reach
-      bot-py-service — proven via test `payment.order.settled` event (Phase 12)
-
-## Phase 9 — Security Hardening (payment-service direct-route guard)
-- [x] Add `auth/permissions.decorator.ts` (NestJS `PermissionKey` + `PERMISSIONS_KEY`
-      + `RequirePermission` decorator) to payment-service
-- [x] Add `auth/jwt-auth.guard.ts` to payment-service — validates Bearer token
-      against auth-node-service `POST /auth/validate-token`, enforces
-      `manageBilling` / `manageSystem` permissions (admin always passes)
-- [x] Protect payment-service admin endpoints with `JwtAuthGuard` +
-      `RequirePermission('manageBilling')`:
-      `GET/POST /api/qris/orders*`, `/api/qris/orders/:id`,
-      `/api/qris/orders/:id/verify`, `/api/qris/callbacks`, `/api/qris/stats`
-- [x] Protect payment-service config endpoint with `JwtAuthGuard` +
-      `RequirePermission('manageSystem')`: `GET/POST /api/payment-config`
-- [x] `npm run build` in payment-service → EXIT 0 (guard wired, HttpModule already present)
-- [x] **Bug fix — JWT validation URL missing `/api` prefix:** both payment-service
-      and erp-node-service `jwt-auth.guard.ts` called `${AUTH_SERVICE_URL}/auth/validate-token`,
-      but auth-service's route is `/api/auth/validate-token`. Fixed both guards to
-      call `/api/auth/validate-token` — otherwise every guarded request would have
-      401'd (404 → UnauthorizedException), breaking all authenticated access.
-- [x] **Bug fix — QRIS admin UI would 401 (routing gap closed):** the frontend
-      (`app.js`) calls QRIS admin endpoints via `/api/qris/stats|orders|callbacks|
-      orders/:id/verify`. nginx routed `/api/qris/` straight to payment-service,
-      so the new `JwtAuthGuard` would 401 the cookie-session-only admin UI. Fixed
-      by routing `/api/qris/` through the BFF (nginx) and adding a `qris → payment`
-      alias to the BFF `ProxyController.TARGETS`, which enforces the session and
-      injects the cached JWT. Public customer routes (`/payments/payhook/app-webhook`,
-      `/api/qris/orders` POST, `/api/qris/orders/:id/qr` POST, `/qris/status/:id`)
-      remain public via a rewritten `isPublic` canonical-path check.
-- [x] Rebuild: **all 4 Node services** (`auth`, `erp`, `payment`, `main`) → EXIT 0
-      with the JWT URL fix + qris BFF routing in place.
-
-## Phase 10 — Router Sessions E2E + Final Verification & Cleanup ✅
-- [x] Router session management (CRUD + test-connect) wired end-to-end:
-      Go proto (`List/Get/Create/Update/DeleteSession`) + server + store → ERP
-      `RouterSessionController` (`/sessions*`, `/mikrotik/:id/connect/test`) →
-      BFF proxy `sessions`/`mikrotik` aliases → nginx `/api/sessions`,
-      `/api/mikrotik/` locations. Fixes the long-standing `GET /api/sessions` 404.
-- [x] BFF proxy route fix: `@All(['', ':rest(.*)'])` so bare `/api/sessions`
-      matches and multi-segment paths aren't truncated.
-- [x] Build verification — all 6 services compile cleanly with the sessions
-      feature (Go build+vet, 4× Nest build, Python compileall).
-- [x] Extended `scripts/verify-e2e.sh` with a Sessions CRUD test section.
-- [x] Live run: rebuilt/recreated the 3 changed services; `verify-e2e.sh` →
-      **15/15 pass** (incl. Sessions GET/POST/GET:test/DELETE).
-- [x] Cleanup: removed `.patch` dev artifacts and `public/backup-*` files.
-
-## Phase 11 — Missing Backend Logic for Frontend Feature Areas ✅
-- [x] bot-py REST controllers (`rest_api.py`): resellers + bot-resellers
-      (CRUD/toggle/topup/logs) and telegram config (list/get/save/delete/test/logs),
-      wired into `main.py`; Bearer-token validation against auth-service.
-- [x] BFF `ProxyController` aliases for `resellers`, `bot-resellers`, `telegram`,
-      `pppoe`, `report`, `billing`, `payments` (canonical-path pass-through).
-- [x] `nginx.conf` `location =` exact-match blocks for bare `/api/batches`,
-      `/api/voucher-types`, `/api/users`, `/api/report`, `/api/voucher`.
-- [x] Rebuilt `bot-py-service`, `main-node-service`, `api-gateway`; nginx config
-      valid; BFF started cleanly with all aliases + webhook routes mapped.
-- [x] Live: `GATEWAY_PORT=80 ./scripts/verify-e2e.sh` → **Passed: 15, Failed: 0**
-      (exit 0).
-- [x] PPPoE feature complete: Go proto + server RPCs (PppSecrets/PppProfiles/
-      PppActive: List/Get/Add/Update/Delete/Enable/Disable/Disconnect/ListPppPools)
-      implemented & `router.proto`/`router.pb.go`/`router_grpc.pb.go` regenerated.
-      ERP `mikrotik-grpc.client.ts` PPPoE methods + `PppoeController` added and
-      registered in `erp.module.ts`; `router.proto` (with PPPoE) synced to
-      erp/payment/bot proto copies. Full build chain verified: Go build+vet,
-      all 4 Node `nest build`, Python `compileall` → all exit 0.
+### Final cutover
+- [ ] Shadow traffic / parallel run.
+- [ ] Remove monolith-only runtime dependencies and shared SQLite after production verification.
+- [ ] Final end-to-end smoke test and rollback rehearsal.
