@@ -9,7 +9,7 @@ on:
 jobs:
   compose-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,3 +19,38 @@ jobs:
 
       - name: Build service images
         run: docker compose build --pull
+
+      - name: Start application services
+        run: docker compose up -d auth-node-service erp-node-service payment-service mikrotik-go-service bot-py-service main-node-service
+
+      - name: Wait for BFF health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/healthz >/tmp/healthz.json 2>/dev/null; then
+              cat /tmp/healthz.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'BFF health check failed'
+          docker compose ps
+          docker compose logs --tail=200 main-node-service auth-node-service erp-node-service payment-service mikrotik-go-service bot-py-service
+          exit 1
+
+      - name: Verify containers stay running
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose ps
+          exited=$(docker compose ps --status exited -q)
+          if [ -n "$exited" ]; then
+            echo 'One or more application containers exited unexpectedly'
+            docker compose logs --tail=200 $exited
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v --remove-orphans
