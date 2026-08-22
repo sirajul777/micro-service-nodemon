@@ -21,7 +21,7 @@ DATABASE_URL = os.getenv(
 HEALTH_PORT = int(os.getenv("HEALTH_PORT", "8082"))
 
 # ── Cross-service endpoints ────────────────────────────────────
-ERP_BASE_URL = os.getenv("ERP_BASE_URL", "http://localhost:3003")
+ERP_GRPC_ADDR = os.getenv("ERP_GRPC_ADDR", "localhost:50053")
 MIKROTIK_GRPC_ADDR = os.getenv("MIKROTIK_GRPC_ADDR", "localhost:50051")
 
 # ── Telegram / WhatsApp ────────────────────────────────────────
