@@ -21,8 +21,8 @@ DATABASE_URL = os.getenv(
 HEALTH_PORT = int(os.getenv("HEALTH_PORT", "8082"))
 
 # ── Cross-service gRPC endpoints ────────────────────────────────
-AUTH_GRPC_ADDR = os.getenv("AUTH_GRPC_ADDR", "localhost:50052")
-ERP_GRPC_ADDR = os.getenv("ERP_GRPC_ADDR", "localhost:50053")
+AUTH_GRPC_ADDR = os.getenv("AUTH_GRPC_ADDR", "auth-node-service:50052")
+ERP_GRPC_ADDR = os.getenv("ERP_GRPC_ADDR", "erp-node-service:50053")
 MIKROTIK_GRPC_ADDR = os.getenv("MIKROTIK_GRPC_ADDR", "localhost:50051")
 
 # ── Telegram / WhatsApp ────────────────────────────────────────
