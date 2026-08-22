@@ -258,7 +258,8 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-super_secure_redis_pass_123}
       - USE_REDIS_STREAMS=true
-      - MIKROTIK_GRPC_SERVER=mikrotik-go-service:50051
+      - MIKROTIK_GRPC_ADDR=mikrotik-go-service:50051
+      - ERP_GRPC_ADDR=erp-node-service:50053
       - BOT_GRPC_ADDR=0.0.0.0:50055
     depends_on:
       postgres-db:
@@ -266,6 +267,8 @@ services:
       redis-broker:
         condition: service_healthy
       mikrotik-go-service:
+        condition: service_started
+      erp-node-service:
         condition: service_started
     expose:
       - "50055"
