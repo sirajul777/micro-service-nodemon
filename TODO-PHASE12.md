@@ -1,6 +1,6 @@
 # Phase 12 — Live Cutover & Final Verification
 
-Closes out the remaining live-cutover work for the microservice stack. The runtime stack, live E2E path, Redis event flow, and migration generator are now implemented. Final database row-count verification remains environment-dependent because the source SQLite database must be available where the restore is performed.
+Closes out the remaining live-cutover work for the microservice stack. The runtime stack, live E2E path, Redis event flow, and migration generator are implemented. The restore scripts now perform source-vs-target row-count verification; the final checklist item remains environment-dependent until the actual `mikhmon.db` has been restored into the target PostgreSQL instance.
 
 ## Steps
 - [x] 1. Bring up the full stack — `docker compose up -d --build` (gateway, BFF,
@@ -12,14 +12,16 @@ Closes out the remaining live-cutover work for the microservice stack. The runti
        Sessions CRUD).
 - [x] 3. Data migration generator — `scripts/migrate-sqlite-to-pg.sh` now emits
        COPY data with SELECT order matching the target column order, handles
-       schema drift by omitting source-missing columns, and fails clearly when
-       required source data is unavailable. This fixes the previous silent
-       column-shift risk in payment/router/bot migration output.
+       schema drift by omitting source-missing columns, and emits
+       `out/migration_row_counts.tsv` with source row counts for every migrated
+       table. This fixes the previous silent column-shift risk in
+       payment/router/bot migration output.
 - [ ] 4. Final data restore verification — run the generator against the actual
-       `mikhmon.db`, execute `scripts/restore_from_out.sh`, then compare row
-       counts and representative payment rows between SQLite and PostgreSQL.
-       The current repository state cannot claim this step complete without the
-       source DB and running PostgreSQL instance in the execution environment.
+       `mikhmon.db` and execute `scripts/restore_from_out.sh`. The restore script
+       now compares every migrated source row count against the PostgreSQL target
+       row count and exits non-zero on any mismatch. The repository cannot claim
+       this step complete until that command has been run against the real source
+       DB and target PostgreSQL instance.
 - [x] 5. Event-flow proof — published a test `payment.order.settled` event to
        the Redis stream; `ms_python_bot` consumer received & dispatched it
        (`[event] payment.order.settled -> {...}` logged). Redis event →
@@ -35,10 +37,7 @@ bash scripts/migrate-sqlite-to-pg.sh ../nodemon/data/mikhmon.db
 ./scripts/restore_from_out.sh
 ```
 
-Then verify the payment database with:
-
-```sql
-SELECT COUNT(*) FROM payment_config;
-SELECT COUNT(*) FROM voucher_orders;
-SELECT COUNT(*) FROM payhook_callback_logs;
-```
+`restore_from_out.sh` now prints `source=<n> target=<n> ✓` for each migrated
+source table and exits with an error if any count differs. It also prints the
+important Payment table counts (`payment_config`, `voucher_orders`,
+`payhook_callback_logs`) after verification.
