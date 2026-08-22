@@ -9,6 +9,7 @@ set -euo pipefail
 
 DB="${1:-../nodemon/data/mikhmon.db}"
 OUT="./out"
+MANIFEST="$OUT/migration_row_counts.tsv"
 mkdir -p "$OUT"
 
 command -v sqlite3 >/dev/null 2>&1 || { echo "ERROR: sqlite3 CLI not found" >&2; exit 1; }
@@ -71,6 +72,11 @@ filter_existing_columns() {
   printf '%s' "${kept[*]}"
 }
 
+: > "$MANIFEST"
+printf '# db\ttarget\tsource\trows\n' > "$MANIFEST"
+
+echo "  Row-count manifest: $MANIFEST"
+
 emit() {
   local db="$1"
   local table="$2"
@@ -96,6 +102,10 @@ emit() {
     fi
     select_expr=$(select_cols "$cols")
   fi
+
+  local source_rows
+  source_rows="$(sqlite3 "$DB" "SELECT COUNT(*) FROM \"$table\";")"
+  printf '%s\t%s\t%s\t%s\n' "$db" "$target" "$table" "$source_rows" >> "$MANIFEST"
 
   local copy_cols
   copy_cols=$(quote_cols "$cols")
@@ -151,4 +161,5 @@ done
 
 echo "✔ Column-order validation passed for every remapped source table."
 echo "  Missing source columns were omitted; target PostgreSQL defaults/nullability will apply."
+echo "  Source row-count manifest generated at $MANIFEST."
 echo "  Load only after the target services have created their PostgreSQL schema."
