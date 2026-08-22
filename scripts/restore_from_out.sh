@@ -7,9 +7,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT_DIR/out"
 PG_USER="${POSTGRES_USER:-admin_mikrotik}"
+MANIFEST="$OUT_DIR/migration_row_counts.tsv"
 
 if [ ! -d "$OUT_DIR" ]; then
   echo "out/ directory not found at $OUT_DIR" >&2
+  exit 1
+fi
+
+if [ ! -f "$MANIFEST" ]; then
+  echo "migration row-count manifest not found at $MANIFEST" >&2
+  echo "Run scripts/migrate-sqlite-to-pg.sh first." >&2
   exit 1
 fi
 
@@ -41,32 +48,41 @@ run_import "$OUT_DIR/db_router.sql" db_router
 run_import "$OUT_DIR/db_bot.sql" db_bot
 
 echo
-echo "Restore complete. Row-count verification:"
+echo "Restore complete. Verifying restored row counts against source manifest..."
 
-run_count() {
-  local db="$1"
-  local table="$2"
-  if compose_psql "$db" -Atc "SELECT to_regclass('$table') IS NOT NULL;" | grep -qx 't'; then
-    local count
-    count="$(compose_psql "$db" -Atc "SELECT COUNT(*) FROM \"$table\";")"
-    printf '  %-12s %-28s %s\n' "$db" "$table" "$count"
+failures=0
+
+while IFS=$'\t' read -r db target source expected; do
+  case "$db" in
+    ""|\#*) continue ;;
+  esac
+
+  actual="$(compose_psql "$db" -Atc "SELECT COUNT(*) FROM \"$target\";")"
+
+  if [ "$actual" = "$expected" ]; then
+    printf '  %-12s %-28s source=%-8s target=%-8s ✓\n' "$db" "$target" "$expected" "$actual"
   else
-    printf '  %-12s %-28s %s\n' "$db" "$table" 'missing'
+    printf '  %-12s %-28s source=%-8s target=%-8s ✗\n' "$db" "$target" "$expected" "$actual"
+    failures=$((failures + 1))
   fi
-}
-
-run_count db_auth users
-run_count db_auth app_config
-run_count db_erp voucher_types
-run_count db_erp voucher_batches
-run_count db_erp profile_meta
-run_count db_payment payment_config
-run_count db_payment voucher_orders
-run_count db_payment payhook_callback_logs
-run_count db_router router_sessions
-run_count db_bot bot_resellers
-run_count db_bot topup_logs
-run_count db_bot telegram_configs
+done < "$MANIFEST"
 
 echo
-echo "✔ Restore + row-count verification complete."
+echo "Important tables:"
+for spec in \
+  'db_payment payment_config' \
+  'db_payment voucher_orders' \
+  'db_payment payhook_callback_logs'; do
+  read -r db table <<< "$spec"
+  count="$(compose_psql "$db" -Atc "SELECT COUNT(*) FROM \"$table\";")"
+  printf '  %-12s %-28s %s\n' "$db" "$table" "$count"
+done
+
+if [ "$failures" -ne 0 ]; then
+  echo
+  echo "ERROR: $failures row-count verification(s) failed." >&2
+  exit 1
+fi
+
+echo
+echo "✔ Restore + source-vs-target row-count verification complete."
