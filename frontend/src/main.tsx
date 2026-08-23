@@ -6,8 +6,8 @@ import PaymentPage from './PaymentPage';
 
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
-  if (path === '/payments') return <PaymentPage kind="payments" data={[]} loading={false} onReload={() => window.location.reload()} />;
-  if (path === '/qris-ops') return <PaymentPage kind="qris" data={{ stats: null, orders: [], callbacks: [] }} loading={false} onReload={() => window.location.reload()} />;
+  if (path === '/payments') return <PaymentPage kind="payments" />;
+  if (path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
 
