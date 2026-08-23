@@ -15,6 +15,7 @@ import (
 const (
 	scriptProplist     = "=.proplist=.id,name"
 	liveReportCacheTTL = 60 * time.Second
+	liveReportTimeout  = 20 * time.Second
 )
 
 type liveReportCacheEntry struct {
@@ -39,9 +40,31 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 
 	requestStarted := time.Now()
-	isROS7 := true
-	cacheKey := reportCacheKey(req.SessionId, req.Idhr, req.Idbl, isROS7)
+	queryCtx, cancel := context.WithTimeout(ctx, liveReportTimeout)
+	defer cancel()
 
+	// Detect the RouterOS generation before selecting the cache/in-flight key.
+	// This prevents ROS6 and ROS7 requests from sharing an incorrect flight.
+	isROS7 := true
+	c, err := s.dial(queryCtx, req.SessionId)
+	if err != nil {
+		resp.Error = err.Error()
+		return resp, nil
+	}
+	defer c.Close()
+
+	if req.Idhr != "" {
+		versionRows, versionErr := c.RunContext(queryCtx, "/system/resource/print")
+		if versionErr != nil {
+			resp.Error = versionErr.Error()
+			return resp, nil
+		}
+		if len(versionRows) > 0 && strings.HasPrefix(versionRows[0]["version"], "6") {
+			isROS7 = false
+		}
+	}
+
+	cacheKey := reportCacheKey(req.SessionId, req.Idhr, req.Idbl, isROS7)
 	rows, ok := getLiveReportCache(cacheKey)
 	cacheState := "miss"
 	queryStarted := time.Now()
@@ -61,38 +84,16 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 					resp.Error = f.err.Error()
 					return resp, nil
 				}
-			case <-ctx.Done():
-				resp.Error = ctx.Err().Error()
+			case <-queryCtx.Done():
+				resp.Error = queryCtx.Err().Error()
 				return resp, nil
 			}
 		} else {
 			defer liveReportInflight.Delete(cacheKey)
 			defer close(flight.done)
 
-			c, err := s.dial(ctx, req.SessionId)
-			if err != nil {
-				flight.err = err
-				resp.Error = err.Error()
-				return resp, nil
-			}
-			defer c.Close()
-
-			// Historical requests need RouterOS version detection; current-month
-			// requests can query directly without the extra round trip.
-			if req.Idhr != "" {
-				versionRows, versionErr := c.RunContext(ctx, "/system/resource/print")
-				if versionErr != nil {
-					flight.err = versionErr
-					resp.Error = versionErr.Error()
-					return resp, nil
-				}
-				if len(versionRows) > 0 && strings.HasPrefix(versionRows[0]["version"], "6") {
-					isROS7 = false
-					cacheKey = reportCacheKey(req.SessionId, req.Idhr, req.Idbl, isROS7)
-				}
-			}
-
-			rows, err = s.getSellingRows(ctx, c, isROS7, req.Idhr, req.Idbl)
+			// Reuse the already-open router connection for the actual query.
+			rows, err = s.getSellingRows(queryCtx, c, isROS7, req.Idhr, req.Idbl)
 			if err != nil {
 				flight.err = err
 				resp.Error = err.Error()
@@ -109,8 +110,8 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	parseStarted := time.Now()
 	for _, row := range rows {
 		select {
-		case <-ctx.Done():
-			resp.Error = ctx.Err().Error()
+		case <-queryCtx.Done():
+			resp.Error = queryCtx.Err().Error()
 			return resp, nil
 		default:
 		}
@@ -132,10 +133,11 @@ func (s *RouterServiceServer) ListSellingScripts(ctx context.Context, req *pb.Li
 	}
 	parseDuration := time.Since(parseStarted)
 
-	log.Printf("[report] session=%s idbl=%s idhr=%s cache=%s rows=%d parsed=%d query_ms=%d parse_ms=%d total_ms=%d",
+	log.Printf("[report] session=%s idbl=%s idhr=%s ros7=%t cache=%s rows=%d parsed=%d query_ms=%d parse_ms=%d total_ms=%d",
 		req.SessionId,
 		req.Idbl,
 		req.Idhr,
+		isROS7,
 		cacheState,
 		len(rows),
 		len(resp.Scripts),
@@ -215,6 +217,8 @@ type reportError struct{ message string }
 func (e *reportError) Error() string { return e.message }
 
 func valueAt(parts []string, index int) string {
-	if index < 0 || index >= len(parts) { return "" }
+	if index < 0 || index >= len(parts) {
+		return ""
+	}
 	return parts[index]
 }
