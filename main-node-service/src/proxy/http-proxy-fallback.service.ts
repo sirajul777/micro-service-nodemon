@@ -34,17 +34,17 @@ export class HttpProxyFallbackService {
   ): Promise<LegacyProxyResponse> {
     const match = path.match(/^\/report\/([^/]+)\/live$/);
     if (target === 'erp' && method === 'GET' && match) {
+      const session = decodeURIComponent(match[1]);
       try {
-        const response = await this.reportGrpc.getLiveReport(
-          decodeURIComponent(match[1]),
-        );
+        const response = await this.reportGrpc.getLiveReport(session);
         if (!response?.success) {
           throw new BadGatewayException(
             response?.error || 'ERP report gRPC failed',
           );
         }
+
         this.logger.debug(
-          `Translated legacy report/live route to ReportInternalService gRPC for session ${match[1]}`,
+          `Translated legacy report/live route to ReportInternalService gRPC for session ${session}`,
         );
         return {
           status: 200,
@@ -67,12 +67,12 @@ export class HttpProxyFallbackService {
       } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
         this.logger.error(
-          `Report gRPC live report failed: ${error.message}`,
+          `Report gRPC live report failed for ${session}: ${error.message}`,
           error.stack,
         );
         if (err instanceof BadGatewayException) throw err;
         throw new ServiceUnavailableException(
-          'Report gRPC live report tidak tersedia',
+          `Report gRPC live report tidak tersedia: ${error.message}`,
         );
       }
     }
