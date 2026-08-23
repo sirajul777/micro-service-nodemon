@@ -9,17 +9,10 @@ COPY erp-node-service/ ./
 COPY mikrotik-go-service/proto/router.proto /tmp/canonical-router.proto
 COPY mikrotik-go-service/proto/reportproto/report_router.proto /tmp/canonical-report-router.proto
 
-# The Go contracts carry an optional go_package declaration while the Node
-# loader does not need it. Compare the wire-level contract after removing
-# that language-specific declaration so drift in RPC/message definitions
-# fails the build, while the valid language-specific option remains allowed.
-RUN sed '/^[[:space:]]*option go_package[[:space:]]*=/d' proto/router.proto > /tmp/local-router.proto \
-    && sed '/^[[:space:]]*option go_package[[:space:]]*=/d' /tmp/canonical-router.proto > /tmp/source-router.proto \
-    && sed '/^[[:space:]]*option go_package[[:space:]]*=/d' proto/report_router.proto > /tmp/local-report-router.proto \
-    && sed '/^[[:space:]]*option go_package[[:space:]]*=/d' /tmp/canonical-report-router.proto > /tmp/source-report-router.proto \
-    && cmp -s /tmp/local-router.proto /tmp/source-router.proto \
-    && cmp -s /tmp/local-report-router.proto /tmp/source-report-router.proto \
-    && cp /tmp/canonical-router.proto proto/router.proto \
+# Canonical MikroTik proto files are the single source of truth for the RouterService
+# and ReportRouterService contracts. Replace local copies before compiling so stale
+# ERP copies can never produce client/server wire mismatches.
+RUN cp /tmp/canonical-router.proto proto/router.proto \
     && cp /tmp/canonical-report-router.proto proto/report_router.proto
 
 RUN test -f src/main.ts
