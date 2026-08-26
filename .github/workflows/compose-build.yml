@@ -44,19 +44,24 @@ jobs:
         run: |
           set -euo pipefail
           docker compose exec -T main-node-service node - <<'NODE'
-          const services = [
-            ['auth-node-service', 3001],
-            ['erp-node-service', 3003],
-            ['payment-service', 3002],
-            ['mikrotik-go-service', 8081],
-          ];
-          for (const [host, port] of services) {
-            const url = `http://${host}:${port}/healthz`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`${url} -> HTTP ${response.status}`);
-            const body = await response.text();
-            console.log(`${url} -> ${body}`);
-          }
+          (async () => {
+            const services = [
+              ['auth-node-service', 3001],
+              ['erp-node-service', 3003],
+              ['payment-service', 3002],
+              ['mikrotik-go-service', 8081],
+            ];
+            for (const [host, port] of services) {
+              const url = `http://${host}:${port}/healthz`;
+              const response = await fetch(url);
+              if (!response.ok) throw new Error(`${url} -> HTTP ${response.status}`);
+              const body = await response.text();
+              console.log(`${url} -> ${body}`);
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
           NODE
 
       - name: Verify internal gRPC ports
@@ -64,24 +69,29 @@ jobs:
         run: |
           set -euo pipefail
           docker compose exec -T main-node-service node - <<'NODE'
-          const net = require('node:net');
-          const targets = [
-            ['auth-node-service', 50052],
-            ['erp-node-service', 50053],
-            ['payment-service', 50054],
-            ['bot-py-service', 50055],
-            ['mikrotik-go-service', 50051],
-          ];
-          const check = (host, port) => new Promise((resolve, reject) => {
-            const socket = net.createConnection({ host, port, timeout: 3000 });
-            socket.once('connect', () => { socket.destroy(); resolve(); });
-            socket.once('timeout', () => { socket.destroy(); reject(new Error(`${host}:${port} timed out`)); });
-            socket.once('error', reject);
+          (async () => {
+            const net = require('node:net');
+            const targets = [
+              ['auth-node-service', 50052],
+              ['erp-node-service', 50053],
+              ['payment-service', 50054],
+              ['bot-py-service', 50055],
+              ['mikrotik-go-service', 50051],
+            ];
+            const check = (host, port) => new Promise((resolve, reject) => {
+              const socket = net.createConnection({ host, port, timeout: 3000 });
+              socket.once('connect', () => { socket.destroy(); resolve(); });
+              socket.once('timeout', () => { socket.destroy(); reject(new Error(`${host}:${port} timed out`)); });
+              socket.once('error', reject);
+            });
+            for (const [host, port] of targets) {
+              await check(host, port);
+              console.log(`${host}:${port} -> reachable`);
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
           });
-          for (const [host, port] of targets) {
-            await check(host, port);
-            console.log(`${host}:${port} -> reachable`);
-          }
           NODE
 
       - name: Verify containers stay running
