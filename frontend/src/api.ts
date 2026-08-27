@@ -36,4 +36,9 @@ export const payment = {
   listQrisOrders: (status = '') => api(`/api/qris/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`), getQrisStatus: (id: string) => api(`/api/qris/status/${encodeURIComponent(id)}`), getQrisStats: () => api('/api/qris/stats'), callbacks: (limit = 100) => api(`/api/qris/callbacks?limit=${limit}`)
 };
 export const reseller = { session: (session: string) => api(`/api/resellers/session/${sessionPath(session)}`) };
-export const reports = { live: (session: string) => api(`/api/report/${sessionPath(session)}/live`) };
+export const reports = {
+  live: (session: string) => api(`/api/report/${sessionPath(session)}/live`),
+  selling: (session: string, params: Record<string,string> = {}) => { const q = new URLSearchParams(params).toString(); return api(`/api/report/${sessionPath(session)}/selling${q ? `?${q}` : ''}`); },
+  resume: (session: string, idbl?: string) => api(`/api/report/${sessionPath(session)}/resume${idbl ? `?idbl=${encodeURIComponent(idbl)}` : ''}`),
+  clear: (session: string, params: { idhr?: string; idbl?: string } = {}) => { const q = new URLSearchParams(params).toString(); return api(`/api/report/${sessionPath(session)}/selling${q ? `?${q}` : ''}`, { method: 'DELETE' }); },
+};
