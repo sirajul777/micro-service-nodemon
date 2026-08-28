@@ -1,6 +1,18 @@
-import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { AxiosResponse } from 'axios';
+import {
+  BadGatewayException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ReportGrpcClient } from '../erp/report-grpc.client';
+
+type LegacyProxyResponse = {
+  status: number;
+  statusText: string;
+  data: unknown;
+  headers: Record<string, string>;
+  config: Record<string, never>;
+};
 
 /**
  * Compatibility adapter for legacy routes. Internal service communication
@@ -17,40 +29,60 @@ export class HttpProxyFallbackService {
     path: string,
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     _token: string | null,
-    _body?: any,
-    _query?: any,
-  ): Promise<AxiosResponse> {
+    _body?: unknown,
+    _query?: unknown,
+  ): Promise<LegacyProxyResponse> {
     const match = path.match(/^\/report\/([^/]+)\/live$/);
     if (target === 'erp' && method === 'GET' && match) {
+      const session = decodeURIComponent(match[1]);
       try {
-        const response = await this.reportGrpc.getLiveReport(decodeURIComponent(match[1]));
+        const response = await this.reportGrpc.getLiveReport(session);
         if (!response?.success) {
-          throw new BadGatewayException(response?.error || 'ERP report gRPC failed');
+          throw new BadGatewayException(
+            response?.error || 'ERP report gRPC failed',
+          );
         }
-        this.logger.debug(`Translated legacy report/live route to ReportInternalService gRPC for session ${match[1]}`);
+
+        this.logger.debug(
+          `Translated legacy report/live route to ReportInternalService gRPC for session ${session}`,
+        );
         return {
           status: 200,
           statusText: 'OK',
           data: {
-            today: { vouchers: Number(response.todayVouchers || 0), income: Number(response.todayIncome || 0) },
-            month: { vouchers: Number(response.monthVouchers || 0), income: Number(response.monthIncome || 0) },
+            today: {
+              vouchers: Number(response.todayVouchers || 0),
+              income: Number(response.todayIncome || 0),
+            },
+            month: {
+              vouchers: Number(response.monthVouchers || 0),
+              income: Number(response.monthIncome || 0),
+            },
             currency: String(response.currency || 'Rp'),
             isIndo: Boolean(response.isIndo),
           },
           headers: {},
-          config: {} as any,
-        } as AxiosResponse;
-      } catch (err: any) {
-        this.logger.error(`Report gRPC live report failed: ${err?.message || err}`, err?.stack);
+          config: {},
+        };
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.logger.error(
+          `Report gRPC live report failed for ${session}: ${error.message}`,
+          error.stack,
+        );
         if (err instanceof BadGatewayException) throw err;
-        throw new ServiceUnavailableException('Report gRPC live report tidak tersedia');
+        throw new ServiceUnavailableException(
+          `Report gRPC live report tidak tersedia: ${error.message}`,
+        );
       }
     }
 
-    throw new BadGatewayException(`Internal route ${method} ${target}${path} wajib menggunakan gRPC`);
+    throw new BadGatewayException(
+      `Internal route ${method} ${target}${path} wajib menggunakan gRPC`,
+    );
   }
 
-  respond(resp: AxiosResponse): { status: number; body: any } {
+  respond(resp: LegacyProxyResponse): { status: number; body: unknown } {
     return { status: resp.status, body: resp.data };
   }
 }

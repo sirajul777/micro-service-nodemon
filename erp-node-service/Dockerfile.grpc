@@ -6,8 +6,14 @@ COPY erp-node-service/package.json erp-node-service/package-lock.json* ./
 RUN npm install
 
 COPY erp-node-service/ ./
-COPY mikrotik-go-service/proto/router.proto ./proto/router.proto
-COPY mikrotik-go-service/proto/reportproto/report_router.proto ./proto/report_router.proto
+COPY mikrotik-go-service/proto/router.proto /tmp/canonical-router.proto
+COPY mikrotik-go-service/proto/reportproto/report_router.proto /tmp/canonical-report-router.proto
+
+# Canonical MikroTik proto files are the single source of truth for the RouterService
+# and ReportRouterService contracts. Replace local copies before compiling so stale
+# ERP copies can never produce client/server wire mismatches.
+RUN cp /tmp/canonical-router.proto proto/router.proto \
+    && cp /tmp/canonical-report-router.proto proto/report_router.proto
 
 RUN test -f src/main.ts
 RUN test -f src/app.module.ts

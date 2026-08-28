@@ -1,5 +1,4 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { HttpModule } from '@nestjs/axios';
 import { AppController } from './app.controller';
 import { AuthController } from './auth/auth.controller';
 import { ProxyController } from './proxy/proxy.controller';
@@ -23,13 +22,12 @@ import { VoucherTypeGrpcClient } from './erp/voucher-type-grpc.client';
 import { ReportGrpcClient } from './erp/report-grpc.client';
 import { BotGrpcClient } from './bot/bot-grpc.client';
 import { PaymentGrpcClient } from './payment/payment-grpc.client';
-import { ProxyService } from './proxy/proxy.service';
 import { HttpProxyFallbackService } from './proxy/http-proxy-fallback.service';
 import { ViewService } from './view/view.service';
 import { SecurityMiddleware } from './security/security.middleware';
 
 @Module({
-  imports: [HttpModule],
+  imports: [],
   controllers: [
     AppController,
     AuthController,
@@ -56,7 +54,6 @@ import { SecurityMiddleware } from './security/security.middleware';
     ReportGrpcClient,
     BotGrpcClient,
     PaymentGrpcClient,
-    ProxyService,
     HttpProxyFallbackService,
     ViewService,
   ],

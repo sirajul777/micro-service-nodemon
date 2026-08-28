@@ -1,8 +1,6 @@
 # Phase 12 — Live Cutover & Final Verification
 
-Closes out every remaining "live" item that was blocked on Docker. This phase
-brings the whole microservice stack up, proves the end-to-end path, runs the
-data ETL cutover, demonstrates the Redis event flow, and cleans up dev artifacts.
+Closes out the remaining live-cutover work for the microservice stack. The runtime stack, live E2E path, Redis event flow, and migration generator are implemented. The restore scripts now perform source-vs-target row-count verification; the final checklist item remains environment-dependent until the actual `mikhmon.db` has been restored into the target PostgreSQL instance.
 
 ## Steps
 - [x] 1. Bring up the full stack — `docker compose up -d --build` (gateway, BFF,
@@ -12,20 +10,34 @@ data ETL cutover, demonstrates the Redis event flow, and cleans up dev artifacts
        (nginx/BFF health, login→session→me, auth-guard, proxied payment-config,
        QRIS webhook, Redis reachability, security headers, rate-limit smoke,
        Sessions CRUD).
-- [x] 3. Data cutover (ETL) — `scripts/restore_from_out.sh` loaded the 5 dumps.
-       Row counts confirmed vs `mikhmon.db`:
-       db_auth users=4 ✓ (app_config=0 vs src 1 — key mismatch), db_erp
-       profile_meta=14/voucher_batches=28/voucher_types=8 ✓ all match,
-       db_router router_sessions=1 ✓, db_bot bot_resellers=8/topup_logs=347/
-       telegram_configs=1 ✓ all match. db_payment shows 0 for
-       voucher_orders/payment_config/billing_* due to the known SQLite→PG
-       column-order/type mismatch in the raw COPY dump (documented caveat);
-       payment flow still proven by E2E payment-config check.
-- [x] 4. Event-flow proof — published a test `payment.order.settled` event to
+- [x] 3. Data migration generator — `scripts/migrate-sqlite-to-pg.sh` now emits
+       COPY data with SELECT order matching the target column order, handles
+       schema drift by omitting source-missing columns, and emits
+       `out/migration_row_counts.tsv` with source row counts for every migrated
+       table. This fixes the previous silent column-shift risk in
+       payment/router/bot migration output.
+- [ ] 4. Final data restore verification — run the generator against the actual
+       `mikhmon.db` and execute `scripts/restore_from_out.sh`. The restore script
+       now compares every migrated source row count against the PostgreSQL target
+       row count and exits non-zero on any mismatch. The repository cannot claim
+       this step complete until that command has been run against the real source
+       DB and target PostgreSQL instance.
+- [x] 5. Event-flow proof — published a test `payment.order.settled` event to
        the Redis stream; `ms_python_bot` consumer received & dispatched it
        (`[event] payment.order.settled -> {...}` logged). Redis event →
        bot-py voucher-delivery path confirmed end-to-end.
-- [x] 5. Cleanup — removed `bff-route-aliases-and-axios-fix.patch`; the
-       `backup-*` files and other `.patch` artifacts were already removed in
-       Phase 10. Working tree clean except this doc.
-- [ ] 6. Docs — update `TODO.md` Phase 12 section; mark live items complete.
+- [x] 6. Cleanup — removed obsolete patch/backup artifacts from the migration
+       work. Repository working tree is expected to remain clean after the
+       final verification step.
+
+## Current verification command
+
+```bash
+bash scripts/migrate-sqlite-to-pg.sh ../nodemon/data/mikhmon.db
+./scripts/restore_from_out.sh
+```
+
+`restore_from_out.sh` now prints `source=<n> target=<n> ✓` for each migrated
+source table and exits with an error if any count differs. It also prints the
+important Payment table counts (`payment_config`, `voucher_orders`,
+`payhook_callback_logs`) after verification.
