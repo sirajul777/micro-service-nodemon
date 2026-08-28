@@ -9,6 +9,7 @@ import PppoeProfilesPage from './pages/PppoeProfilesPage';
 import PppoeSecretsPage from './pages/PppoeSecretsPage';
 import PppoeActivePage from './pages/PppoeActivePage';
 import VoucherOperationsPage from './pages/VoucherOperationsPage';
+import SchedulerPage from './pages/SchedulerPage';
 
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -19,6 +20,7 @@ function Root() {
   if (path === '/pppoe-secrets') return <PppoeSecretsPage session={session} />;
   if (path === '/pppoe-active') return <PppoeActivePage session={session} />;
   if (path === '/voucher-operations') return <VoucherOperationsPage session={session} />;
+  if (path === '/scheduler') return <SchedulerPage session={session} />;
   if (path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
