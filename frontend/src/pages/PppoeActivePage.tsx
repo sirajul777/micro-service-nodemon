@@ -1,0 +1,10 @@
+import { useEffect, useState } from 'react';
+import { router } from '../api';
+
+export default function PppoeActivePage({ session }: { session: string }) {
+  const [rows, setRows] = useState<any[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const load = async () => { if (!session) return; setBusy(true); setError(''); try { const r:any=await router.pppActive(session); setRows(r?.active??r?.connections??r?.data??r??[]); } catch(e:any){setError(e?.message||'Unable to load active PPPoE sessions.')} finally{setBusy(false)} };
+  useEffect(()=>{void load()},[session]);
+  const disconnect=async(name:string)=>{if(!confirm(`Disconnect ${name}?`))return;setBusy(true);try{await router.disconnectPppActive(session,name);await load()}catch(e:any){setError(e?.message||'Unable to disconnect session.');setBusy(false)}};
+  return <div className="panel"><div className="panel-head"><div><h3>PPPoE Active</h3><span>Live PPPoE sessions and disconnect controls</span></div><div className="panel-actions"><button className="button secondary" onClick={()=>void load()} disabled={busy}>Refresh</button></div></div>{error&&<div className="error banner">{error}</div>}<div className="table-wrap"><table><thead><tr><th>Name</th><th>Address</th><th>Uptime</th><th>Service</th><th>Caller ID</th><th>Actions</th></tr></thead><tbody>{rows.map((r,i)=><tr key={String(r.name||r.id||i)}><td>{r.name||'—'}</td><td>{r.address||r.remoteAddress||'—'}</td><td>{r.uptime||'—'}</td><td>{r.service||'pppoe'}</td><td>{r.callerId||r['caller-id']||'—'}</td><td><button className="button secondary" disabled={busy||!r.name} onClick={()=>void disconnect(r.name)}>Disconnect</button></td></tr>)}</tbody></table>{!rows.length&&<div className="empty">No active PPPoE sessions.</div>}</div></div>;
+}
