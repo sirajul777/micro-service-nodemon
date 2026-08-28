@@ -5,11 +5,13 @@ import App from './App';
 import BillingPage from './pages/BillingPage';
 import PaymentManagementPage from './pages/PaymentManagementPage';
 import PaymentPage from './PaymentPage';
+import PppoeProfilesPage from './pages/PppoeProfilesPage';
 
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   if (path === '/billing') return <BillingPage />;
   if (path === '/payments') return <PaymentManagementPage />;
+  if (path === '/pppoe-profiles') return <PppoeProfilesPage />;
   if (path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
