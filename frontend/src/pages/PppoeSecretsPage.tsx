@@ -1,47 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { KeyRound, Pencil, Plus, RefreshCw, Search, ShieldCheck, ShieldOff, Trash2, X } from 'lucide-react';
 import { router } from '../api';
 
 type Secret = Record<string, any>;
+type Props = { session: string };
+const empty = { name: '', password: '', service: 'pppoe', profile: '', localAddress: '', remoteAddress: '', comment: '', disabled: false };
 
-export default function PppoeSecretsPage({ session }: { session: string }) {
-  const [rows, setRows] = useState<Secret[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [editing, setEditing] = useState<Secret | null>(null);
-
-  const load = async () => {
-    if (!session) return;
-    setBusy(true); setError('');
-    try { const result: any = await router.pppSecrets(session); setRows(result?.secrets ?? result?.data ?? result ?? []); }
-    catch (e: any) { setError(e?.message || 'Unable to load PPPoE secrets.'); }
-    finally { setBusy(false); }
-  };
+export default function PppoeSecretsPage({ session }: Props) {
+  const [rows, setRows] = useState<Secret[]>([]); const [query, setQuery] = useState(''); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState('');
+  const [editing, setEditing] = useState<Secret | null>(null); const [form, setForm] = useState({ ...empty });
+  const load = async () => { if (!session) return; setBusy(true); setNotice(''); try { const r = await router.pppSecrets(session); setRows(Array.isArray(r) ? r : r?.secrets || r?.data || []); } catch (e: any) { setNotice(e?.message || 'Unable to load PPPoE secrets.'); } finally { setBusy(false); } };
   useEffect(() => { void load(); }, [session]);
-
-  const save = async (value: Secret) => {
-    if (!value.name) return;
-    setBusy(true); setError('');
-    try {
-      const body = { password: value.password || '', service: value.service || 'pppoe', profile: value.profile || '', remoteAddress: value.remoteAddress || '', comment: value.comment || '' };
-      if (editing?.name) await router.updatePppSecret(session, editing.name, body); else await router.addPppSecret(session, body);
-      setEditing(null); await load();
-    } catch (e: any) { setError(e?.message || 'Unable to save PPPoE secret.'); setBusy(false); }
-  };
-  const remove = async (name: string) => { if (!confirm(`Delete PPPoE secret ${name}?`)) return; setBusy(true); try { await router.deletePppSecret(session, name); await load(); } catch (e: any) { setError(e?.message || 'Unable to delete secret.'); setBusy(false); } };
-  const toggle = async (row: Secret) => { setBusy(true); try { if (row.disabled === true || row.disabled === 'true') await router.enablePppSecret(session, row.name); else await router.disablePppSecret(session, row.name); await load(); } catch (e: any) { setError(e?.message || 'Unable to change secret state.'); setBusy(false); } };
-  const filtered = rows.filter(r => String(r.name || '').toLowerCase().includes(query.toLowerCase()) || String(r.profile || '').toLowerCase().includes(query.toLowerCase()));
-
-  return <div className="panel">
-    <div className="panel-head"><div><h3>PPPoE Secrets</h3><span>Subscriber credentials and enable/disable operations</span></div><div className="panel-actions"><input className="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search secrets..." /><button className="primary small" onClick={() => setEditing({ name:'', password:'', service:'pppoe', profile:'' })}>Add Secret</button><button className="button secondary" onClick={() => void load()} disabled={busy}>Refresh</button></div></div>
-    {error && <div className="error banner">{error}</div>}
-    <div className="table-wrap"><table><thead><tr><th>Name</th><th>Service</th><th>Profile</th><th>Remote Address</th><th>Comment</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filtered.map((r, i) => <tr key={String(r.name || i)}><td>{r.name}</td><td>{r.service || '—'}</td><td>{r.profile || '—'}</td><td>{r.remoteAddress || '—'}</td><td>{r.comment || '—'}</td><td>{r.disabled === true || r.disabled === 'true' ? 'Disabled' : 'Enabled'}</td><td><div className="row-actions"><button className="icon tiny" onClick={() => setEditing({ ...r })}>Edit</button><button className="icon tiny" onClick={() => void toggle(r)}>{r.disabled === true || r.disabled === 'true' ? 'On' : 'Off'}</button><button className="icon tiny danger" onClick={() => void remove(r.name)}>Del</button></div></td></tr>)}</tbody></table>{!filtered.length && <div className="empty">No PPPoE secrets found.</div>}</div>
-    {editing && <SecretModal value={editing} onCancel={() => setEditing(null)} onSave={save} busy={busy} />}
-  </div>;
+  const visible = useMemo(() => { const q = query.trim().toLowerCase(); return !q ? rows : rows.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(q))); }, [rows, query]);
+  const open = (row?: Secret) => { setEditing(row || null); setForm({ ...empty, ...(row || {}) }); }; const close = () => { setEditing(null); setForm({ ...empty }); };
+  const save = async () => { if (!session || !form.name.trim()) { setNotice('Username is required.'); return; } setBusy(true); setNotice(''); try { const body = { ...form, disabled: !!form.disabled }; const result = editing ? await router.updatePppSecret(session, String(editing.name), body) : await router.addPppSecret(session, body); if (result?.success === false) throw new Error(result.error || 'Operation failed.'); const wasEditing = !!editing; close(); await load(); setNotice(wasEditing ? 'PPPoE secret updated.' : 'PPPoE secret created.'); } catch (e: any) { setNotice(e?.message || 'Unable to save PPPoE secret.'); setBusy(false); } };
+  const remove = async (name: string) => { if (!window.confirm(`Delete PPPoE secret \"${name}\"?`)) return; setBusy(true); setNotice(''); try { const result = await router.deletePppSecret(session, name); if (result?.success === false) throw new Error(result.error || 'Delete failed.'); await load(); setNotice(`Secret ${name} deleted.`); } catch (e: any) { setNotice(e?.message || 'Unable to delete PPPoE secret.'); setBusy(false); } };
+  const toggle = async (row: Secret) => { const name = String(row.name || row.username || ''); if (!name) return; setBusy(true); setNotice(''); try { const disabled = String(row.disabled).toLowerCase() === 'true'; const result = disabled ? await router.enablePppSecret(session, name) : await router.disablePppSecret(session, name); if (result?.success === false) throw new Error(result.error || 'Toggle failed.'); await load(); setNotice(disabled ? `Secret ${name} enabled.` : `Secret ${name} disabled.`); } catch (e: any) { setNotice(e?.message || 'Unable to change secret state.'); setBusy(false); } };
+  return <div className="stack"><div className="hero"><div><span className="eyebrow">PPPOE MANAGEMENT</span><h3>PPPoE Secrets</h3><p>Manage PPPoE subscribers, profiles and secret state.</p></div><div className="top-actions"><button className="button" disabled={busy} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button><button className="button primary" disabled={busy} onClick={() => open()}><Plus size={15}/> Add Secret</button></div></div>{notice && <div className="error banner">{notice}</div>}<section className="panel"><div className="panel-head"><div><h3><KeyRound size={15}/> Secrets</h3><span>{visible.length} of {rows.length} subscribers</span></div><span className="badge">{busy ? 'WORKING' : 'LIVE'}</span></div><div className="table-controls"><div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search username, profile, address..."/></div></div><div className="table-wrap"><table><thead><tr><th>Username</th><th>Service</th><th>Profile</th><th>Remote Address</th><th>Disabled</th><th>Comment</th><th>Actions</th></tr></thead><tbody>{visible.map((r,i) => { const name = String(r.name || r.username || i); const disabled = String(r.disabled).toLowerCase() === 'true'; return <tr key={name}><td><b>{name}</b></td><td>{r.service || '—'}</td><td>{r.profile || '—'}</td><td>{r.remoteAddress || r.remote_address || '—'}</td><td>{disabled ? 'Yes' : 'No'}</td><td>{r.comment || '—'}</td><td><div className="row-actions"><button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(r)}><Pencil size={14}/></button><button className="icon tiny" title={disabled ? 'Enable' : 'Disable'} disabled={busy} onClick={() => void toggle(r)}>{disabled ? <ShieldCheck size={14}/> : <ShieldOff size={14}/>}</button><button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14}/></button></div></td></tr>; })}</tbody></table>{!visible.length && <div className="empty">No PPPoE secrets found.</div>}</div></section>{editing !== null || form.name !== '' ? <Modal form={form} setForm={setForm} editing={editing} busy={busy} close={close} save={() => void save()} /> : null}</div>;
 }
-
-function SecretModal({ value, onCancel, onSave, busy }: { value: Secret; onCancel:()=>void; onSave:(v:Secret)=>void; busy:boolean }) {
-  const [v, setV] = useState(value);
-  const field = (key:string, label:string, type='text') => <label>{label}<input type={type} value={v[key] ?? ''} onChange={e => setV({ ...v, [key]: e.target.value })} /></label>;
-  return <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="eyebrow">PPPOE</span><h3>{value.name ? 'Edit Secret' : 'Add Secret'}</h3></div><button className="icon" onClick={onCancel}>×</button></div><form onSubmit={e=>{e.preventDefault();onSave(v)}}><div className="form-grid">{field('name','Username')}{field('password','Password','password')}{field('service','Service')}{field('profile','Profile')}{field('remoteAddress','Remote Address')}{field('comment','Comment')}</div><div className="modal-actions"><button type="button" className="button secondary" onClick={onCancel}>Cancel</button><button className="button primary" disabled={busy}>Save</button></div></form></div></div>;
-}
+function Modal({ form, setForm, editing, busy, close, save }: any) { const field = (key: string, label: string, placeholder = '') => <label><span>{label}</span><input type={key === 'password' ? 'password' : 'text'} value={form[key] ?? ''} placeholder={placeholder} disabled={key === 'name' && !!editing} onChange={e => setForm((f: any) => ({ ...f, [key]: e.target.value }))}/></label>; return <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="eyebrow">PPPOE SECRET</span><h3>{editing ? 'Edit Secret' : 'Add Secret'}</h3></div><button className="icon" onClick={close}><X size={18}/></button></div><form onSubmit={e => { e.preventDefault(); save(); }}><div className="form-grid">{field('name','Username')}{field('password','Password')}{field('service','Service','pppoe')}{field('profile','Profile')}{field('localAddress','Local Address')}{field('remoteAddress','Remote Address')}{field('comment','Comment')}<label><span>Disabled</span><input type="checkbox" checked={!!form.disabled} onChange={e => setForm((f: any) => ({ ...f, disabled: e.target.checked }))}/></label></div><div className="modal-actions"><button type="button" className="button secondary" onClick={close}>Cancel</button><button className="button primary" disabled={busy}>{editing ? 'Save Changes' : 'Create Secret'}</button></div></form></div></div>; }
