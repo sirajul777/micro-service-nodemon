@@ -11,6 +11,7 @@ import PppoeActivePage from './pages/PppoeActivePage';
 import VoucherOperationsPage from './pages/VoucherOperationsPage';
 import SchedulerPage from './pages/SchedulerPage';
 import RouterSessionsPage from './pages/RouterSessionsPage';
+import ResellersPage from './pages/ResellersPage';
 
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -23,6 +24,7 @@ function Root() {
   if (path === '/voucher-operations') return <VoucherOperationsPage session={session} />;
   if (path === '/scheduler') return <SchedulerPage session={session} />;
   if (path === '/routers') return <RouterSessionsPage />;
+  if (path === '/resellers') return <ResellersPage />;
   if (path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
