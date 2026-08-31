@@ -21,6 +21,7 @@ import BotResellersPage from './pages/BotResellersPage';
 import UsersPage from './pages/UsersPage';
 import SystemResourcePage from './pages/SystemResourcePage';
 import InterfacesPage from './pages/InterfacesPage';
+import InterfaceTrafficPage from './pages/InterfaceTrafficPage';
 
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -43,6 +44,7 @@ function Root() {
   if (path === '/users') return <UsersPage />;
   if (path === '/system-resource') return <SystemResourcePage session={session} />;
   if (path === '/interfaces') return <InterfacesPage session={session} />;
+  if (path === '/interface-traffic') return <InterfaceTrafficPage session={session} />;
   if (path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
