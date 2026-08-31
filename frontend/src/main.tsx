@@ -12,6 +12,7 @@ import VoucherOperationsPage from './pages/VoucherOperationsPage';
 import SchedulerPage from './pages/SchedulerPage';
 import RouterSessionsPage from './pages/RouterSessionsPage';
 import ResellersPage from './pages/ResellersPage';
+import TelegramPage from './pages/TelegramPage';
 
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -25,6 +26,7 @@ function Root() {
   if (path === '/scheduler') return <SchedulerPage session={session} />;
   if (path === '/routers') return <RouterSessionsPage />;
   if (path === '/resellers') return <ResellersPage />;
+  if (path === '/telegram') return <TelegramPage />;
   if (path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
