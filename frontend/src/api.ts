@@ -4,6 +4,7 @@ const api = async (path: string, init: RequestInit = {}) => {
   if (!res.ok) { const body = await res.text(); throw new Error(body || `HTTP ${res.status}`); }
   return res.status === 204 ? null : res.json();
 };
+export { api };
 export const request = (path: string, init: RequestInit = {}) => api(path, init);
 const sessionPath = (session: string) => encodeURIComponent(session);
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
