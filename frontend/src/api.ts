@@ -4,6 +4,7 @@ const api = async (path: string, init: RequestInit = {}) => {
   if (!res.ok) { const body = await res.text(); throw new Error(body || `HTTP ${res.status}`); }
   return res.status === 204 ? null : res.json();
 };
+export const request = (path: string, init: RequestInit = {}) => api(path, init);
 const sessionPath = (session: string) => encodeURIComponent(session);
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
 export const auth = { me: () => api('/api/auth/me'), login: (username: string, password: string) => api('/api/auth/login', json({ username, password })), logout: () => api('/api/auth/logout', json({})) };
