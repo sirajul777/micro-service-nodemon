@@ -12,6 +12,7 @@ import HotspotActivePage from './pages/HotspotActivePage';
 import HotspotLogPage from './pages/HotspotLogPage';
 import DhcpLeasesPage from './pages/DhcpLeasesPage';
 import VoucherOperationsPage from './pages/VoucherOperationsPage';
+import VoucherTypesPage from './pages/VoucherTypesPage';
 import SchedulerPage from './pages/SchedulerPage';
 import RouterSessionsPage from './pages/RouterSessionsPage';
 import ResellersPage from './pages/ResellersPage';
@@ -30,6 +31,7 @@ function Root() {
   if (path === '/hotspot-log') return <HotspotLogPage session={session} />;
   if (path === '/dhcp-leases') return <DhcpLeasesPage session={session} />;
   if (path === '/voucher-operations' || path === '/voucher-batches') return <VoucherOperationsPage session={session} />;
+  if (path === '/voucher-types') return <VoucherTypesPage />;
   if (path === '/scheduler') return <SchedulerPage session={session} />;
   if (path === '/routers') return <RouterSessionsPage />;
   if (path === '/resellers') return <ResellersPage />;
