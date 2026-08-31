@@ -20,6 +20,7 @@ import TelegramPage from './pages/TelegramPage';
 import BotResellersPage from './pages/BotResellersPage';
 import UsersPage from './pages/UsersPage';
 import SystemResourcePage from './pages/SystemResourcePage';
+import InterfacesPage from './pages/InterfacesPage';
 
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -41,6 +42,7 @@ function Root() {
   if (path === '/bot-resellers') return <BotResellersPage />;
   if (path === '/users') return <UsersPage />;
   if (path === '/system-resource') return <SystemResourcePage session={session} />;
+  if (path === '/interfaces') return <InterfacesPage session={session} />;
   if (path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
