@@ -23,6 +23,10 @@ import SystemResourcePage from './pages/SystemResourcePage';
 import InterfacesPage from './pages/InterfacesPage';
 import InterfaceTrafficPage from './pages/InterfaceTrafficPage';
 
+// App.tsx still references the legacy page symbol directly; keep that shell compatible while
+// the dedicated router entry points remain the preferred path.
+globalThis.HotspotActivePage = HotspotActivePage;
+
 function Root() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   const session = new URLSearchParams(window.location.search).get('session') || '';
