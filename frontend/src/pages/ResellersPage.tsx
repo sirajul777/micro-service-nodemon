@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, Edit3, Plus, RefreshCw, Search, Trash2, ToggleLeft, X } from 'lucide-react';
-import { api } from '../api';
+import { request } from '../api';
 
 type Reseller = Record<string, any>;
 type FormState = { id: string; name: string; username: string; sessionId: string; status: string; balance: string };
 const emptyForm: FormState = { id: '', name: '', username: '', sessionId: '', status: 'active', balance: '0' };
-
-const request = (path: string, init?: RequestInit) => api.request(path, init);
 
 export default function ResellersPage() {
   const [rows, setRows] = useState<Reseller[]>([]);
