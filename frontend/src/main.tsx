@@ -8,6 +8,7 @@ import PaymentPage from './PaymentPage';
 import PppoeProfilesPage from './pages/PppoeProfilesPage';
 import PppoeSecretsPage from './pages/PppoeSecretsPage';
 import PppoeActivePage from './pages/PppoeActivePage';
+import HotspotActivePage from './pages/HotspotActivePage';
 import VoucherOperationsPage from './pages/VoucherOperationsPage';
 import SchedulerPage from './pages/SchedulerPage';
 import RouterSessionsPage from './pages/RouterSessionsPage';
@@ -23,6 +24,7 @@ function Root() {
   if (path === '/pppoe-profiles') return <PppoeProfilesPage session={session} />;
   if (path === '/pppoe-secrets') return <PppoeSecretsPage session={session} />;
   if (path === '/pppoe-active') return <PppoeActivePage session={session} />;
+  if (path === '/hotspot-active') return <HotspotActivePage session={session} />;
   if (path === '/voucher-operations') return <VoucherOperationsPage session={session} />;
   if (path === '/scheduler') return <SchedulerPage session={session} />;
   if (path === '/routers') return <RouterSessionsPage />;
