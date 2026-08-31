@@ -45,7 +45,7 @@ function Root() {
   if (path === '/system-resource') return <SystemResourcePage session={session} />;
   if (path === '/interfaces') return <InterfacesPage session={session} />;
   if (path === '/interface-traffic') return <InterfaceTrafficPage session={session} />;
-  if (path === '/qris-ops') return <PaymentPage kind="qris" />;
+  if (path === '/qris' || path === '/qris-ops') return <PaymentPage kind="qris" />;
   return <App />;
 }
 
