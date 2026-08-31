@@ -29,7 +29,7 @@ function Root() {
   if (path === '/hotspot-active') return <HotspotActivePage session={session} />;
   if (path === '/hotspot-log') return <HotspotLogPage session={session} />;
   if (path === '/dhcp-leases') return <DhcpLeasesPage session={session} />;
-  if (path === '/voucher-operations') return <VoucherOperationsPage session={session} />;
+  if (path === '/voucher-operations' || path === '/voucher-batches') return <VoucherOperationsPage session={session} />;
   if (path === '/scheduler') return <SchedulerPage session={session} />;
   if (path === '/routers') return <RouterSessionsPage />;
   if (path === '/resellers') return <ResellersPage />;
