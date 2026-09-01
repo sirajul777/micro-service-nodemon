@@ -6,46 +6,35 @@ service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
   rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+  rpc ListUsers(ListUsersRequest) returns (UserListResponse);
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc CreateUser(CreateUserRequest) returns (UserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc ToggleUser(ToggleUserRequest) returns (ToggleUserResponse);
+  rpc ResetUserPassword(ResetUserPasswordRequest) returns (SimpleSuccessResponse);
+  rpc GetRoleDefaults(GetRoleDefaultsRequest) returns (RoleDefaultsResponse);
 }
 
-message LoginRequest {
-  string username = 1;
-  string password = 2;
-}
-
-message UserContext {
-  string id = 1;
-  string username = 2;
-  string name = 3;
-  string role = 4;
-  map<string, bool> permissions = 5;
-  repeated string allowed_sessions = 6;
-}
-
-message LoginResponse {
-  bool success = 1;
-  string message = 2;
-  string token = 3;
-  UserContext user = 4;
-}
-
-message ValidateTokenRequest {
-  string token = 1;
-}
-
-message ValidateTokenResponse {
-  bool success = 1;
-  string message = 2;
-  UserContext payload = 3;
-}
-
-message ChangePasswordRequest {
-  string token = 1;
-  string old_password = 2;
-  string new_password = 3;
-}
-
-message ChangePasswordResponse {
-  bool success = 1;
-  string message = 2;
-}
+message LoginRequest { string username = 1; string password = 2; }
+message UserContext { string id = 1; string username = 2; string name = 3; string role = 4; map<string, bool> permissions = 5; repeated string allowed_sessions = 6; }
+message LoginResponse { bool success = 1; string message = 2; string token = 3; UserContext user = 4; }
+message ValidateTokenRequest { string token = 1; }
+message ValidateTokenResponse { bool success = 1; string message = 2; UserContext payload = 3; }
+message ChangePasswordRequest { string token = 1; string old_password = 2; string new_password = 3; }
+message ChangePasswordResponse { bool success = 1; string message = 2; }
+message UserRecord { string id = 1; string username = 2; string name = 3; string role = 4; bool active = 5; repeated string allowed_sessions = 6; map<string, bool> permissions = 7; string created_at = 8; string last_login = 9; string note = 10; }
+message ListUsersRequest {}
+message GetUserRequest { string id = 1; }
+message CreateUserRequest { string username = 1; string password = 2; string name = 3; string role = 4; repeated string allowed_sessions = 5; map<string, bool> permissions = 6; string note = 7; }
+message UpdateUserRequest { string id = 1; string name = 2; string role = 3; bool active = 4; bool has_active = 5; repeated string allowed_sessions = 6; bool has_allowed_sessions = 7; map<string, bool> permissions = 8; bool has_permissions = 9; string note = 10; bool has_note = 11; }
+message DeleteUserRequest { string id = 1; }
+message ToggleUserRequest { string id = 1; }
+message ResetUserPasswordRequest { string id = 1; string new_password = 2; }
+message UserListResponse { bool success = 1; string message = 2; repeated UserRecord users = 3; }
+message UserResponse { bool success = 1; string message = 2; UserRecord user = 3; }
+message DeleteUserResponse { bool success = 1; string message = 2; bool deleted = 3; }
+message ToggleUserResponse { bool success = 1; string message = 2; bool active = 3; }
+message SimpleSuccessResponse { bool success = 1; string message = 2; }
+message GetRoleDefaultsRequest { string role = 1; }
+message RoleDefaultsResponse { bool success = 1; string message = 2; map<string, bool> permissions = 3; }
