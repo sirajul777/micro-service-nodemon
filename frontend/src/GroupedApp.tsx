@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Activity, BarChart3, CreditCard, FileText, KeyRound, Network, QrCode, Router as RouterIcon, Server, Settings, ShoppingCart, Ticket, Users, WalletCards } from 'lucide-react';
 import App from './App';
+import RouterSessionsPage from './pages/RouterSessionsPage';
 import './grouped-navigation.css';
 
 type ExistingTarget = { label: string; target: string; icon: any; requiresSession?: boolean; disabled?: boolean };
@@ -63,77 +64,63 @@ const groups: MenuGroup[] = [
   ] },
 ];
 
-function SidebarBridge() {
+function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
-  const [active, setActive] = useState('Dashboard');
+  const [contentNode, setContentNode] = useState<HTMLElement | null>(null);
+  const [active, setActive] = useState(sessionMode ? 'Sessions' : 'Dashboard');
   const labelByTarget = useMemo(() => new Map(groups.flatMap(group => group.items.map(item => [hasPath(item) ? item.path : item.target, item.label]))), []);
 
   useEffect(() => {
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
-    if (!sidebar) return;
+    const content = document.querySelector<HTMLElement>('.content');
+    if (!sidebar || !content) return;
     setMountNode(sidebar);
+    setContentNode(content);
+
     const syncActive = () => {
+      if (sessionMode) return;
       const activeButton = sidebar.querySelector<HTMLElement>('nav:not(.grouped-nav) .nav.active');
       const text = activeButton?.textContent?.trim() || 'Overview';
       setActive(labelByTarget.get(text) || (text === 'Overview' ? 'Dashboard' : text));
     };
+
     syncActive();
     const observer = new MutationObserver(syncActive);
     observer.observe(sidebar, { subtree: true, attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
-  }, [labelByTarget]);
+  }, [labelByTarget, sessionMode]);
 
   if (!mountNode) return null;
-  return createPortal(
-    <nav className="grouped-nav" aria-label="Main navigation">
-      {groups.map(group => (
-        <div className="nav-group" key={group.label}>
-          <div className="nav-section">{group.label}</div>
-          {group.items.map(item => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={`${group.label}:${item.label}`}
-                type="button"
-                disabled={item.disabled}
-                className={`${active === item.label ? 'nav grouped-item active' : 'nav grouped-item'}${item.disabled ? ' disabled' : ''}`}
-                title={item.disabled ? 'Module entry is not implemented yet' : undefined}
-                onClick={() => {
-                  if (item.disabled) return;
-                  if (item.requiresSession) {
-                    const selector = document.querySelector<HTMLSelectElement>('.router-box select');
-                    if (!selector?.value) {
-                      window.location.assign('/routers');
-                      return;
-                    }
-                  }
-                  setActive(item.label);
-                  if (hasPath(item)) {
-                    window.location.assign(item.path);
-                    return;
-                  }
-                  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar > nav:not(.grouped-nav) .nav'));
-                  const button = buttons.find(candidate => candidate.textContent?.trim() === item.target);
-                  if (button) button.click();
-                }}
-              >
-                <Icon size={17} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
-    </nav>,
-    mountNode,
-  );
+  return <>
+    {createPortal(
+      <nav className="grouped-nav" aria-label="Main navigation">
+        {groups.map(group => (
+          <div className="nav-group" key={group.label}>
+            <div className="nav-section">{group.label}</div>
+            {group.items.map(item => {
+              const Icon = item.icon;
+              return <button key={`${group.label}:${item.label}`} type="button" disabled={item.disabled} className={`${active === item.label ? 'nav grouped-item active' : 'nav grouped-item'}${item.disabled ? ' disabled' : ''}`} title={item.disabled ? 'Module entry is not implemented yet' : undefined} onClick={() => {
+                if (item.disabled) return;
+                if (item.requiresSession) {
+                  const selector = document.querySelector<HTMLSelectElement>('.router-box select');
+                  if (!selector?.value) { window.location.assign('/routers'); return; }
+                }
+                setActive(item.label);
+                if (hasPath(item)) { window.location.assign(item.path); return; }
+                const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar > nav:not(.grouped-nav) .nav'));
+                const button = buttons.find(candidate => candidate.textContent?.trim() === item.target);
+                if (button) button.click();
+              }}><Icon size={17}/><span>{item.label}</span></button>;
+            })}
+          </div>
+        ))}
+      </nav>,
+      mountNode,
+    )}
+    {sessionMode && contentNode ? createPortal(<div className="session-overlay"><RouterSessionsPage/></div>, contentNode) : null}
+  </>;
 }
 
-export default function GroupedApp() {
-  return (
-    <div className="grouped-shell">
-      <App />
-      <SidebarBridge />
-    </div>
-  );
+export default function GroupedApp({ sessionMode = false }: { sessionMode?: boolean }) {
+  return <div className={sessionMode ? 'grouped-shell session-overlay-active' : 'grouped-shell'}><App/><SidebarBridge sessionMode={sessionMode}/></div>;
 }
