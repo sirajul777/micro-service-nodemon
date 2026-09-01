@@ -4,13 +4,13 @@ import { Activity, BarChart3, CreditCard, FileText, KeyRound, Network, QrCode, R
 import App from './App';
 import './grouped-navigation.css';
 
-type ExistingTarget = { label: string; target: string; icon: any; requiresSession?: boolean };
-type RouteTarget = { label: string; path: string; icon: any; requiresSession?: boolean };
+type ExistingTarget = { label: string; target: string; icon: any; requiresSession?: boolean; disabled?: boolean };
+type RouteTarget = { label: string; path: string; icon: any; requiresSession?: boolean; disabled?: boolean };
 type MenuItem = ExistingTarget | RouteTarget;
 type MenuGroup = { label: string; items: MenuItem[] };
 
-const existing = (label: string, target: string, icon: any, requiresSession = false): ExistingTarget => ({ label, target, icon, requiresSession });
-const route = (label: string, path: string, icon: any, requiresSession = false): RouteTarget => ({ label, path, icon, requiresSession });
+const existing = (label: string, target: string, icon: any, requiresSession = false, disabled = false): ExistingTarget => ({ label, target, icon, requiresSession, disabled });
+const route = (label: string, path: string, icon: any, requiresSession = false, disabled = false): RouteTarget => ({ label, path, icon, requiresSession, disabled });
 const hasPath = (item: MenuItem): item is RouteTarget => 'path' in item;
 
 const groups: MenuGroup[] = [
@@ -27,10 +27,10 @@ const groups: MenuGroup[] = [
     existing('PPPoE Profiles', 'PPPoE Profiles', Server, true),
   ] },
   { label: 'Voucher', items: [
-    existing('Reseller', 'Resellers', ShoppingCart, false),
+    existing('Reseller', 'Resellers', ShoppingCart),
     existing('Generate Voucher', 'Voucher Generate', Ticket, true),
     existing('Daftar Batch', 'Voucher Batches', FileText, true),
-    existing('Settings Voucher', 'Voucher Types', Settings, false),
+    existing('Settings Voucher', 'Voucher Types', Settings),
   ] },
   { label: 'Report', items: [
     existing('Selling Report', 'Selling Report', BarChart3, true),
@@ -38,23 +38,23 @@ const groups: MenuGroup[] = [
     existing('Live Report', 'Live Report', Activity, true),
   ] },
   { label: 'Telegram Bot', items: [
-    route('Reseller Bot', '/bot-resellers', Users, false),
-    route('Tools & Settings', '/telegram', Settings, false),
+    route('Reseller Bot', '/bot-resellers', Users),
+    route('Tools & Settings', '/telegram', Settings),
   ] },
   { label: 'Billing', items: [
-    existing('Pelanggan Billing', 'Billing', WalletCards, false),
-    route('Tagihan / Invoice', '/billing', FileText, false),
+    existing('Pelanggan Billing', 'Billing', WalletCards),
+    route('Tagihan / Invoice', '/billing', FileText, false, true),
   ] },
   { label: 'Pembayaran', items: [
-    existing('Transaksi Pembayaran', 'Payment Orders', CreditCard, false),
-    route('Payment Settings', '/payments', Settings, false),
-    existing('QRIS Monitor', 'QRIS Monitor', QrCode, false),
+    existing('Transaksi Pembayaran', 'Payment Orders', CreditCard),
+    route('Payment Settings', '/payments', Settings, false, true),
+    existing('QRIS Monitor', 'QRIS Monitor', QrCode),
   ] },
   { label: 'System', items: [
-    existing('User Management', 'System Users', Users, false),
-    route('Ganti Password', '/users', KeyRound, false),
-    route('Mobile API', '/users', Server, false),
-    route('Sessions', '/routers', RouterIcon, false),
+    existing('User Management', 'System Users', Users),
+    route('Ganti Password', '/users', KeyRound, false, true),
+    route('Mobile API', '/users', Server, false, true),
+    route('Sessions', '/routers', RouterIcon),
     existing('Scheduler', 'Scheduler', Activity, true),
     existing('DHCP Leases', 'DHCP Leases', Network, true),
     existing('Interfaces', 'Interfaces', RouterIcon, true),
@@ -63,25 +63,20 @@ const groups: MenuGroup[] = [
   ] },
 ];
 
-const allLabels = groups.flatMap(group => group.items.map(item => item.label));
-
 function SidebarBridge() {
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState('Dashboard');
-
   const labelByTarget = useMemo(() => new Map(groups.flatMap(group => group.items.map(item => [hasPath(item) ? item.path : item.target, item.label]))), []);
 
   useEffect(() => {
     const sidebar = document.querySelector<HTMLElement>('.sidebar');
     if (!sidebar) return;
     setMountNode(sidebar);
-
     const syncActive = () => {
-      const activeButton = sidebar.querySelector<HTMLElement>('nav .nav.active');
+      const activeButton = sidebar.querySelector<HTMLElement>('nav:not(.grouped-nav) .nav.active');
       const text = activeButton?.textContent?.trim() || 'Overview';
       setActive(labelByTarget.get(text) || (text === 'Overview' ? 'Dashboard' : text));
     };
-
     syncActive();
     const observer = new MutationObserver(syncActive);
     observer.observe(sidebar, { subtree: true, attributes: true, attributeFilter: ['class'] });
@@ -96,12 +91,15 @@ function SidebarBridge() {
           <div className="nav-section">{group.label}</div>
           {group.items.map(item => {
             const Icon = item.icon;
-            const target = hasPath(item) ? item.path : item.target;
             return (
               <button
                 key={`${group.label}:${item.label}`}
-                className={active === item.label ? 'nav grouped-item active' : 'nav grouped-item'}
+                type="button"
+                disabled={item.disabled}
+                className={`${active === item.label ? 'nav grouped-item active' : 'nav grouped-item'}${item.disabled ? ' disabled' : ''}`}
+                title={item.disabled ? 'Module entry is not implemented yet' : undefined}
                 onClick={() => {
+                  if (item.disabled) return;
                   if (item.requiresSession) {
                     const selector = document.querySelector<HTMLSelectElement>('.router-box select');
                     if (!selector?.value) {
@@ -109,18 +107,14 @@ function SidebarBridge() {
                       return;
                     }
                   }
-
                   setActive(item.label);
                   if (hasPath(item)) {
                     window.location.assign(item.path);
                     return;
                   }
-
-                  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar > nav .nav'));
+                  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.sidebar > nav:not(.grouped-nav) .nav'));
                   const button = buttons.find(candidate => candidate.textContent?.trim() === item.target);
-                  if (button) {
-                    button.click();
-                  }
+                  if (button) button.click();
                 }}
               >
                 <Icon size={17} />
