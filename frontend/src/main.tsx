@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
-import App from './App';
+import GroupedApp from './GroupedApp';
 import BillingPage from './pages/BillingPage';
 import PaymentManagementPage from './pages/PaymentManagementPage';
 import PaymentPage from './PaymentPage';
@@ -50,7 +50,7 @@ function Root() {
   if (path === '/interfaces') return <InterfacesPage session={session} />;
   if (path === '/interface-traffic') return <InterfaceTrafficPage session={session} />;
   if (path === '/qris' || path === '/qris-ops') return <PaymentPage kind="qris" />;
-  return <App />;
+  return <GroupedApp />;
 }
 
 createRoot(document.getElementById('root')!).render(<React.StrictMode><Root /></React.StrictMode>);
