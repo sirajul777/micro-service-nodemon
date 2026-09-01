@@ -1,0 +1,1 @@
+User Management internal transport is gRPC-backed via AuthService RPCs. This file documents the transport boundary.
