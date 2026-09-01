@@ -1,0 +1,1 @@
+User Management is exposed by AuthService over gRPC and consumed by the BFF.
