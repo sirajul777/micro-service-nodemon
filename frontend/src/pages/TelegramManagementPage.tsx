@@ -1,35 +1,218 @@
-import { useEffect, useState } from 'react';
-
-const request = async (path: string, init: RequestInit = {}) => {
-  const res = await fetch(path, { credentials: 'include', ...init, headers: { 'Content-Type': 'application/json', ...(init.headers || {}) } });
-  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
-  return res.status === 204 ? null : res.json();
-};
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, Bot, History, Pencil, Plus, RefreshCw, Send, ShieldCheck, Trash2, Wifi } from 'lucide-react';
+import { request } from '../api';
 
 type Config = Record<string, any>;
+
+type FormState = {
+  id?: string;
+  name: string;
+  token: string;
+  chatId: string;
+  sessionId: string;
+  notifSale: boolean;
+  notifDaily: boolean;
+  dailyTime: string;
+  botEnabled: boolean;
+  allowedUsers: string;
+  defaultProfile: string;
+  welcomeMsg: string;
+};
+
+const emptyForm: FormState = {
+  name: '', token: '', chatId: '', sessionId: '',
+  notifSale: false, notifDaily: false, dailyTime: '23:59',
+  botEnabled: true, allowedUsers: '', defaultProfile: '', welcomeMsg: '',
+};
+
+const maskToken = (value: string) => {
+  if (!value) return '—';
+  if (value.length <= 10) return '••••••••';
+  return `${value.slice(0, 5)}••••••${value.slice(-4)}`;
+};
+
+const displayStatus = (cfg: Config) => cfg.botEnabled === false ? 'Disabled' : 'Enabled';
 
 export default function TelegramManagementPage() {
   const [configs, setConfigs] = useState<Config[]>([]);
   const [logs, setLogs] = useState<Config[]>([]);
   const [selected, setSelected] = useState<Config | null>(null);
-  const [form, setForm] = useState<Config>({ name: '', botToken: '', chatId: '', enabled: true });
-  const [message, setMessage] = useState('Test dari NodeMon');
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [message, setMessage] = useState('Test dari Mikhmon');
+  const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
-  const load = async () => { setBusy(true); setNotice(''); try { const [c, l] = await Promise.all([request('/api/telegram/config'), request('/api/telegram/logs')]); setConfigs(Array.isArray(c) ? c : []); setLogs(Array.isArray(l) ? l : []); } catch (e: any) { setNotice(e?.message || 'Unable to load Telegram data.'); } finally { setBusy(false); } };
+
+  const load = async () => {
+    setBusy(true); setNotice('');
+    try {
+      const [c, l] = await Promise.all([
+        request('/api/telegram/config'),
+        request('/api/telegram/logs'),
+      ]);
+      setConfigs(Array.isArray(c) ? c : []);
+      setLogs(Array.isArray(l) ? l : []);
+    } catch (e: any) {
+      setNotice(e?.message || 'Gagal memuat konfigurasi Telegram.');
+    } finally { setBusy(false); }
+  };
+
   useEffect(() => { void load(); }, []);
-  const edit = (cfg: Config) => { setSelected(cfg); setForm({ ...cfg }); };
-  const save = async () => { setBusy(true); setNotice(''); try { if (selected?.id) await request(`/api/telegram/config/${encodeURIComponent(String(selected.id))}`, { method: 'PUT', body: JSON.stringify(form) }); else await request('/api/telegram/config', { method: 'POST', body: JSON.stringify(form) }); setSelected(null); await load(); } catch (e: any) { setNotice(e?.message || 'Unable to save Telegram configuration.'); } finally { setBusy(false); } };
-  const remove = async (id: string) => { if (!window.confirm('Delete this Telegram configuration?')) return; setBusy(true); try { await request(`/api/telegram/config/${encodeURIComponent(id)}`, { method: 'DELETE' }); await load(); } catch (e: any) { setNotice(e?.message || 'Unable to delete configuration.'); } finally { setBusy(false); } };
-  const test = async (cfg: Config) => { setBusy(true); setNotice(''); try { await request('/api/telegram/test', { method: 'POST', body: JSON.stringify({ id: cfg.id, chatId: cfg.chatId || form.chatId, message }) }); setNotice('Telegram test sent.'); } catch (e: any) { setNotice(e?.message || 'Telegram test failed.'); } finally { setBusy(false); } };
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return configs;
+    return configs.filter((cfg) => Object.values(cfg).some((v) => String(v ?? '').toLowerCase().includes(q)));
+  }, [configs, query]);
+
+  const openNew = () => { setSelected({}); setForm({ ...emptyForm }); setNotice(''); };
+  const openEdit = (cfg: Config) => {
+    setSelected(cfg);
+    setForm({
+      ...emptyForm,
+      ...cfg,
+      token: cfg.token || cfg.botToken || '',
+      chatId: cfg.chatId ?? cfg.chat_id ?? '',
+      sessionId: cfg.sessionId ?? cfg.session_id ?? '',
+      notifSale: cfg.notifSale ?? cfg.notif_sale ?? false,
+      notifDaily: cfg.notifDaily ?? cfg.notif_daily ?? false,
+      dailyTime: cfg.dailyTime ?? cfg.daily_time ?? '23:59',
+      botEnabled: cfg.botEnabled ?? cfg.bot_enabled ?? true,
+      allowedUsers: Array.isArray(cfg.allowedUsers) ? cfg.allowedUsers.join(',') : (cfg.allowed_users || ''),
+      defaultProfile: cfg.defaultProfile ?? cfg.default_profile ?? '',
+      welcomeMsg: cfg.welcomeMsg ?? cfg.welcome_msg ?? '',
+    });
+    setNotice('');
+  };
+
+  const payload = () => ({
+    ...(form.id ? { id: form.id } : {}),
+    name: form.name,
+    token: form.token,
+    chatId: form.chatId,
+    sessionId: form.sessionId,
+    notifSale: !!form.notifSale,
+    notifDaily: !!form.notifDaily,
+    dailyTime: form.dailyTime,
+    botEnabled: !!form.botEnabled,
+    allowedUsers: form.allowedUsers.split(',').map((x) => x.trim()).filter(Boolean),
+    defaultProfile: form.defaultProfile,
+    welcomeMsg: form.welcomeMsg,
+  });
+
+  const save = async () => {
+    setBusy(true); setNotice('');
+    try {
+      const body = payload();
+      if (form.id) await request(`/api/telegram/config/${encodeURIComponent(form.id)}`, { method: 'PUT', body: JSON.stringify(body) });
+      else await request('/api/telegram/config', { method: 'POST', body: JSON.stringify(body) });
+      setSelected(null); await load();
+    } catch (e: any) { setNotice(e?.message || 'Gagal menyimpan bot.'); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (id: string) => {
+    if (!window.confirm('Hapus konfigurasi bot ini?')) return;
+    setBusy(true); setNotice('');
+    try { await request(`/api/telegram/config/${encodeURIComponent(id)}`, { method: 'DELETE' }); await load(); }
+    catch (e: any) { setNotice(e?.message || 'Gagal menghapus bot.'); }
+    finally { setBusy(false); }
+  };
+
+  const test = async (cfg: Config) => {
+    const id = String(cfg.id || '');
+    setTestingId(id || 'new'); setNotice('');
+    try {
+      await request('/api/telegram/test', {
+        method: 'POST',
+        body: JSON.stringify({ id, chatId: cfg.chatId || cfg.chat_id || '', message }),
+      });
+      setNotice(`Test koneksi berhasil untuk ${cfg.name || id}.`);
+    } catch (e: any) { setNotice(e?.message || 'Test koneksi bot gagal.'); }
+    finally { setTestingId(null); }
+  };
+
+  const enabledCount = configs.filter((x) => x.botEnabled !== false && x.bot_enabled !== false).length;
+
   return <div className="stack">
-    <div className="hero"><div><span className="eyebrow">BOT INTEGRATION</span><h3>Telegram Management</h3><p>Manage Telegram bot destinations and inspect delivery logs.</p></div><button className="button" disabled={busy} onClick={() => void load()}>Refresh</button></div>
+    <div className="hero">
+      <div>
+        <span className="eyebrow">TELEGRAM BOT</span>
+        <h3>Bot Management</h3>
+        <p>Kelola multi-bot, koneksi Telegram, notifikasi, dan activity log.</p>
+      </div>
+      <div>
+        <button className="button" disabled={busy} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button>{' '}
+        <button className="primary" disabled={busy} onClick={openNew}><Plus size={15}/> Add Bot</button>
+      </div>
+    </div>
+
     {notice && <div className="error banner">{notice}</div>}
-    <section className="panel"><div className="panel-head"><div><h3>Configurations</h3><span>{configs.length} configured destinations</span></div><button className="primary" onClick={() => { setSelected(null); setForm({ name: '', botToken: '', chatId: '', enabled: true }); }}>Add Telegram</button></div>
-      <div className="table-wrap"><table><thead><tr><th>Name</th><th>Chat ID</th><th>Status</th><th>Actions</th></tr></thead><tbody>{configs.map((cfg, i) => <tr key={String(cfg.id ?? i)}><td>{cfg.name || cfg.id || 'Unnamed'}</td><td>{cfg.chatId || '—'}</td><td><span className="badge">{cfg.enabled === false ? 'DISABLED' : 'ENABLED'}</span></td><td><button className="button tiny" onClick={() => edit(cfg)}>Edit</button> <button className="button tiny" onClick={() => void test(cfg)} disabled={busy}>Test</button> {cfg.id && <button className="button tiny" onClick={() => void remove(String(cfg.id))} disabled={busy}>Delete</button>}</td></tr>)}</tbody></table>{!configs.length && <div className="empty">No Telegram configurations.</div>}</div>
+
+    <div className="stat-grid">
+      <div className="stat-card"><Bot size={18}/><span>Total Bot</span><strong>{configs.length}</strong></div>
+      <div className="stat-card"><Wifi size={18}/><span>Enabled</span><strong>{enabledCount}</strong></div>
+      <div className="stat-card"><Activity size={18}/><span>Logs</span><strong>{logs.length}</strong></div>
+      <div className="stat-card"><ShieldCheck size={18}/><span>Mode</span><strong>Long Polling</strong></div>
+    </div>
+
+    <section className="panel">
+      <div className="panel-head">
+        <div><h3>Bot Instances</h3><span>{filtered.length} of {configs.length} configured bots</span></div>
+      </div>
+      <div className="table-controls"><div className="table-search"><Bot size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search bot, chat ID, router session..."/></div></div>
+      <div className="table-wrap">
+        <table><thead><tr><th>Bot</th><th>Token</th><th>Chat ID</th><th>Router Session</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>{filtered.map((cfg, i) => {
+            const id = String(cfg.id ?? i);
+            return <tr key={id}>
+              <td><strong>{cfg.name || id}</strong></td>
+              <td>{maskToken(String(cfg.token || cfg.botToken || ''))}</td>
+              <td>{cfg.chatId || cfg.chat_id || '—'}</td>
+              <td>{cfg.sessionId || cfg.session_id || '—'}</td>
+              <td><span className="badge">{displayStatus(cfg)}</span></td>
+              <td>
+                <button className="button tiny" onClick={() => openEdit(cfg)}><Pencil size={13}/> Edit</button>{' '}
+                <button className="button tiny" disabled={testingId === id} onClick={() => void test(cfg)}><Wifi size={13}/> {testingId === id ? 'Testing…' : 'Test'}</button>{' '}
+                <button className="button tiny" disabled={busy} onClick={() => void remove(id)}><Trash2 size={13}/> Delete</button>
+              </td>
+            </tr>;
+          })}</tbody>
+        </table>
+        {!filtered.length && <div className="empty">Belum ada konfigurasi bot.</div>}
+      </div>
     </section>
-    <section className="panel"><div className="panel-head"><div><h3>Delivery Test</h3><span>Send a test message using a selected configuration</span></div></div><div className="grid"><label className="metric"><span>Message</span><input value={message} onChange={e => setMessage(e.target.value)} /></label></div></section>
-    <section className="panel"><div className="panel-head"><div><h3>Logs</h3><span>{logs.length} recent entries</span></div></div><div className="table-wrap"><table><thead><tr><th>Time</th><th>Event</th><th>Payload</th></tr></thead><tbody>{logs.map((log, i) => <tr key={String(log.id ?? i)}><td>{log.time || log.createdAt || '—'}</td><td>{log.event || log.type || log.status || '—'}</td><td>{typeof log === 'object' ? JSON.stringify(log) : String(log)}</td></tr>)}</tbody></table>{!logs.length && <div className="empty">No Telegram logs.</div>}</div></section>
-    {selected !== null && <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="eyebrow">TELEGRAM CONFIG</span><h3>{selected.id ? 'Edit configuration' : 'New configuration'}</h3></div><button className="icon" onClick={() => setSelected(null)}>×</button></div><div className="detail-grid"><label className="metric"><span>Name</span><input value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label className="metric"><span>Bot Token</span><input value={form.botToken || ''} onChange={e => setForm({ ...form, botToken: e.target.value })} /></label><label className="metric"><span>Chat ID</span><input value={form.chatId || ''} onChange={e => setForm({ ...form, chatId: e.target.value })} /></label><label className="metric"><span>Enabled</span><select value={form.enabled === false ? 'false' : 'true'} onChange={e => setForm({ ...form, enabled: e.target.value === 'true' })}><option value="true">Enabled</option><option value="false">Disabled</option></select></label></div><div className="modal-actions"><button className="button secondary" onClick={() => setSelected(null)}>Cancel</button><button className="primary" disabled={busy} onClick={() => void save()}>Save</button></div></div></div>}
+
+    <section className="panel">
+      <div className="panel-head"><div><h3>Test Connection</h3><span>Verifikasi token dan tujuan chat melalui Bot gRPC.</span></div></div>
+      <div className="grid"><label className="metric"><span>Test Message</span><textarea rows={3} value={message} onChange={e => setMessage(e.target.value)} /></label></div>
+      <div><Send size={15}/> Pilih tombol <b>Test</b> pada bot yang ingin diuji.</div>
+    </section>
+
+    <section className="panel">
+      <div className="panel-head"><div><h3>Activity Log</h3><span>{logs.length} recent entries</span></div><History size={18}/></div>
+      <div className="table-wrap"><table><thead><tr><th>Time</th><th>Event</th><th>Payload</th></tr></thead>
+        <tbody>{logs.slice(0, 100).map((log, i) => <tr key={String(log.id ?? i)}><td>{log.time || log.createdAt || '—'}</td><td>{log.event || log.type || log.status || '—'}</td><td className="mono">{typeof log === 'object' ? JSON.stringify(log) : String(log)}</td></tr>)}</tbody>
+      </table>{!logs.length && <div className="empty">Belum ada activity log.</div>}</div>
+    </section>
+
+    {selected !== null && <div className="modal-backdrop"><div className="modal modal-wide">
+      <div className="modal-head"><div><span className="eyebrow">TELEGRAM CONFIG</span><h3>{form.id ? 'Edit Bot' : 'Add Bot'}</h3></div><button className="icon" onClick={() => setSelected(null)}>×</button></div>
+      <div className="detail-grid">
+        <label className="metric"><span>Name</span><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></label>
+        <label className="metric"><span>Bot Token</span><input type="password" autoComplete="off" value={form.token} onChange={e => setForm({ ...form, token: e.target.value })}/></label>
+        <label className="metric"><span>Chat ID</span><input value={form.chatId} onChange={e => setForm({ ...form, chatId: e.target.value })}/></label>
+        <label className="metric"><span>Router Session</span><input value={form.sessionId} onChange={e => setForm({ ...form, sessionId: e.target.value })}/></label>
+        <label className="metric"><span>Default Profile</span><input value={form.defaultProfile} onChange={e => setForm({ ...form, defaultProfile: e.target.value })}/></label>
+        <label className="metric"><span>Daily Report Time</span><input type="time" value={form.dailyTime} onChange={e => setForm({ ...form, dailyTime: e.target.value })}/></label>
+        <label className="metric"><span>Bot Status</span><select value={form.botEnabled ? 'true' : 'false'} onChange={e => setForm({ ...form, botEnabled: e.target.value === 'true' })}><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+        <label className="metric"><span>Sale Notification</span><select value={form.notifSale ? 'true' : 'false'} onChange={e => setForm({ ...form, notifSale: e.target.value === 'true' })}><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+        <label className="metric"><span>Daily Notification</span><select value={form.notifDaily ? 'true' : 'false'} onChange={e => setForm({ ...form, notifDaily: e.target.value === 'true' })}><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+        <label className="metric"><span>Allowed User IDs</span><input placeholder="123,456,789" value={form.allowedUsers} onChange={e => setForm({ ...form, allowedUsers: e.target.value })}/></label>
+        <label className="metric"><span>Welcome Message</span><textarea rows={4} value={form.welcomeMsg} onChange={e => setForm({ ...form, welcomeMsg: e.target.value })}/></label>
+      </div>
+      <div className="modal-actions"><button className="button secondary" onClick={() => setSelected(null)}>Cancel</button><button className="primary" disabled={busy || !form.name || !form.token} onClick={() => void save()}>Save Bot</button></div>
+    </div></div>}
   </div>;
 }
