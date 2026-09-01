@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AuthController } from './auth/auth.controller';
+import { UserProxyController } from './auth/user-proxy.controller';
 import { ProxyController } from './proxy/proxy.controller';
 import { PaymentWebhookController } from './proxy/payment-webhook.controller';
 import { QrisGrpcController } from './payment/qris-grpc.controller';
@@ -31,6 +32,7 @@ import { SecurityMiddleware } from './security/security.middleware';
   controllers: [
     AppController,
     AuthController,
+    UserProxyController,
     SessionController,
     QrisGrpcController,
     HotspotGrpcController,
@@ -41,22 +43,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     ProxyController,
     HealthController,
   ],
-  providers: [
-    AuthService,
-    AuthGrpcClient,
-    ErpGrpcClient,
-    ErpDashboardGrpcClient,
-    HotspotGrpcClient,
-    PppoeGrpcClient,
-    VoucherBatchGrpcClient,
-    VoucherGenerateGrpcClient,
-    VoucherTypeGrpcClient,
-    ReportGrpcClient,
-    BotGrpcClient,
-    PaymentGrpcClient,
-    HttpProxyFallbackService,
-    ViewService,
-  ],
+  providers: [AuthService, AuthGrpcClient, ErpGrpcClient, ErpDashboardGrpcClient, HotspotGrpcClient, PppoeGrpcClient, VoucherBatchGrpcClient, VoucherGenerateGrpcClient, VoucherTypeGrpcClient, ReportGrpcClient, BotGrpcClient, PaymentGrpcClient, HttpProxyFallbackService, ViewService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
