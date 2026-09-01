@@ -14,7 +14,6 @@ import DhcpLeasesPage from './pages/DhcpLeasesPage';
 import VoucherOperationsPage from './pages/VoucherOperationsPage';
 import VoucherTypesPage from './pages/VoucherTypesPage';
 import SchedulerPage from './pages/SchedulerPage';
-import RouterSessionsPage from './pages/RouterSessionsPage';
 import ResellersPage from './pages/ResellersPage';
 import TelegramPage from './pages/TelegramPage';
 import BotResellersPage from './pages/BotResellersPage';
@@ -41,7 +40,7 @@ function Root() {
   if (path === '/voucher-operations' || path === '/voucher-batches') return <VoucherOperationsPage session={session} />;
   if (path === '/voucher-types') return <VoucherTypesPage />;
   if (path === '/scheduler') return <SchedulerPage session={session} />;
-  if (path === '/routers') return <RouterSessionsPage />;
+  if (path === '/routers') return <GroupedApp sessionMode />;
   if (path === '/resellers') return <ResellersPage />;
   if (path === '/telegram') return <TelegramPage />;
   if (path === '/bot-resellers') return <BotResellersPage />;
