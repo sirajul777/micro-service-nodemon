@@ -15,15 +15,13 @@ import VoucherOperationsPage from './pages/VoucherOperationsPage';
 import VoucherTypesPage from './pages/VoucherTypesPage';
 import SchedulerPage from './pages/SchedulerPage';
 import ResellersPage from './pages/ResellersPage';
-import TelegramPage from './pages/TelegramPage';
+import TelegramManagementPage from './pages/TelegramManagementPage';
 import BotResellersPage from './pages/BotResellersPage';
 import UsersPage from './pages/UsersPage';
 import SystemResourcePage from './pages/SystemResourcePage';
 import InterfacesPage from './pages/InterfacesPage';
 import InterfaceTrafficPage from './pages/InterfaceTrafficPage';
 
-// App.tsx still references the legacy page symbol directly; keep that shell compatible while
-// the dedicated router entry points remain the preferred path.
 globalThis.HotspotActivePage = HotspotActivePage;
 
 function Root() {
@@ -42,7 +40,7 @@ function Root() {
   if (path === '/scheduler') return <SchedulerPage session={session} />;
   if (path === '/routers') return <GroupedApp sessionMode />;
   if (path === '/resellers') return <ResellersPage />;
-  if (path === '/telegram') return <TelegramPage />;
+  if (path === '/telegram') return <TelegramManagementPage />;
   if (path === '/bot-resellers') return <BotResellersPage />;
   if (path === '/users') return <UsersPage />;
   if (path === '/system-resource') return <SystemResourcePage session={session} />;
