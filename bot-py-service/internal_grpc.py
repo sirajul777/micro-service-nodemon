@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 import grpc
 from concurrent import futures
 
@@ -113,10 +114,59 @@ class BotInternalService(bot_internal_pb2_grpc.BotInternalServiceServicer):
         if not cfg:
             return bot_internal_pb2.MutationResponse(success=False, error="Konfigurasi Telegram tidak ditemukan")
         try:
-            ok = bool(tg_bot.send_message(cfg, request.chat_id or cfg.get("chatId"), request.message or "Test dari MikHMon"))
+            result = tg_bot.send_message(cfg, request.chat_id or cfg.get("chatId"), request.message or "Test dari MikHMon")
+            ok = bool(result.get("ok")) if isinstance(result, dict) else bool(result)
             return bot_internal_pb2.MutationResponse(success=ok, message="Pesan terkirim" if ok else "Gagal mengirim pesan")
         except Exception as e:
             return bot_internal_pb2.MutationResponse(success=False, error=str(e))
+
+    def BroadcastTelegram(self, request, context):
+        message = (request.message or "").strip()
+        if not message:
+            return bot_internal_pb2.MutationResponse(success=False, error="Pesan broadcast kosong")
+
+        cfg = tg_config_service.get_config(request.id or None)
+        if not cfg or not cfg.get("token"):
+            return bot_internal_pb2.MutationResponse(success=False, error="Konfigurasi Telegram tidak ditemukan atau token kosong")
+        if not cfg.get("botEnabled"):
+            return bot_internal_pb2.MutationResponse(success=False, error="Bot Telegram sedang disabled")
+
+        # Broadcast follows the monolith's "semua agen" behavior: only active
+        # bot-resellers with a Telegram ID are targeted. The recipient list is
+        # resolved server-side so the browser cannot inject arbitrary chat IDs.
+        recipients = []
+        seen = set()
+        for reseller in reseller_service.load_all():
+            telegram_id = str(reseller.get("telegramId") or "").strip()
+            if reseller.get("status") != "active" or not telegram_id or telegram_id in seen:
+                continue
+            seen.add(telegram_id)
+            recipients.append(telegram_id)
+
+        if not recipients:
+            return bot_internal_pb2.MutationResponse(success=False, error="Tidak ada agen aktif dengan Telegram ID")
+
+        delivered = 0
+        failed = 0
+        for chat_id in recipients[:1000]:
+            try:
+                result = tg_bot.send_message(cfg, chat_id, message)
+                ok = bool(result.get("ok")) if isinstance(result, dict) else bool(result)
+                if ok:
+                    delivered += 1
+                else:
+                    failed += 1
+            except Exception as exc:
+                failed += 1
+                log.warning("Telegram broadcast failed for chat %s: %s", chat_id, exc)
+            # Keep broadcasts below Telegram's normal send rate and avoid a
+            # tight loop when the reseller list is large.
+            time.sleep(0.05)
+
+        total = min(len(recipients), 1000)
+        success = delivered > 0 and failed == 0
+        message_result = f"Broadcast selesai: {delivered} berhasil, {failed} gagal dari {total} agen"
+        return bot_internal_pb2.MutationResponse(success=success, message=message_result, error="Sebagian pesan gagal terkirim" if failed else "")
 
     def ListTelegramLogs(self, request, context):
         rows = tg_config_service.load_topup_requests()
