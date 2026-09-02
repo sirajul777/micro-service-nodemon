@@ -2,7 +2,7 @@
 
 Ported the monolith's Telegram + reseller-bot notification behavior into a
 standalone Python service (`bot-py-service/`), event-driven off the
-payment-service's Redis `payment.order.settled` channel.
+payment-service's Redis payment/billing events.
 
 ## Steps Completed
 
@@ -13,7 +13,7 @@ payment-service's Redis `payment.order.settled` channel.
 - [x] 5. `services/tg_config_service.py` — DB-backed telegram configs + in-memory topup-request store (mirrors monolith JSON files).
 - [x] 6. `services/tg_api.py` — thin Telegram Bot API client (sendMessage, editMessage, answerCallback, getUpdates).
 - [x] 7. `services/notifier.py` — WhatsApp voucher delivery (Fonnte/Wablas) with `wa.me` fallback (port of `PayhookNotifierService`).
-- [x] 8. `services/redis_consumer.py` — consumes `payment.order.paid`, `payment.order.settled`, `payment.failed`, `billing.invoice.overdue`; delivers voucher credentials on settle.
+- [x] 8. `services/redis_consumer.py` — consumes `payment.order.paid`, `payment.order.settled`, `payment.failed`, `billing.invoice.overdue`; delivers voucher credentials on settle and emits configured Telegram alerts.
 - [x] 9. `services/tg_bot.py` — Telegram long-polling bot: reseller (`/beli`, `/saldo`, `/topup`, `/daftar`, `/riwayat`, `/profil`, `/cek`) + admin (`/status`, `/aktif`, `/hapus`, `/generate`, `/rekap`) commands, callback-driven inline flows, topup approve/reject.
 - [x] 10. `clients/erp_client.py` — compatibility facade retained, now backed by the internal ERP gRPC client.
 - [x] 11. `clients/erp_grpc.py` — gRPC client for `GetActiveVoucherTypes` and `GetVoucherType`.
@@ -24,17 +24,21 @@ payment-service's Redis `payment.order.settled` channel.
 - [x] 16. `docker-compose.yml` — `ERP_GRPC_ADDR=erp-node-service:50053` and dependency wiring.
 - [x] 17. `services/__init__.py`, `clients/__init__.py` — package markers.
 - [x] 18. **Verification** — Python syntax/import compilation should be run in the container build.
+- [x] 19. **Telegram event notifications** — `notifSale` controls sale alerts; payment failures and overdue invoices are forwarded to configured Telegram admin chats. Telegram delivery errors are auxiliary and do not block the core Redis event acknowledgement path.
+- [x] 20. **Telegram broadcast** — internal Bot gRPC exposes `BroadcastTelegram`; BFF exposes `/api/telegram/broadcast`; recipients are resolved server-side to active bot-resellers with Telegram IDs.
 
 ## Cross-service contract (what bot consumes)
 | Topic | Payload key fields | Bot action |
 |-------|--------------------|------------|
-| `payment.order.paid` | `{ orderId, uniqueAmount, voucherName, profile }` | admin log |
-| `payment.order.settled` | `{ orderId, username, password, phone, profile, validity }` | WA voucher delivery + admin log |
-| `payment.failed` | `{ orderId, reason }` | admin alert (log) |
-| `billing.invoice.overdue` | `{ invoiceId, customerId }` | reminder (log) |
+| `payment.order.paid` | `{ orderId, uniqueAmount, voucherName, profile }` | Telegram sale/admin notification when `notifSale` is enabled |
+| `payment.order.settled` | `{ orderId, username, password, phone, profile, validity }` | WA voucher delivery + Telegram sale notification when enabled |
+| `payment.failed` | `{ orderId, reason }` | Telegram admin alert |
+| `billing.invoice.overdue` | `{ invoiceId, customerId }` | Telegram billing alert |
 
 ## Internal service communication
 - ERP voucher-type reads now use **gRPC only** (`ErpInternalService.GetActiveVoucherTypes` / `GetVoucherType`).
 - Router operations use gRPC (`mikrotik-go-service`).
 - Redis remains the asynchronous event transport for payment/billing events.
+- Telegram management/configuration uses the BFF → Bot gRPC path.
+- Telegram broadcast uses the BFF → Bot gRPC path; the bot service resolves recipients from `db_bot`.
 - HTTP remains exposed only for the bot health endpoint and external Telegram/WhatsApp APIs.
