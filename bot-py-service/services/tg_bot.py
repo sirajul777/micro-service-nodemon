@@ -5,10 +5,8 @@ Key changes vs the monolith:
   - Router operations go through `mikrotik_grpc` (→ Go) instead of direct
     `MikrotikService`/`createClient`.
   - Voucher types come from `erp_client` (→ erp-service) instead of direct
-    `VoucherTypeService`/MikroTik profile reads.
-  - Voucher generation (creating hotspot users) is delegated to the Go service
-    via `AddHotspotUser`; the bot then books the sale against the reseller's
-    saldo (deduct) and notifies admin.
+    VoucherTypeService/MikroTik profile reads.
+  - Voucher generation is delegated to the Go service via `AddHotspotUser`.
 """
 import logging
 import random
@@ -24,7 +22,6 @@ from clients import erp_client, mikrotik_grpc
 log = logging.getLogger("bot-py-service.tg-bot")
 
 INDO_CURR = ["RP", "Rp", "rp", "IDR", "idr"]
-
 _bot_states: dict[str, dict] = {}
 _user_states: dict[str, dict] = {}
 
@@ -125,8 +122,7 @@ def start_polling(config_id: str):
         return
     state["polling"] = True
     log.info(f"Bot [{config_id}] polling started")
-    t = threading.Thread(target=_poll_loop, args=(config_id,), daemon=True)
-    t.start()
+    threading.Thread(target=_poll_loop, args=(config_id,), daemon=True).start()
 
 
 def _poll_loop(config_id: str):
@@ -158,11 +154,9 @@ def _handle_message(msg: dict, cfg: dict):
     text = (msg.get("text") or "").strip()
     if not cfg or not chat_id:
         return
-
     is_admin_user = _is_admin(cfg, chat_id, user_id)
     reseller = reseller_svc.get_by_telegram_id(user_id)
     is_seller = bool(reseller and reseller.get("status") == "active")
-
     if not text.startswith("/"):
         state = _get_state(chat_id)
         if state and state.get("step") == "awaiting_qty":
@@ -172,14 +166,11 @@ def _handle_message(msg: dict, cfg: dict):
             _handle_topup_amount_input(chat_id, user_id, username, text, cfg)
             return
         return
-
     cmd_part = text.split(" ")[0].lower()
     command = cmd_part.split("@")[0]
     args = [a for a in text.split(" ")[1:] if a]
-
     reseller_cmds = {"/beli", "/saldo", "/riwayat", "/profil", "/profile", "/cek", "/topup", "/cektopup"}
     admin_cmds = {"/status", "/aktif", "/rekap", "/today", "/bulan", "/pppoe", "/hapus", "/resellers"}
-
     if not is_admin_user:
         if command in reseller_cmds and not is_seller:
             send_message(cfg, chat_id, "⛔ <b>Akses Ditolak</b>\n\nAnda belum terdaftar atau akun Anda nonaktif. Silakan ketik /daftar untuk mendaftar sebagai reseller.")
@@ -187,7 +178,6 @@ def _handle_message(msg: dict, cfg: dict):
         if command in admin_cmds:
             send_message(cfg, chat_id, "🚫 Perintah ini hanya untuk Admin.")
             return
-
     handlers = {
         "/start": lambda: _handle_help(chat_id, is_admin_user, cfg),
         "/help": lambda: _handle_help(chat_id, is_admin_user, cfg),
@@ -228,7 +218,6 @@ def _handle_callback(cb: dict, cfg: dict):
         return
     tg_api.answer_callback(token, cb.get("id"), "")
     action, *params = data.split(":")
-
     if action in ("beli_prof", "gen_prof"):
         mode = "beli" if action == "beli_prof" else "generate"
         _cb_select_profile(chat_id, user_id, username, msg_id, params[0], mode, cfg)
@@ -258,26 +247,13 @@ def _handle_callback(cb: dict, cfg: dict):
         _handle_topup_request(chat_id, user_id, username, [], cfg)
 
 
-# ── Help / menu commands ─────────────────────────────────────────
-
 def _handle_help(chat_id: str, is_admin_user: bool, cfg: dict):
-    reseller = reseller_svc.get_by_telegram_id(chat_id)
-    is_reseller = bool(reseller and reseller.get("status") == "active")
-    text = "🤖 <b>MikHMon Hotspot Bot</b>\n\n"
-    text += "📖 <b>Perintah Umum:</b>\n• /start — Memulai bot\n• /daftar — Daftar sebagai reseller\n• /help — Bantuan\n\n"
-    if is_reseller or is_admin_user:
-        text += ("💼 <b>Menu Reseller:</b>\n• /beli — Beli voucher\n• /saldo — Cek saldo\n"
-                 "• /topup — Request topup\n• /cektopup — Status topup\n• /riwayat — Riwayat\n"
-                 "• /profil — Daftar harga\n• /cek [user] — Detail voucher\n\n")
+    text = "🤖 <b>MikHMon Hotspot Bot</b>\n\n📖 <b>Perintah Umum:</b>\n• /start — Memulai bot\n• /daftar — Daftar sebagai reseller\n• /help — Bantuan\n\n"
     if is_admin_user:
-        text += ("⚙️ <b>Menu Admin:</b>\n• /status — Status router\n• /aktif — HS aktif\n"
-                 "• /today — Rekap hari ini\n• /bulan — Rekap bulan ini\n• /pppoe — PPPoE aktif\n"
-                 "• /hapus [user] — Hapus user\n• /generate — Batch generate\n\n"
-                 "👥 <b>Reseller:</b>\n• /resellers — Daftar reseller\n• /topup [id] [jumlah] — Topup manual\n\n")
-    if not is_reseller and not is_admin_user:
-        text += "ℹ️ <i>Anda belum terdaftar. Ketik /daftar.</i>\n\n"
-    text += "🕒 " + datetime.now().strftime("%d/%m/%Y %H:%M")
-    send_message(cfg, chat_id, text)
+        text += "⚙️ <b>Menu Admin:</b>\n• /status — Status router\n• /aktif — HS aktif\n• /today — Rekap hari ini\n• /bulan — Rekap bulan ini\n• /pppoe — PPPoE aktif\n• /hapus [user] — Hapus user\n• /generate — Batch generate\n\n👥 <b>Reseller:</b>\n• /resellers — Daftar reseller\n• /topup [id] [jumlah] — Topup manual\n"
+    else:
+        text += "💼 <b>Menu Reseller:</b>\n• /beli — Beli voucher\n• /saldo — Cek saldo\n• /topup — Request topup\n• /cektopup — Status topup\n• /riwayat — Riwayat\n• /profil — Daftar harga\n• /cek [user] — Detail voucher\n"
+    send_message(cfg, chat_id, text + "\n🕒 " + datetime.now().strftime("%d/%m/%Y %H:%M"))
 
 
 def _handle_profil(chat_id: str, cfg: dict):
@@ -285,7 +261,6 @@ def _handle_profil(chat_id: str, cfg: dict):
     if not items:
         send_message(cfg, chat_id, "⚠️ Belum ada tipe voucher aktif. Hubungi admin.")
         return
-    # preserve existing monolith port behavior
     rows = []
     for item in items:
         on = _parse_on_login(item.get("onLogin", ""))
@@ -365,15 +340,18 @@ def _cb_confirm_beli(chat_id, user_id, username, msg_id, profile_id, cfg):
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, "❌ Profile tidak ditemukan.")
         return
     on = _parse_on_login(item.get("onLogin", ""))
-    price = on.get("price", 0)
-    saldo = reseller.get("saldo", 0)
+    price = float(on.get("price", 0) or 0)
+    if price <= 0:
+        tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, "❌ Harga voucher tidak valid.")
+        return
+    saldo = float(reseller.get("saldo", 0) or 0)
     if saldo < price:
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"❌ Saldo tidak cukup. Saldo: {_fmt_rp(saldo)}")
         return
     username_v = _random_str(6, "upperdigit")
     password_v = _random_str(6, "lowerdigit")
     try:
-        mikrotik_grpc.add_hotspot_user({"sessionId": reseller.get("sessionId"), "name": username_v, "password": password_v, "profile": item.get("profile") or item.get("name") or profile_id, "limitUptime": _parse_on_login(item.get("onLogin", "")).get("validity", "")})
+        mikrotik_grpc.add_hotspot_user({"sessionId": reseller.get("sessionId"), "name": username_v, "password": password_v, "profile": item.get("profile") or item.get("name") or profile_id, "limitUptime": on.get("validity", "")})
     except Exception as exc:
         log.warning("voucher provision failed: %s", exc)
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"❌ Gagal membuat voucher: {exc}")
@@ -382,14 +360,14 @@ def _cb_confirm_beli(chat_id, user_id, username, msg_id, profile_id, cfg):
         try:
             mikrotik_grpc.remove_hotspot_user(reseller.get("sessionId"), username_v)
         except Exception:
-            pass
+            log.warning("failed to roll back router voucher %s", username_v)
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, "❌ Saldo berubah sebelum transaksi selesai. Voucher dibatalkan.")
         return
-    tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"✅ <b>Pembelian berhasil</b>\n\nUser: <code>{username_v}</code>\nPass: <code>{password_v}</code>\nHarga: <b>{_fmt_rp(price)}</b>")
+    tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id,
+        f"✅ <b>Pembelian berhasil</b>\n\nUser: <code>{username_v}</code>\nPass: <code>{password_v}</code>\nHarga: <b>{_fmt_rp(price)}</b>")
 
 
 def _cb_confirm_generate(chat_id, user_id, username, msg_id, profile_id, qty, cfg):
-    # existing batch generation behavior
     for _ in range(max(1, min(qty, 50))):
         _cb_confirm_beli(chat_id, user_id, username, msg_id, profile_id, cfg)
 
@@ -463,7 +441,7 @@ def _handle_topup_request(chat_id, user_id, username, args, cfg):
     nominals = [50000, 100000, 150000, 200000, 300000, 500000]
     keyboard = []
     for i in range(0, len(nominals), 2):
-        keyboard.append([{ "text": f"Rp {n:,}".replace(",", "."), "callback_data": f"topup_req:{n}" } for n in nominals[i:i + 2]])
+        keyboard.append([{"text": f"Rp {n:,}".replace(",", "."), "callback_data": f"topup_req:{n}"} for n in nominals[i:i + 2]])
     keyboard.append([{"text": "✏️ Nominal Lain", "callback_data": "topup_custom"}])
     keyboard.append([{"text": "❌ Batal", "callback_data": "cancel"}])
     send_message(cfg, chat_id, f"💰 <b>Request Topup Saldo</b>\n\n👤 {reseller.get('name')}\n💳 Saldo saat ini: <b>{_fmt_rp(reseller.get('saldo'))}</b>\n\nPilih nominal topup:", {"reply_markup": {"inline_keyboard": keyboard}})
@@ -471,16 +449,7 @@ def _handle_topup_request(chat_id, user_id, username, args, cfg):
 
 def _process_topup_request(chat_id, user_id, username, reseller, amount, note, cfg):
     req_id = f"TR-{int(time.time() * 1000)}"
-    topup_req = {
-        "id": req_id,
-        "resellerId": reseller["id"],
-        "resellerName": reseller["name"],
-        "telegramId": user_id,
-        "amount": amount,
-        "note": note,
-        "requestedAt": datetime.now().isoformat(),
-        "status": "pending",
-    }
+    topup_req = {"id": req_id, "resellerId": reseller["id"], "resellerName": reseller["name"], "telegramId": user_id, "amount": amount, "note": note, "requestedAt": datetime.now().isoformat(), "status": "pending"}
     tg_cfg.add_topup_request(topup_req)
     note_line = f"📝 Catatan: {note}" if note else ""
     send_message(cfg, chat_id, f"✅ <b>Request Topup Terkirim!</b>\n\n💰 Jumlah: <b>{_fmt_rp(amount)}</b>\n{note_line}\n🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\nTunggu konfirmasi admin.\nKetik /cektopup untuk cek status.")
@@ -522,7 +491,9 @@ def _cb_topup_select_nominal(chat_id, user_id, username, msg_id, amount, cfg):
     if not reseller:
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, "❌ Reseller tidak ditemukan.")
         return
-    tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"💰 <b>Konfirmasi Request Topup</b>\n\n👤 {reseller.get('name')}\n💵 Jumlah: <b>{_fmt_rp(amount)}</b>\n💳 Saldo saat ini: <b>{_fmt_rp(reseller.get('saldo'))}</b>\n💳 Saldo setelah topup: <b>{_fmt_rp(reseller.get('saldo') + amount)}</b>\n\nKonfirmasi request?", {"reply_markup": {"inline_keyboard": [[{"text": "✅ Ya, Request Sekarang", "callback_data": f"topup_confirm:{amount}"}, {"text": "◀️ Kembali", "callback_data": "topup_back"}, {"text": "❌ Batal", "callback_data": "cancel"}]]}})
+    tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id,
+        f"💰 <b>Konfirmasi Request Topup</b>\n\n👤 {reseller.get('name')}\n💵 Jumlah: <b>{_fmt_rp(amount)}</b>\n💳 Saldo saat ini: <b>{_fmt_rp(reseller.get('saldo'))}</b>\n💳 Saldo setelah topup: <b>{_fmt_rp(reseller.get('saldo') + amount)}</b>\n\nKonfirmasi request?",
+        {"reply_markup": {"inline_keyboard": [[{"text": "✅ Ya, Request Sekarang", "callback_data": f"topup_confirm:{amount}"}, {"text": "◀️ Kembali", "callback_data": "topup_back"}, {"text": "❌ Batal", "callback_data": "cancel"}]]}})
 
 
 def _cb_topup_confirm(chat_id, user_id, username, msg_id, amount, cfg):
@@ -544,7 +515,11 @@ def _cb_topup_custom(chat_id, user_id, msg_id, cfg):
 
 
 def _handle_topup_amount_input(chat_id, user_id, username, text, cfg):
-    amount = int(re.sub(r"\D", "", text))
+    digits = re.sub(r"\D", "", text)
+    if not digits:
+        send_message(cfg, chat_id, "❌ Nominal tidak valid.\n\nKetik ulang nominalnya:")
+        return
+    amount = int(digits)
     if amount < 1000:
         send_message(cfg, chat_id, "❌ Nominal tidak valid. Minimal Rp 1.000\n\nKetik ulang nominalnya:")
         return
@@ -557,7 +532,6 @@ def _handle_topup_amount_input(chat_id, user_id, username, text, cfg):
 
 def _cb_topup_approve(chat_id, user_id, msg_id, req_id, cfg):
     if not _is_admin(cfg, chat_id, user_id):
-        tg_api.answer_callback(cfg.get("token", ""), "", "Hanya admin yang bisa approve")
         return
     processor = f"tg:{user_id}"
     req = tg_cfg.claim_topup_request(req_id, processor)
@@ -566,16 +540,13 @@ def _cb_topup_approve(chat_id, user_id, msg_id, req_id, cfg):
         if not current:
             tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, "❌ Request tidak ditemukan.")
         else:
-            status = current.get("status")
-            tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"⚠️ Request sudah diproses. Status: {status}")
+            tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"⚠️ Request sudah diproses. Status: {current.get('status')}")
         return
-
     result = reseller_svc.topup(req["resellerId"], req.get("amount", 0), "Topup via bot disetujui admin", processor)
     if not result:
         tg_cfg.finish_topup_request(req_id, "rejected", processor, note="Reseller tidak ditemukan")
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, "❌ Gagal memproses topup. Reseller tidak ditemukan.")
         return
-
     tg_cfg.finish_topup_request(req_id, "approved", processor)
     tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"✅ <b>Topup DISETUJUI</b>\n\n👤 {req.get('resellerName')}\n💰 +{_fmt_rp(req.get('amount'))}\n💳 Saldo baru: <b>{_fmt_rp(result['reseller'].get('saldo'))}</b>")
     send_message(cfg, req.get("telegramId"), f"🎉 <b>Request Topup Disetujui!</b>\n\n💰 Topup: <b>+{_fmt_rp(req.get('amount'))}</b>\n💳 Saldo sekarang: <b>{_fmt_rp(result['reseller'].get('saldo'))}</b>\n\nKetik /beli untuk mulai belanja! 🛒")
@@ -614,8 +585,10 @@ def _handle_aktif(chat_id, cfg):
     if not res.get("users"):
         send_message(cfg, chat_id, "📭 Tidak ada user hotspot aktif.")
         return
-    text = f"👥 <b>HS Aktif ({len(res['users'])})</b>\n\n<pre>" + "".join(f"{str(i).zfill(2)}. {(u.get('name') or '—')}\n" for i, u in enumerate(res["users"][:25], start=1)) + "</pre>"
-    send_message(cfg, chat_id, text)
+    text = f"👥 <b>HS Aktif ({len(res['users'])})</b>\n\n<pre>"
+    for i, u in enumerate(res["users"][:25], start=1):
+        text += f"{str(i).zfill(2)}. {(u.get('name') or '—')}\n"
+    send_message(cfg, chat_id, text + "</pre>")
 
 
 def _handle_rekap(chat_id, period, cfg):
