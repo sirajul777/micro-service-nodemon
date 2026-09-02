@@ -17,8 +17,6 @@ export async function handleBotGrpcRoute(
     if (root === 'resellers' || root === 'bot-resellers') {
       const isBot = root === 'bot-resellers';
 
-      // Legacy parity route: GET /resellers/session/:session
-      // The old REST service returns plain resellers filtered by router session.
       if (!isBot && req.method === 'GET' && parts.length === 3 && parts[1] === 'session') {
         const sessionId = decodeURIComponent(parts[2]);
         const response = await bot.listResellers(false);
@@ -89,6 +87,13 @@ export async function handleBotGrpcRoute(
       }
       if (req.method === 'POST' && parts.length === 2 && parts[1] === 'test') {
         const response = await bot.testTelegram(String(body?.id || ''), String(body?.chatId || ''), String(body?.message || 'Test dari MikHMon'));
+        return res.status(response.success === false ? 502 : 200).json(response);
+      }
+      if (req.method === 'POST' && parts.length === 2 && parts[1] === 'broadcast') {
+        const id = String(body?.id || '');
+        const message = String(body?.message || '');
+        if (!id || !message.trim()) return res.status(400).json({ success: false, message: 'Bot dan pesan wajib diisi' });
+        const response = await bot.broadcastTelegram(id, message);
         return res.status(response.success === false ? 502 : 200).json(response);
       }
       if (req.method === 'GET' && parts.length === 2 && parts[1] === 'logs') {
