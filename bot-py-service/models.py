@@ -77,3 +77,18 @@ class TelegramConfig(Base):
     allowedUsers = Column(Text, nullable=True)  # JSON array string
     defaultProfile = Column(String, default="")
     welcomeMsg = Column(String, default="")
+
+
+class TelegramTopupRequest(Base):
+    __tablename__ = "telegram_topup_requests"
+
+    id = Column(String, primary_key=True)
+    resellerId = Column(String, nullable=False, index=True)
+    resellerName = Column(String, nullable=False)
+    telegramId = Column(String, nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    note = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending", index=True)  # pending | approved | rejected
+    createdAt = Column(DateTime, server_default=func.now(), index=True)
+    processedAt = Column(DateTime, nullable=True)
+    processedBy = Column(String, nullable=True)
