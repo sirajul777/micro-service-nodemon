@@ -39,9 +39,12 @@ export default function TelegramManagementPage() {
   const [selected, setSelected] = useState<Config | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [message, setMessage] = useState('Test dari Mikhmon');
+  const [broadcastBotId, setBroadcastBotId] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [broadcasting, setBroadcasting] = useState(false);
   const [notice, setNotice] = useState('');
 
   const load = async () => {
@@ -51,8 +54,10 @@ export default function TelegramManagementPage() {
         request('/api/telegram/config'),
         request('/api/telegram/logs'),
       ]);
-      setConfigs(Array.isArray(c) ? c : []);
+      const nextConfigs = Array.isArray(c) ? c : [];
+      setConfigs(nextConfigs);
       setLogs(Array.isArray(l) ? l : []);
+      if (!broadcastBotId && nextConfigs.length) setBroadcastBotId(String(nextConfigs[0].id || ''));
     } catch (e: any) {
       setNotice(e?.message || 'Gagal memuat konfigurasi Telegram.');
     } finally { setBusy(false); }
@@ -133,6 +138,25 @@ export default function TelegramManagementPage() {
     finally { setTestingId(null); }
   };
 
+  const broadcast = async () => {
+    if (!broadcastBotId || !broadcastMessage.trim()) {
+      setNotice('Pilih bot dan isi pesan broadcast terlebih dahulu.');
+      return;
+    }
+    if (!window.confirm('Kirim broadcast ke semua agen aktif yang memiliki Telegram ID?')) return;
+    setBroadcasting(true); setNotice('');
+    try {
+      const result = await request('/api/telegram/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({ id: broadcastBotId, message: broadcastMessage.trim() }),
+      });
+      setNotice(result?.message || 'Broadcast selesai.');
+      setBroadcastMessage('');
+    } catch (e: any) {
+      setNotice(e?.message || 'Broadcast Telegram gagal.');
+    } finally { setBroadcasting(false); }
+  };
+
   const enabledCount = configs.filter((x) => x.botEnabled !== false && x.bot_enabled !== false).length;
 
   return <div className="stack">
@@ -140,11 +164,11 @@ export default function TelegramManagementPage() {
       <div>
         <span className="eyebrow">TELEGRAM BOT</span>
         <h3>Bot Management</h3>
-        <p>Kelola multi-bot, koneksi Telegram, notifikasi, dan activity log.</p>
+        <p>Kelola multi-bot, koneksi Telegram, notifikasi, broadcast, dan activity log.</p>
       </div>
       <div>
-        <button className="button" disabled={busy} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button>{' '}
-        <button className="primary" disabled={busy} onClick={openNew}><Plus size={15}/> Add Bot</button>
+        <button className="button" disabled={busy || broadcasting} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button>{' '}
+        <button className="primary" disabled={busy || broadcasting} onClick={openNew}><Plus size={15}/> Add Bot</button>
       </div>
     </div>
 
@@ -182,6 +206,18 @@ export default function TelegramManagementPage() {
         </table>
         {!filtered.length && <div className="empty">Belum ada konfigurasi bot.</div>}
       </div>
+    </section>
+
+    <section className="panel">
+      <div className="panel-head"><div><h3>Broadcast ke Semua Agen</h3><span>Kirim pesan menggunakan bot terpilih ke semua bot-reseller aktif yang memiliki Telegram ID.</span></div><Send size={18}/></div>
+      <div className="detail-grid">
+        <label className="metric"><span>Bot Pengirim</span><select value={broadcastBotId} onChange={e => setBroadcastBotId(e.target.value)} disabled={broadcasting || !configs.length}>
+          <option value="">Pilih bot...</option>
+          {configs.map((cfg, i) => <option key={String(cfg.id ?? i)} value={String(cfg.id ?? '')}>{cfg.name || cfg.id || `Bot ${i + 1}`} {cfg.botEnabled === false ? '(Disabled)' : ''}</option>)}
+        </select></label>
+        <label className="metric"><span>Pesan Broadcast</span><textarea rows={5} value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Tulis pesan broadcast..." disabled={broadcasting}/></label>
+      </div>
+      <div className="modal-actions"><button className="primary" disabled={broadcasting || !broadcastBotId || !broadcastMessage.trim()} onClick={() => void broadcast()}><Send size={15}/> {broadcasting ? 'Mengirim…' : 'Kirim Broadcast'}</button></div>
     </section>
 
     <section className="panel">
