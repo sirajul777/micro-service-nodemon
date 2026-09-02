@@ -15,6 +15,7 @@ service BotInternalService {
   rpc SaveTelegramConfig(SaveTelegramConfigRequest) returns (TelegramConfigResponse);
   rpc DeleteTelegramConfig(DeleteTelegramConfigRequest) returns (MutationResponse);
   rpc TestTelegram(TestTelegramRequest) returns (MutationResponse);
+  rpc BroadcastTelegram(BroadcastTelegramRequest) returns (MutationResponse);
   rpc ListTelegramLogs(ListTelegramLogsRequest) returns (TelegramLogsResponse);
 }
 
@@ -66,6 +67,7 @@ message TelegramConfigResponse { bool success = 1; string error = 2; TelegramCon
 message SaveTelegramConfigRequest { TelegramConfig config = 1; }
 message DeleteTelegramConfigRequest { string id = 1; }
 message TestTelegramRequest { string id = 1; string chat_id = 2; string message = 3; }
+message BroadcastTelegramRequest { string id = 1; string message = 2; }
 message ListTelegramLogsRequest {}
 message TelegramLog { string id = 1; string payload = 2; }
 message TelegramLogsResponse { bool success = 1; string error = 2; repeated TelegramLog logs = 3; }
