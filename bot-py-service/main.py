@@ -7,6 +7,7 @@ Wires together:
     to customers via the WhatsApp gateway (and logs/admin alerts).
   - Telegram bots (long-polling) for reseller/admin commands, ported from the
     monolith's TelegramService + reseller-bot.
+  - Scheduled Telegram daily reports from the persisted reseller purchase ledger.
   - A tiny HTTP server exposing /healthz (and optionally /resellers back-channel).
 
 Run locally:   python main.py
@@ -22,6 +23,7 @@ from datetime import datetime
 import db
 import rest_api
 from services import redis_consumer, tg_bot, tg_config_service as tg_cfg
+from services import tg_daily_report
 from internal_grpc import serve as serve_grpc
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s %(name)s: %(message)s")
@@ -111,6 +113,7 @@ def main():
     consumer = redis_consumer.RedisConsumer(redis_consumer_topics())
     consumer.start()
     tg_bot.start_all()
+    tg_daily_report.start()
 
     log.info("bot-py-service started. Health endpoint on :%d/healthz", HEALTH_PORT)
     server = HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler)
@@ -120,6 +123,7 @@ def main():
         log.info("Shutting down...")
         consumer.stop()
         tg_bot.stop_all()
+        tg_daily_report.stop()
         grpc_server.stop(0)
 
 
