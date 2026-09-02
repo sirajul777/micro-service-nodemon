@@ -159,12 +159,10 @@ class BotInternalService(bot_internal_pb2_grpc.BotInternalServiceServicer):
             except Exception as exc:
                 failed += 1
                 log.warning("Telegram broadcast failed for chat %s: %s", chat_id, exc)
-            # Keep broadcasts below Telegram's normal send rate and avoid a
-            # tight loop when the reseller list is large.
             time.sleep(0.05)
 
         total = min(len(recipients), 1000)
-        success = delivered > 0 and failed == 0
+        success = delivered > 0
         message_result = f"Broadcast selesai: {delivered} berhasil, {failed} gagal dari {total} agen"
         return bot_internal_pb2.MutationResponse(success=success, message=message_result, error="Sebagian pesan gagal terkirim" if failed else "")
 
