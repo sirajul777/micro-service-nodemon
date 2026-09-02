@@ -1,15 +1,10 @@
-"""TelegramConfig persistence + topup-request store (db-backed).
-
-Replaces the monolith's file-based telegram.json / topup-requests.json with
-rows in db_bot. Also keeps an in-memory copy of topup requests (mirroring the
-monolith's JSON file behavior) since they're lightweight.
-"""
+"""Telegram config + topup-request persistence (db-backed)."""
 import json
 import logging
 from datetime import datetime
 
 from db import get_session
-from models import TelegramConfig
+from models import TelegramConfig, TelegramTopupRequest
 
 log = logging.getLogger("bot-py-service.tg-config")
 
@@ -91,20 +86,70 @@ def delete_config(config_id: str):
         s.close()
 
 
-# ── Topup requests (in-memory, mirrors monolith's topup-requests.json) ──
-_topup_requests: list[dict] = []
+# ── Topup requests (Postgres-backed; survive service restart) ─────
+
+def _topup_to_dict(r: TelegramTopupRequest) -> dict:
+    return {
+        "id": r.id,
+        "resellerId": r.resellerId,
+        "resellerName": r.resellerName,
+        "telegramId": r.telegramId,
+        "amount": r.amount or 0,
+        "note": r.note or "",
+        "status": r.status or "pending",
+        "createdAt": r.createdAt.isoformat() if r.createdAt else "",
+        "processedAt": r.processedAt.isoformat() if r.processedAt else "",
+        "processedBy": r.processedBy or "",
+    }
 
 
 def add_topup_request(req: dict):
-    _topup_requests.insert(0, req)
-    if len(_topup_requests) > 100:
-        del _topup_requests[100:]
+    s = get_session()
+    try:
+        row = TelegramTopupRequest(
+            id=req["id"],
+            resellerId=req.get("resellerId", ""),
+            resellerName=req.get("resellerName", ""),
+            telegramId=str(req.get("telegramId", "")),
+            amount=float(req.get("amount", 0) or 0),
+            note=req.get("note", ""),
+            status=req.get("status", "pending"),
+        )
+        s.merge(row)
+        s.commit()
+    finally:
+        s.close()
 
 
-def load_topup_requests():
-    return list(_topup_requests)
+def load_topup_requests() -> list[dict]:
+    s = get_session()
+    try:
+        rows = (
+            s.query(TelegramTopupRequest)
+            .order_by(TelegramTopupRequest.createdAt.desc())
+            .limit(100)
+            .all()
+        )
+        return [_topup_to_dict(r) for r in rows]
+    finally:
+        s.close()
 
 
 def save_topup_requests(reqs: list[dict]):
-    global _topup_requests
-    _topup_requests = reqs
+    """Persist changed request states without rewriting/deleting history."""
+    s = get_session()
+    try:
+        for req in reqs:
+            row = s.query(TelegramTopupRequest).filter(TelegramTopupRequest.id == req.get("id")).first()
+            if not row:
+                continue
+            row.status = req.get("status", row.status)
+            if req.get("processedBy"):
+                row.processedBy = req["processedBy"]
+            elif row.status in ("approved", "rejected") and not row.processedBy:
+                row.processedBy = "Telegram Admin"
+            if row.status in ("approved", "rejected") and not row.processedAt:
+                row.processedAt = datetime.now()
+        s.commit()
+    finally:
+        s.close()
