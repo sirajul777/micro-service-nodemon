@@ -57,6 +57,7 @@ export class BotGrpcClient implements OnModuleDestroy {
   saveTelegramConfig(config: any) { return this.call('SaveTelegramConfig', { config }); }
   deleteTelegramConfig(id: string) { return this.call('DeleteTelegramConfig', { id }); }
   testTelegram(id: string, chatId = '', message = '') { return this.call('TestTelegram', { id, chatId, message }); }
+  broadcastTelegram(id: string, message: string) { return this.call('BroadcastTelegram', { id, message }, 60000); }
   listTelegramLogs() { return this.call('ListTelegramLogs', {}); }
 
   close() { this.client?.close?.(); }
