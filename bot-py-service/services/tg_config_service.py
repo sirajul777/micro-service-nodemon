@@ -1,15 +1,10 @@
-"""TelegramConfig persistence + topup-request store (db-backed).
-
-Replaces the monolith's file-based telegram.json / topup-requests.json with
-rows in db_bot. Also keeps an in-memory copy of topup requests (mirroring the
-monolith's JSON file behavior) since they're lightweight.
-"""
+"""Telegram configuration and persistent topup-request store."""
 import json
 import logging
 from datetime import datetime
 
 from db import get_session
-from models import TelegramConfig
+from models import TelegramConfig, TelegramTopupRequest
 
 log = logging.getLogger("bot-py-service.tg-config")
 
@@ -74,7 +69,7 @@ def save_config(cfg: dict):
         row.defaultProfile = cfg.get("defaultProfile", "")
         row.welcomeMsg = cfg.get("welcomeMsg", "")
         s.commit()
-        log.info(f"Saved telegram config {cfg['id']}")
+        log.info("Saved telegram config %s", cfg["id"])
     finally:
         s.close()
 
@@ -86,25 +81,111 @@ def delete_config(config_id: str):
         if row:
             s.delete(row)
             s.commit()
-            log.info(f"Deleted telegram config {config_id}")
+            log.info("Deleted telegram config %s", config_id)
     finally:
         s.close()
 
 
-# ── Topup requests (in-memory, mirrors monolith's topup-requests.json) ──
-_topup_requests: list[dict] = []
+def _topup_to_dict(r: TelegramTopupRequest) -> dict:
+    return {
+        "id": r.id,
+        "resellerId": r.resellerId,
+        "resellerName": r.resellerName,
+        "telegramId": r.telegramId,
+        "amount": r.amount or 0,
+        "note": r.note or "",
+        "status": r.status,
+        "requestedAt": r.requestedAt.isoformat() if r.requestedAt else "",
+        "processedAt": r.processedAt.isoformat() if r.processedAt else "",
+        "processedBy": r.processedBy or "",
+    }
 
 
 def add_topup_request(req: dict):
-    _topup_requests.insert(0, req)
-    if len(_topup_requests) > 100:
-        del _topup_requests[100:]
+    s = get_session()
+    try:
+        row = TelegramTopupRequest(
+            id=req["id"],
+            resellerId=req.get("resellerId", ""),
+            resellerName=req.get("resellerName", ""),
+            telegramId=req.get("telegramId", ""),
+            amount=float(req.get("amount", 0)),
+            note=req.get("note", ""),
+            status=req.get("status", "pending"),
+        )
+        if req.get("requestedAt"):
+            row.requestedAt = datetime.fromisoformat(str(req["requestedAt"]).replace("Z", "+00:00")).replace(tzinfo=None)
+        s.add(row)
+        s.commit()
+    finally:
+        s.close()
 
 
-def load_topup_requests():
-    return list(_topup_requests)
+def load_topup_requests(limit: int = 100):
+    s = get_session()
+    try:
+        rows = (
+            s.query(TelegramTopupRequest)
+            .order_by(TelegramTopupRequest.requestedAt.desc())
+            .limit(limit)
+            .all()
+        )
+        return [_topup_to_dict(r) for r in rows]
+    finally:
+        s.close()
 
 
-def save_topup_requests(reqs: list[dict]):
-    global _topup_requests
-    _topup_requests = reqs
+def get_topup_request(req_id: str):
+    s = get_session()
+    try:
+        row = s.query(TelegramTopupRequest).filter(TelegramTopupRequest.id == req_id).first()
+        return _topup_to_dict(row) if row else None
+    finally:
+        s.close()
+
+
+def claim_topup_request(req_id: str, processor: str) -> dict | None:
+    """Atomically transition pending -> processing.
+
+    Exactly one concurrent admin can claim a request. The caller should only
+    credit the reseller after receiving this row, then finalize its status.
+    """
+    s = get_session()
+    try:
+        row = (
+            s.query(TelegramTopupRequest)
+            .filter(
+                TelegramTopupRequest.id == req_id,
+                TelegramTopupRequest.status == "pending",
+            )
+            .with_for_update()
+            .first()
+        )
+        if not row:
+            s.rollback()
+            return None
+        row.status = "processing"
+        row.processedBy = processor
+        s.commit()
+        return _topup_to_dict(row)
+    finally:
+        s.close()
+
+
+def finish_topup_request(req_id: str, status: str, processor: str, *, note: str | None = None) -> bool:
+    if status not in {"approved", "rejected", "pending"}:
+        raise ValueError("invalid topup request status")
+    s = get_session()
+    try:
+        row = s.query(TelegramTopupRequest).filter(TelegramTopupRequest.id == req_id).first()
+        if not row:
+            return False
+        row.status = status
+        row.processedBy = processor
+        row.processedAt = datetime.now()
+        if note is not None:
+            row.note = note
+        s.commit()
+        return True
+    finally:
+        s.close()

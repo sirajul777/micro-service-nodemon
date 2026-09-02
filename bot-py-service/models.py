@@ -1,6 +1,6 @@
 """SQLAlchemy models for db_bot (bot-py-service).
 
-Mirrors the monolith's entities: bot_resellers, topup_logs, telegram_configs.
+Mirrors the monolith's entities plus Telegram topup request persistence.
 """
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, Text, DateTime, func,
@@ -30,14 +30,6 @@ class BotReseller(Base):
 
 
 class Reseller(Base):
-    """Plain price-discount reseller, tied to a router session — distinct
-    from BotReseller (the Telegram-bot/saldo-based reseller system above).
-    Mirrors the monolith's ResellerEntity (table `resellers`) exactly.
-    These were previously (incorrectly) served from the BotReseller table,
-    which meant a plain reseller's `phone`/`address` were silently dropped
-    (BotReseller has no such columns) and the two feature's data was mixed
-    together in both listings.
-    """
     __tablename__ = "resellers"
 
     id = Column(String, primary_key=True)
@@ -77,3 +69,18 @@ class TelegramConfig(Base):
     allowedUsers = Column(Text, nullable=True)  # JSON array string
     defaultProfile = Column(String, default="")
     welcomeMsg = Column(String, default="")
+
+
+class TelegramTopupRequest(Base):
+    __tablename__ = "telegram_topup_requests"
+
+    id = Column(String, primary_key=True)
+    resellerId = Column(String, nullable=False, index=True)
+    resellerName = Column(String, nullable=False)
+    telegramId = Column(String, nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    note = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending", index=True)
+    requestedAt = Column(DateTime, nullable=False, server_default=func.now())
+    processedAt = Column(DateTime, nullable=True)
+    processedBy = Column(String, nullable=True)
