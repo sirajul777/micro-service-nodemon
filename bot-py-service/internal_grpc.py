@@ -131,9 +131,6 @@ class BotInternalService(bot_internal_pb2_grpc.BotInternalServiceServicer):
         if not cfg.get("botEnabled"):
             return bot_internal_pb2.MutationResponse(success=False, error="Bot Telegram sedang disabled")
 
-        # Broadcast follows the monolith's "semua agen" behavior: only active
-        # bot-resellers with a Telegram ID are targeted. The recipient list is
-        # resolved server-side so the browser cannot inject arbitrary chat IDs.
         recipients = []
         seen = set()
         for reseller in reseller_service.load_all():
