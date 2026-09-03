@@ -5,7 +5,7 @@ Implements full working business logic for the frontend routes that currently
 
 ## Feature → service ownership
 | Area | Routes | Service(s) to implement |
-|------|--------|------------------------|
+|------|--------|-------------------------|
 | billing | 19 | payment-service (customers/invoices/settlements/topup) |
 | pppoe | 15 | Go gRPC + erp controllers |
 | mikrotik hotspot ops | 18 | erp controllers over existing Go RPCs (dashboard/users/profiles/interfaces/log/traffic) |
@@ -26,6 +26,15 @@ Implements full working business logic for the frontend routes that currently
       regenerated; erp `mikrotik-grpc.client.ts` PPPoE methods added; `PppoeController` created
       and registered in `erp.module.ts`; `router.proto` (with PPPoE) synced to erp/payment/bot
       proto copies. Go build+vet → exit 0; erp `nest build` → exit 0 (dist/proto carries RPCs).
+- [x] ReportController complete: `selling`, `live`, `resume`, and `DELETE selling` implemented over RouterService report RPCs.
+- [x] Voucher generation complete: `POST /voucher/generate` and `/voucher/generate/csv` are implemented with batch persistence and request validation (1–500 vouchers).
+- [x] Billing complete: customer CRUD, invoice generation/manual/pay/reminder, overdue suspension/re-enable, settlements, collector summary, and router-backed Hotspot/PPPoE status changes implemented.
+- [x] Payments complete: list/stats/config/test/detail/check implemented over `VoucherOrderService` and `PaymentConfigService`.
+- [x] Active-router session endpoints implemented BFF-locally via `SessionController`.
+
+## Verification state
+- Route parity implementation is present for the previously tracked TODO areas.
+- Full live deployment verification is still environment-dependent; see `TODO-PHASE12.md` for the final data-restore verification step.
 
 ## Plan order (dependency-first)
 1. erp: hotspot ops controllers (dashboard, active, log, interfaces, traffic, users CRUD, profiles CRUD)
@@ -46,4 +55,4 @@ Implements full working business logic for the frontend routes that currently
 ## Notes
 - Follow existing patterns: JwtAuthGuard + RequirePermission on controllers.
 - BFF canonical path mapping must match downstream controllers.
-- Rebuild changed services and run verify-e2e.sh.
+- Go proto regen required for PPPoE RPCs.
