@@ -1,10 +1,8 @@
 # Phase 11 — Monolith Route Parity (Option A: full backend implementation)
 
-Goal: make every route the monolith frontend (`../nodemon/public/assets/app.js`)
-calls work against the microservice stack. The BFF aliases already exist; the
-downstream controllers now implement the tracked route areas.
+Goal: make every route the monolith (`../nodemon/public/assets/app.js`) calls work against the microservice stack. The BFF aliases already exist; the downstream controllers now implement the tracked route areas.
 
-## Route audit (monolith `app.js` → BFF alias → downstream target)
+## Route audit
 
 | Frontend call | BFF alias | Downstream | Status |
 |---|---|---|---|
@@ -18,9 +16,9 @@ downstream controllers now implement the tracked route areas.
 | `/api/resellers*`, `/api/bot-resellers*`, `/api/telegram*` | — | bot rest_api.py | ✅ done |
 | `/payments/payhook/app-webhook`, `/qris/status/:id` | — | payment / BFF | ✅ done |
 | `POST /api/session/router`, `GET /api/session/active` | BFF-local SessionController | main-node-service session | ✅ done |
-| `/api/mikrotik/:cs/dashboard\|hotspot/*\|interfaces\|interface/traffic/:if\|log\|scheduler\|dhcp/leases\|system/resource\|connect/test` | mikrotik→erp | erp HotspotController + gRPC clients | ✅ done |
+| `/api/mikrotik/:cs/dashboard|hotspot/*|interfaces|interface/traffic/:if|log|scheduler|dhcp/leases|system/resource|connect/test` | mikrotik→erp | erp HotspotController + gRPC clients | ✅ done |
 | `/api/pppoe/:cs/*` (active/secrets/profiles/pools) | pppoe→erp | erp PppoeController + Go RouterService | ✅ done |
-| `/api/report/:cs/selling\|live\|resume\|DELETE` | report→erp | erp ReportController + Router report RPC | ✅ done |
+| `/api/report/:cs/selling|live|resume|DELETE` | report→erp | erp ReportController + Router report RPC | ✅ done |
 | `/api/voucher/generate`, `/api/voucher/generate/csv` | voucher→erp | erp VoucherGenerateController | ✅ done |
 | `/api/billing/:cs/*` (customers/invoices/stats/settlements/run-overdue/import-users) | billing→payment | payment BillingController + BillingService | ✅ done |
 | `/api/payments*` (list/stats/config/test/detail/check) | payments→payment | payment PaymentsController + VoucherOrderService | ✅ done |
@@ -31,10 +29,10 @@ downstream controllers now implement the tracked route areas.
 `POST /api/session/router` and `GET /api/session/active` are intentionally BFF-local because the active router is stored in the cookie session.
 
 ### ERP router operations
-Hotspot, PPPoE, reporting, voucher generation, scheduler, DHCP, interfaces, system-resource, and related routes use the existing Go RouterService / report gRPC contracts. GET endpoints return the response shapes expected by the legacy frontend.
+Hotspot, PPPoE, reporting, voucher generation, scheduler, DHCP, interfaces, system-resource, and related routes use the existing Go RouterService / report gRPC contracts.
 
 ### Billing
-Billing entities and service cover customer CRUD, invoice generation/manual creation/payment/reminders, overdue suspension/re-enable, settlements, collector summaries, and route/session scoping. Router import remains an explicit no-op response until a dedicated import workflow is available; the route itself is implemented and does not silently proxy elsewhere.
+Billing entities and service cover customer CRUD, invoice generation/manual creation/payment/reminders, overdue suspension/re-enable, settlements, collector summaries, and router-user import. `GET /api/billing/:cs/import-users/:type` now reads the selected router's Hotspot users or PPPoE secrets over RouterService gRPC and upserts them into billing customers, preserving existing customer metadata while refreshing MikroTik identity/profile/status.
 
 ### Payments
 The payments admin surface is backed by QRIS voucher orders and payment configuration, with list/stats/config/test/detail/check endpoints exposed through the BFF.
@@ -44,8 +42,6 @@ The payments admin surface is backed by QRIS voucher orders and payment configur
 - Full live deployment verification is still environment-dependent; see `TODO-PHASE12.md` for the final data-restore verification step.
 
 ## Build + E2E
-The repository should be rebuilt and exercised with:
-
 ```bash
 docker compose up -d --build
 GATEWAY_PORT=80 ./scripts/verify-e2e.sh
