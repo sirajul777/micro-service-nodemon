@@ -165,16 +165,36 @@ def deduct_saldo(telegram_id, amount, note):
 
 
 def refund_saldo(telegram_id, amount, note):
-    """Reverse a deduct_saldo() call — used when a charged purchase is rolled back."""
+    """Atomically refund a previously charged voucher purchase."""
+    amount = float(amount or 0)
+    if amount <= 0:
+        return False
+
     s = get_session()
     try:
         row = s.query(BotReseller).filter(BotReseller.telegramId == telegram_id).first()
         if not row:
             return False
-        before = row.saldo or 0
-        row.saldo = before + amount
-        row.totalVoucher = max(0, (row.totalVoucher or 0) - 1)
-        row.totalIncome = max(0, (row.totalIncome or 0) - amount)
+
+        before = float(row.saldo or 0)
+        affected = (
+            s.query(BotReseller)
+            .filter(BotReseller.id == row.id)
+            .update(
+                {
+                    BotReseller.saldo: BotReseller.saldo + amount,
+                    BotReseller.totalVoucher: func.greatest(func.coalesce(BotReseller.totalVoucher, 0) - 1, 0),
+                    BotReseller.totalIncome: func.greatest(func.coalesce(BotReseller.totalIncome, 0) - amount, 0),
+                    BotReseller.lastActive: datetime.now().isoformat(),
+                },
+                synchronize_session=False,
+            )
+        )
+        if affected != 1:
+            s.rollback()
+            return False
+
+        after = before + amount
         s.add(TopupLog(
             reselerId=row.id,
             amount=amount,
@@ -182,10 +202,13 @@ def refund_saldo(telegram_id, amount, note):
             note=note,
             by="system",
             balanceBefore=before,
-            balanceAfter=row.saldo,
+            balanceAfter=after,
         ))
         s.commit()
         return True
+    except Exception:
+        s.rollback()
+        raise
     finally:
         s.close()
 
