@@ -2,8 +2,7 @@
 
 Goal: make every route the monolith frontend (`../nodemon/public/assets/app.js`)
 calls work against the microservice stack. The BFF aliases already exist; the
-missing piece is the **downstream controllers** that implement the business
-logic. This phase implements them.
+downstream controllers now implement the tracked route areas.
 
 ## Route audit (monolith `app.js` → BFF alias → downstream target)
 
@@ -18,71 +17,43 @@ logic. This phase implements them.
 | `/api/qris/*` | qris | payment | ✅ done |
 | `/api/resellers*`, `/api/bot-resellers*`, `/api/telegram*` | — | bot rest_api.py | ✅ done |
 | `/payments/payhook/app-webhook`, `/qris/status/:id` | — | payment / BFF | ✅ done |
-| `POST /api/session/router`, `GET /api/session/active` | ❌ NO ALIAS | — | **TODO #1** |
-| `/api/mikrotik/:cs/dashboard\|hotspot/*\|interfaces\|interface/traffic/:if\|log\|scheduler\|dhcp/leases\|system/resource\|connect/test` | mikrotik→erp | erp HotspotController | **TODO #2** |
-| `/api/pppoe/:cs/*` (active/secrets/profiles/pools) | pppoe→erp | erp PppoeController | **TODO #3** |
-| `/api/report/:cs/selling\|live\|resume\|DELETE` | report→erp | erp ReportController | **TODO #4** |
-| `/api/voucher/generate`, `/api/voucher/generate/csv` | voucher→erp | erp VoucherGenerateController | **TODO #5** |
-| `/api/billing/:cs/*` (customers/invoices/stats/settlements/run-overdue/import-users) | billing→payment | payment BillingController | **TODO #6** |
-| `/api/payments*` (list/stats/config/test/detail/check) | payments→payment | payment PaymentsController | **TODO #7** |
+| `POST /api/session/router`, `GET /api/session/active` | BFF-local SessionController | main-node-service session | ✅ done |
+| `/api/mikrotik/:cs/dashboard\|hotspot/*\|interfaces\|interface/traffic/:if\|log\|scheduler\|dhcp/leases\|system/resource\|connect/test` | mikrotik→erp | erp HotspotController + gRPC clients | ✅ done |
+| `/api/pppoe/:cs/*` (active/secrets/profiles/pools) | pppoe→erp | erp PppoeController + Go RouterService | ✅ done |
+| `/api/report/:cs/selling\|live\|resume\|DELETE` | report→erp | erp ReportController + Router report RPC | ✅ done |
+| `/api/voucher/generate`, `/api/voucher/generate/csv` | voucher→erp | erp VoucherGenerateController | ✅ done |
+| `/api/billing/:cs/*` (customers/invoices/stats/settlements/run-overdue/import-users) | billing→payment | payment BillingController + BillingService | ✅ done |
+| `/api/payments*` (list/stats/config/test/detail/check) | payments→payment | payment PaymentsController + VoucherOrderService | ✅ done |
 
-## Implementation steps
+## Implementation notes
 
-### 1. BFF: add `session` target alias
-- Add `session: 'erp'` (or handle in BFF locally) for `POST /api/session/router`
-  and `GET /api/session/active`.
-- These set/read `req.session.activeRouter` — best handled **in the BFF itself**
-  (session is available there). Add a `SessionController` in main-node-service.
+### Session state
+`POST /api/session/router` and `GET /api/session/active` are intentionally BFF-local because the active router is stored in the cookie session.
 
-### 2. ERP: HotspotController (`/mikrotik/:session/*`)
-Uses existing Go gRPC RPCs (TestConnect, GetDashboard, ListActiveHotspotUsers,
-ListHotspotUsers, AddHotspotUser, RemoveHotspotUser, ListHotspotProfiles,
-GetHotspotProfile, GetSystemResource, GetInterfaces).
-- `GET /mikrotik/:cs/dashboard` → GetDashboard
-- `GET /mikrotik/:cs/hotspot/active` → ListActiveHotspotUsers
-- `GET /mikrotik/:cs/hotspot/users` → ListHotspotUsers
-- `POST /mikrotik/:cs/hotspot/users` → AddHotspotUser
-- `DELETE /mikrotik/:cs/hotspot/users/:name` → RemoveHotspotUser (+ bulk-delete)
-- `GET /mikrotik/:cs/hotspot/profiles(/:name)` → List/GetHotspotProfile
-- `GET /mikrotik/:cs/interfaces` → GetInterfaces
-- `GET /mikrotik/:cs/interface/traffic/:name` → needs new Go RPC or best-effort
-- `GET /mikrotik/:cs/hotspot/log`, `scheduler`, `dhcp/leases`, `system/resource`
-  → best-effort via existing RPCs / stub
+### ERP router operations
+Hotspot, PPPoE, reporting, voucher generation, scheduler, DHCP, interfaces, system-resource, and related routes use the existing Go RouterService / report gRPC contracts. GET endpoints return the response shapes expected by the legacy frontend.
 
-### 3. ERP: PppoeController (`/pppoe/:session/*`)
-Requires new Go gRPC RPCs (PPP secrets/profiles/active). Add to proto + Go server:
-- ListPppSecrets, GetPppSecret, AddPppSecret, UpdatePppSecret, DeletePppSecret,
-  EnablePppSecret, DisablePppSecret
-- ListPppProfiles, GetPppProfile, AddPppProfile, UpdatePppProfile, DeletePppProfile
-- ListPppActive, DisconnectPppActive, ListPppPools
-Then erp PppoeController wraps them.
+### Billing
+Billing entities and service cover customer CRUD, invoice generation/manual creation/payment/reminders, overdue suspension/re-enable, settlements, collector summaries, and route/session scoping. Router import remains an explicit no-op response until a dedicated import workflow is available; the route itself is implemented and does not silently proxy elsewhere.
 
-### 4. ERP: ReportController (`/report/:session/*`)
-- `GET /report/:cs/live` — aggregate from voucher batches (today/month income/vouchers)
-- `GET /report/:cs/selling` — selling records from batches + reseller filter
-- `GET /report/:cs/resume` — daily income summary
-- `DELETE /report/:cs/selling` — clear report data
+### Payments
+The payments admin surface is backed by QRIS voucher orders and payment configuration, with list/stats/config/test/detail/check endpoints exposed through the BFF.
 
-### 5. ERP: VoucherGenerateController (`/voucher/generate*`)
-- `POST /voucher/generate` — generate batch of vouchers, save as batch
-- `POST /voucher/generate/csv` — generate + return CSV
+## Verification state
+- Route parity implementation is present for the previously tracked TODO areas.
+- Full live deployment verification is still environment-dependent; see `TODO-PHASE12.md` for the final data-restore verification step.
 
-### 6. Payment: BillingController (`/billing/:session/*`)
-Add BillingCustomer, Invoice, Settlement, TopupRequest entities + service.
-- customers CRUD, invoices (list/generate/pay/manual/send-reminder),
-  run-overdue, re-enable, import-users, settlements, collector profile/summary
+## Build + E2E
+The repository should be rebuilt and exercised with:
 
-### 7. Payment: PaymentsController (`/payments*`)
-- list transactions, stats, config (get/save), test, detail, check status
-- Reuse existing payment-config + voucher-order services; add a payments
-  controller aggregating whatever is available.
+```bash
+docker compose up -d --build
+GATEWAY_PORT=80 ./scripts/verify-e2e.sh
+```
 
-### 8. Build + E2E
-- Rebuild erp, payment, main, Go (proto regen), bot.
-- Extend `verify-e2e.sh` with route-parity smoke tests for each area.
-- Verify all pass.
+The final data restore verification remains environment-dependent and requires the actual source `mikhmon.db` and target PostgreSQL instance.
 
 ## Notes
 - Follow existing patterns: JwtAuthGuard + RequirePermission on controllers.
 - BFF canonical path mapping must match downstream controllers.
-- Go proto regen required for PPPoE RPCs.
+- Go proto regeneration is required whenever the shared RouterService contract changes.
