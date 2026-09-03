@@ -15,13 +15,6 @@ import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermission } from '../auth/permissions.decorator';
 
-/**
- * Billing admin endpoints: `/api/billing/:session/*`.
- *
- * Every entity mutation/read that starts from an id is checked against the
- * route session before it is allowed to proceed. This is important because
- * IDs are UUIDs but are not themselves tenant/session boundaries.
- */
 @Controller('billing/:session')
 @UseGuards(JwtAuthGuard)
 @RequirePermission('manageBilling')
@@ -183,11 +176,58 @@ export class BillingController {
       return { success: false, users: [], message: 'type harus hotspot atau pppoe' };
     }
     if (!session) return { success: false, users: [], message: 'session wajib diisi' };
-    return {
-      success: true,
-      users: [],
-      message: `Import ${normalizedType} users requires a completed router import workflow; no users imported.`,
-    };
+
+    try {
+      const users = normalizedType === 'pppoe'
+        ? await this.mikrotikGrpc.listPppSecrets(session)
+        : await this.mikrotikGrpc.listHotspotUsers(session);
+
+      const existing = await this.billingService.loadCustomers(session);
+      const byUser = new Map(
+        existing
+          .filter((customer) => customer.mikrotikUser)
+          .map((customer) => [
+            `${customer.type}:${customer.mikrotikUser}`.toLowerCase(),
+            customer,
+          ]),
+      );
+
+      const imported: any[] = [];
+      for (const user of users) {
+        const mikrotikUser = String(user?.name || '').trim();
+        if (!mikrotikUser) continue;
+        const key = `${normalizedType}:${mikrotikUser}`.toLowerCase();
+        const current = byUser.get(key);
+        const next = await this.billingService.saveCustomer({
+          ...(current || {}),
+          ...(current ? {} : { id: undefined }),
+          sessionId: session,
+          name: current?.name || mikrotikUser,
+          mikrotikUser,
+          type: normalizedType,
+          profile: String(user?.profile || current?.profile || '').trim(),
+          status: String(user?.disabled || '').toLowerCase() === 'yes' ? 'suspended' : (current?.status || 'active'),
+          note: current?.note || 'Imported from MikroTik',
+        });
+        byUser.set(key, next);
+        imported.push(next);
+      }
+
+      return {
+        success: true,
+        type: normalizedType,
+        total: users.length,
+        imported: imported.length,
+        users: imported,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        type: normalizedType,
+        users: [],
+        message: error?.message || 'Gagal mengambil user dari router',
+      };
+    }
   }
 
   @Get('settlements')

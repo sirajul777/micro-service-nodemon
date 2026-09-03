@@ -4,14 +4,6 @@ import * as protoLoader from '@grpc/proto-loader';
 import { loadPackageDefinition } from '@grpc/grpc-js';
 import { join } from 'path';
 
-/**
- * gRPC client → mikrotik-go-service (RouterService).
- *
- * In the monolith `VoucherOrderService.settleOrder()` created the hotspot user
- * directly via `MikrotikService`. In microservices the router is owned by the
- * Go service, so we call its `AddHotspotUser` RPC synchronously — voucher
- * provisioning must succeed before we mark the order PAID.
- */
 @Injectable()
 export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MikrotikGrpcClient.name);
@@ -59,16 +51,65 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Create a hotspot user on the router via gRPC.
-   *
-   * Router provisioning is intentionally treated as idempotent at this
-   * boundary: if RouterOS reports that the username already exists, the
-   * caller may safely continue its settlement retry. This closes the crash
-   * window where RouterOS committed the user but payment-service died before
-   * persisting PAID. Credential generation must remain stable for the order
-   * when this retry path is used.
-   */
+  private getClient(): any {
+    if (!this.client) throw new Error('mikrotik gRPC client not initialized');
+    return this.client;
+  }
+
+  listHotspotUsers(sessionId: string): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const client = this.getClient();
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 20);
+        client.ListHotspotUsers(
+          { sessionId },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              reject(new Error(`mikrotik gRPC ListHotspotUsers failed: ${err.message}`));
+              return;
+            }
+            if (!resp?.success) {
+              reject(new Error(String(resp?.error || 'mikrotik ListHotspotUsers failed')));
+              return;
+            }
+            resolve(Array.isArray(resp.users) ? resp.users : []);
+          },
+        );
+      } catch (error: any) {
+        reject(error);
+      }
+    });
+  }
+
+  listPppSecrets(sessionId: string): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const client = this.getClient();
+        const deadline = new Date();
+        deadline.setSeconds(deadline.getSeconds() + 20);
+        client.ListPppSecrets(
+          { sessionId },
+          { deadline },
+          (err: any, resp: any) => {
+            if (err) {
+              reject(new Error(`mikrotik gRPC ListPppSecrets failed: ${err.message}`));
+              return;
+            }
+            if (!resp?.success) {
+              reject(new Error(String(resp?.error || 'mikrotik ListPppSecrets failed')));
+              return;
+            }
+            resolve(Array.isArray(resp.secrets) ? resp.secrets : []);
+          },
+        );
+      } catch (error: any) {
+        reject(error);
+      }
+    });
+  }
+
   addHotspotUser(params: {
     sessionId: string;
     name: string;
@@ -117,8 +158,6 @@ export class MikrotikGrpcClient implements OnModuleInit, OnModuleDestroy {
       );
     });
   }
-
-  // ── Billing suspension (overdue → suspend, paid/re-enable → restore) ──
 
   private callSimple(
     method: string,
