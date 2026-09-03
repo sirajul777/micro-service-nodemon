@@ -42,19 +42,6 @@ def _to_dict(msg) -> dict:
     # preserving_proto_field_name=True keeps snake_case keys (session_id,
     # not sessionId) so callers aren't tripped by protobuf's default
     # camelCase JSON conversion.
-    #
-    # We DO need default-valued fields included: proto3 omits scalar
-    # fields left at their zero value (empty string / 0 / false) from
-    # MessageToDict's output regardless of whether the server explicitly
-    # set them. Without this, a legitimate `success: false` response would
-    # come back with no "success" key at all, and every caller here does
-    # `result["success"]` / `result.get("success")` expecting it to always
-    # be present.
-    #
-    # The kwarg for this was renamed across protobuf major versions
-    # (including_default_value_fields -> always_print_fields_with_no_presence
-    # in protobuf 5.26+), and this package doesn't pin an exact protobuf
-    # version, so support both.
     try:
         return MessageToDict(
             msg, preserving_proto_field_name=True, always_print_fields_with_no_presence=True
@@ -112,10 +99,7 @@ def add_hotspot_user(
     validity: str = "",
     comment: str = "",
 ) -> dict:
-    """Provision one hotspot user on the router. Returns {"success": bool,
-    "error"?: str} — callers MUST check "success" rather than assume it, and
-    must NOT treat a gRPC/connection failure as success (see MikrotikError
-    below for callers that want a hard failure instead of a dict check)."""
+    """Provision one hotspot user on the router."""
     return _call(
         "AddHotspotUser",
         router_pb2.AddHotspotUserRequest(
@@ -151,4 +135,13 @@ def get_hotspot_profile(session_id: str, name: str) -> dict:
         "GetHotspotProfile",
         router_pb2.GetProfileRequest(session_id=session_id, name=name),
         {"success": False},
+    )
+
+
+def list_ppp_active(session_id: str) -> dict:
+    """List active PPPoE connections through RouterService."""
+    return _call(
+        "ListPppActive",
+        router_pb2.ListPppActiveRequest(session_id=session_id),
+        {"success": False, "connections": []},
     )
