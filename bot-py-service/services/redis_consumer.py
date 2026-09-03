@@ -5,6 +5,7 @@ Consumes:
   payment.order.paid     → Telegram sale/admin notification
   payment.failed         → Telegram admin alert
   billing.invoice.overdue → Telegram billing alert
+  billing.invoice.reminder → targeted Telegram customer reminder
 
 Port of the logic triggered by the monolith's settlement flow,
 but now driven by async events rather than in-process method calls.
@@ -58,20 +59,17 @@ class RedisConsumer:
 
         use_streams = os.getenv("USE_REDIS_STREAMS", "true").lower() == "true"
         if use_streams:
-            # Use consumer groups on Redis Streams for reliable delivery.
             group = os.getenv("REDIS_STREAM_GROUP", "bot-group")
             consumer = f"bot-{os.getpid()}"
-            # Ensure groups exist for each stream.
             for stream in self.topics:
                 try:
                     r.xgroup_create(stream, group, id="$", mkstream=True)
                 except redis.exceptions.ResponseError:
-                    # Group already exists
                     pass
 
             last_recovery = 0.0
-            recovery_interval = 30  # seconds
-            stale_after_ms = 60_000  # min idle time before we reclaim a PEL entry
+            recovery_interval = 30
+            stale_after_ms = 60_000
 
             while self._running:
                 try:
@@ -81,7 +79,6 @@ class RedisConsumer:
                             self._claim_stale_pending(r, s, group, consumer, stale_after_ms)
                         last_recovery = now
 
-                    # Read new messages from all streams (use '>' to get new entries)
                     resp = r.xreadgroup(groupname=group, consumername=consumer, streams={s: '>' for s in self.topics}, count=10, block=5000)
                     if not resp:
                         continue
@@ -105,7 +102,6 @@ class RedisConsumer:
                     time.sleep(1)
             return
 
-        # Fallback: legacy Pub/Sub
         pubsub = r.pubsub()
         pubsub.subscribe(*self.topics)
         for msg in pubsub.listen():
@@ -134,6 +130,8 @@ class RedisConsumer:
                 return self._handle_payment_failed(payload)
             elif topic == "billing.invoice.overdue":
                 return self._handle_invoice_overdue(payload)
+            elif topic == "billing.invoice.reminder":
+                return self._handle_invoice_reminder(payload)
             return True
         except Exception as e:
             log.error(f"[event] handler for {topic} failed: {e}")
@@ -169,9 +167,6 @@ class RedisConsumer:
             ):
                 return False
 
-        # Telegram sale notification follows the configured notifSale switch.
-        # A configured bot that fails to deliver does not fail the voucher
-        # settlement event because Telegram is auxiliary to the core delivery.
         try:
             tg_notifier.notify_sale(payload)
         except Exception as exc:
@@ -209,6 +204,20 @@ class RedisConsumer:
         customer = payload.get("customerId", "")
         log.warning(f"[OVERDUE] Invoice {invoice_id} for customer {customer}")
         return True
+
+    def _handle_invoice_reminder(self, payload: dict) -> bool:
+        """Deliver a targeted billing reminder to the subscriber."""
+        try:
+            delivered = tg_notifier.notify_invoice_reminder(payload)
+            if not delivered:
+                log.warning(
+                    "[TG] billing reminder could not be delivered for invoice %s",
+                    payload.get("invoiceId", ""),
+                )
+            return True
+        except Exception as exc:
+            log.warning(f"[TG] billing reminder failed: {exc}")
+            return True
 
     def _claim_stale_pending(self, r, stream: str, group: str, consumer: str, min_idle_ms: int):
         start = "-"
