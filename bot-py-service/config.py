@@ -32,10 +32,11 @@ WA_DEFAULT_PROVIDER = os.getenv("WA_DEFAULT_PROVIDER", "fonnte")
 WA_DEFAULT_TOKEN = os.getenv("WA_DEFAULT_TOKEN", "")
 WA_DEFAULT_DOMAIN = os.getenv("WA_DEFAULT_DOMAIN", "")
 
-# Which payment topics this service consumes.
+# Which payment/billing topics this service consumes.
 CONSUMED_TOPICS = [
     "payment.order.paid",
     "payment.order.settled",
     "payment.failed",
     "billing.invoice.overdue",
+    "billing.invoice.reminder",
 ]

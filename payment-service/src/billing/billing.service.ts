@@ -43,6 +43,18 @@ export class BillingService {
     return this.customerRepo.find({ where: { sessionId }, order: { name: 'ASC' } });
   }
 
+  /** Return unique tenant/session ids which have billing customers. */
+  async listReminderSessions(): Promise<string[]> {
+    const rows = await this.customerRepo
+      .createQueryBuilder('customer')
+      .select('customer.sessionId', 'sessionId')
+      .where('customer.sessionId IS NOT NULL')
+      .andWhere("customer.sessionId <> ''")
+      .distinct(true)
+      .getRawMany<{ sessionId: string }>();
+    return rows.map((row) => String(row.sessionId || '').trim()).filter(Boolean);
+  }
+
   async getCustomer(id: string): Promise<BillingCustomerEntity | null> {
     return this.customerRepo.findOne({ where: { id } });
   }
@@ -186,14 +198,10 @@ export class BillingService {
     const seen = new Set<string>();
     const customers: BillingCustomerEntity[] = [];
     for (const { invoice, customer } of overdue) {
-      // getOverdueCustomers already marks the invoice overdue; keep this
-      // method responsible only for the controller-facing aggregate contract.
       if (!seen.has(customer.id)) {
         seen.add(customer.id);
         customers.push(customer);
       }
-      // Keep the explicit update for compatibility if the implementation of
-      // getOverdueCustomers changes later.
       if (invoice.status !== 'overdue') {
         await this.invoiceRepo.update({ id: invoice.id }, { status: 'overdue' });
       }
@@ -253,15 +261,12 @@ export class BillingService {
       amount: normalizedAmount,
       status: 'pending',
     });
-    // Do not clear unsettledCash here. Submission is only a request; the
-    // monolith clears the collector balance after verification.
     return this.settlementRepo.save(entity);
   }
 
   async verifySettlement(id: string): Promise<boolean> {
     const settlement = await this.settlementRepo.findOne({ where: { id } });
     if (!settlement) return false;
-    // Idempotency: a second verify request must not deduct the collector twice.
     if (settlement.status === 'verified') return true;
 
     settlement.status = 'verified';

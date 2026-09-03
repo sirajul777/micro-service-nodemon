@@ -14,6 +14,7 @@ import { PaymentConfigController } from './payment-config.controller';
 import { PaymentsController } from './payments/payments.controller';
 import { BillingService } from './billing/billing.service';
 import { BillingController } from './billing/billing.controller';
+import { BillingSchedulerService } from './billing/billing-scheduler.service';
 import { QrisService } from './qris.service';
 import { VoucherOrderService } from './voucher-order.service';
 import { VoucherOrderController } from './voucher-order.controller';
@@ -44,6 +45,7 @@ import { OutboxService } from './redis/outbox.service';
     QrisService,
     VoucherOrderService,
     BillingService,
+    BillingSchedulerService,
     PayhookNotifierService,
     PayhookSchedulerService,
     VoucherTypeClient,
