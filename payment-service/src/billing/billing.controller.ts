@@ -53,7 +53,6 @@ export class BillingController {
 
   @Post('customers')
   createCustomer(@Param('session') session: string, @Body() body: any) {
-    // Never trust a client-supplied sessionId.
     return this.billingService.saveCustomer({ ...body, sessionId: session, id: undefined });
   }
 
@@ -61,7 +60,6 @@ export class BillingController {
   async updateCustomer(@Param('session') session: string, @Param('id') id: string, @Body() body: any) {
     const existing = await this.billingService.getCustomer(id);
     if (!this.sessionMatches(existing, session)) return { error: 'Not found' };
-    // Never allow the request body to move a customer into another session.
     return this.billingService.saveCustomer({ ...body, id, sessionId: session });
   }
 
@@ -92,7 +90,9 @@ export class BillingController {
   ) {
     const inv = await this.billingService.getInvoice(id);
     if (!this.sessionMatches(inv, session)) return { error: 'Invoice not found' };
-    const paid = await this.billingService.payInvoice(id, body.paidBy || 'Admin', body.note);
+    const collectorName = String(body?.paidBy || 'Admin').trim();
+    if (!collectorName) return { error: 'paidBy wajib diisi' };
+    const paid = await this.billingService.payInvoice(id, collectorName, body?.note);
     return paid ? { success: true, invoice: paid } : { error: 'Not found' };
   }
 
@@ -101,7 +101,9 @@ export class BillingController {
     @Param('session') session: string,
     @Body() body: { customerId: string; period?: string; dueDate?: string },
   ) {
-    const cust = await this.billingService.getCustomer(body.customerId);
+    const customerId = String(body?.customerId || '').trim();
+    if (!customerId) return { error: 'customerId wajib diisi' };
+    const cust = await this.billingService.getCustomer(customerId);
     if (!this.sessionMatches(cust, session)) return { error: 'Customer not found' };
     return this.billingService.createInvoice(cust!, body.period, body.dueDate);
   }
@@ -175,11 +177,16 @@ export class BillingController {
   }
 
   @Get('import-users/:type')
-  async importUsers() {
+  async importUsers(@Param('session') session: string, @Param('type') type: string) {
+    const normalizedType = String(type || '').trim().toLowerCase();
+    if (!['hotspot', 'pppoe'].includes(normalizedType)) {
+      return { success: false, users: [], message: 'type harus hotspot atau pppoe' };
+    }
+    if (!session) return { success: false, users: [], message: 'session wajib diisi' };
     return {
       success: true,
       users: [],
-      message: 'Router import requires the router connection (Go service). No users imported.',
+      message: `Import ${normalizedType} users requires a completed router import workflow; no users imported.`,
     };
   }
 
@@ -193,19 +200,16 @@ export class BillingController {
     @Param('session') session: string,
     @Body() body: { collectorId?: string; collectorName?: string; amount?: number },
   ) {
-    if (!body.collectorId && !body.collectorName) {
-      return { success: false, error: 'Collector wajib dipilih' };
-    }
-    if (body.collectorId) {
-      const collector = await this.billingService.getCustomer(body.collectorId);
+    const collectorId = String(body?.collectorId || '').trim();
+    const collectorName = String(body?.collectorName || '').trim();
+    const amount = Number(body?.amount);
+    if (!collectorId && !collectorName) return { success: false, error: 'Collector wajib dipilih' };
+    if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: 'Amount harus lebih besar dari 0' };
+    if (collectorId) {
+      const collector = await this.billingService.getCustomer(collectorId);
       if (!this.sessionMatches(collector, session)) return { success: false, error: 'Collector not found' };
     }
-    return this.billingService.submitSettlement(
-      session,
-      body.collectorId || '',
-      body.collectorName || '',
-      Number(body.amount) || 0,
-    );
+    return this.billingService.submitSettlement(session, collectorId, collectorName, amount);
   }
 
   @Patch('settlements/:id/verify')
