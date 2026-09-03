@@ -2,6 +2,8 @@
 import logging
 from datetime import datetime
 
+from sqlalchemy import and_, func
+
 from db import get_session
 from models import BotReseller, Reseller, TopupLog
 
@@ -114,16 +116,36 @@ def topup(reseller_id, amount, note, by):
 
 
 def deduct_saldo(telegram_id, amount, note):
+    """Atomically debit a reseller balance and record the purchase ledger."""
+    amount = float(amount or 0)
+    if amount <= 0:
+        return False
+
     s = get_session()
     try:
         row = s.query(BotReseller).filter(BotReseller.telegramId == telegram_id).first()
-        if not row or (row.saldo or 0) < amount:
+        if not row:
             return False
-        before = row.saldo or 0
-        row.saldo = before - amount
-        row.totalVoucher = (row.totalVoucher or 0) + 1
-        row.totalIncome = (row.totalIncome or 0) + amount
-        row.lastActive = datetime.now().isoformat()
+
+        before = float(row.saldo or 0)
+        affected = (
+            s.query(BotReseller)
+            .filter(and_(BotReseller.id == row.id, BotReseller.saldo >= amount))
+            .update(
+                {
+                    BotReseller.saldo: BotReseller.saldo - amount,
+                    BotReseller.totalVoucher: func.coalesce(BotReseller.totalVoucher, 0) + 1,
+                    BotReseller.totalIncome: func.coalesce(BotReseller.totalIncome, 0) + amount,
+                    BotReseller.lastActive: datetime.now().isoformat(),
+                },
+                synchronize_session=False,
+            )
+        )
+        if affected != 1:
+            s.rollback()
+            return False
+
+        after = before - amount
         s.add(TopupLog(
             reselerId=row.id,
             amount=-amount,
@@ -131,21 +153,19 @@ def deduct_saldo(telegram_id, amount, note):
             note=note,
             by="bot",
             balanceBefore=before,
-            balanceAfter=row.saldo,
+            balanceAfter=after,
         ))
         s.commit()
         return True
+    except Exception:
+        s.rollback()
+        raise
     finally:
         s.close()
 
 
 def refund_saldo(telegram_id, amount, note):
-    """Reverse a deduct_saldo() call — used when a purchase was charged but
-    the voucher itself failed to provision on the router (e.g. Fonnte/router
-    down). Mirrors deduct_saldo's bookkeeping exactly (saldo, totalVoucher,
-    totalIncome) so stats stay consistent, rather than just adding the
-    amount back via topup() and leaving a phantom sale on the books.
-    """
+    """Reverse a deduct_saldo() call — used when a charged purchase is rolled back."""
     s = get_session()
     try:
         row = s.query(BotReseller).filter(BotReseller.telegramId == telegram_id).first()
@@ -171,10 +191,7 @@ def refund_saldo(telegram_id, amount, note):
 
 
 def delete(reseller_id) -> bool:
-    """Hard-delete a bot-reseller. Previously this wasn't exposed at all —
-    rest_api.py's DELETE handler fell back to soft-deleting (status=
-    'inactive') instead, which doesn't match the monolith's
-    BotResellerService.delete() (a real `DELETE FROM bot_resellers`)."""
+    """Hard-delete a bot-reseller."""
     s = get_session()
     try:
         row = s.query(BotReseller).filter(BotReseller.id == reseller_id).first()
@@ -186,10 +203,6 @@ def delete(reseller_id) -> bool:
     finally:
         s.close()
 
-
-# ── Plain reseller (price-discount, tied to a router session) ──────
-# Separate table/model from BotReseller above — see Reseller in models.py
-# for why these must not share a data store.
 
 def _to_dict_plain(r: Reseller) -> dict:
     return {
@@ -232,9 +245,6 @@ def get_plain_by_id(reseller_id):
 def upsert_plain(data: dict):
     reseller_id = data.get("id")
     if not reseller_id:
-        # Mirror the monolith's id-from-name convention exactly
-        # (ResellerService.save_reseller): uppercase, non-alnum -> '_',
-        # truncated to 20 chars.
         import re as _re
         reseller_id = _re.sub(r"[^A-Z0-9]", "_", (data.get("name") or "").upper())[:20]
 
