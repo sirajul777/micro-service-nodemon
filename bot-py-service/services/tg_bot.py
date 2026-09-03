@@ -285,7 +285,6 @@ def _handle_profil(chat_id: str, cfg: dict):
     if not items:
         send_message(cfg, chat_id, "⚠️ Belum ada tipe voucher aktif. Hubungi admin.")
         return
-    # preserve existing monolith port behavior
     rows = []
     for item in items:
         on = _parse_on_login(item.get("onLogin", ""))
@@ -373,7 +372,15 @@ def _cb_confirm_beli(chat_id, user_id, username, msg_id, profile_id, cfg):
     username_v = _random_str(6, "upperdigit")
     password_v = _random_str(6, "lowerdigit")
     try:
-        mikrotik_grpc.add_hotspot_user({"sessionId": reseller.get("sessionId"), "name": username_v, "password": password_v, "profile": item.get("profile") or item.get("name") or profile_id, "limitUptime": _parse_on_login(item.get("onLogin", "")).get("validity", "")})
+        provision = mikrotik_grpc.add_hotspot_user(
+            reseller.get("sessionId", ""),
+            username_v,
+            password_v,
+            item.get("profile") or item.get("name") or profile_id,
+            on.get("validity", ""),
+        )
+        if not provision.get("success"):
+            raise RuntimeError(provision.get("error") or "Router menolak pembuatan voucher")
     except Exception as exc:
         log.warning("voucher provision failed: %s", exc)
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"❌ Gagal membuat voucher: {exc}")
@@ -389,7 +396,6 @@ def _cb_confirm_beli(chat_id, user_id, username, msg_id, profile_id, cfg):
 
 
 def _cb_confirm_generate(chat_id, user_id, username, msg_id, profile_id, qty, cfg):
-    # existing batch generation behavior
     for _ in range(max(1, min(qty, 50))):
         _cb_confirm_beli(chat_id, user_id, username, msg_id, profile_id, cfg)
 
@@ -569,13 +575,11 @@ def _cb_topup_approve(chat_id, user_id, msg_id, req_id, cfg):
             status = current.get("status")
             tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"⚠️ Request sudah diproses. Status: {status}")
         return
-
     result = reseller_svc.topup(req["resellerId"], req.get("amount", 0), "Topup via bot disetujui admin", processor)
     if not result:
         tg_cfg.finish_topup_request(req_id, "rejected", processor, note="Reseller tidak ditemukan")
         tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, "❌ Gagal memproses topup. Reseller tidak ditemukan.")
         return
-
     tg_cfg.finish_topup_request(req_id, "approved", processor)
     tg_api.edit_message(cfg.get("token", ""), chat_id, msg_id, f"✅ <b>Topup DISETUJUI</b>\n\n👤 {req.get('resellerName')}\n💰 +{_fmt_rp(req.get('amount'))}\n💳 Saldo baru: <b>{_fmt_rp(result['reseller'].get('saldo'))}</b>")
     send_message(cfg, req.get("telegramId"), f"🎉 <b>Request Topup Disetujui!</b>\n\n💰 Topup: <b>+{_fmt_rp(req.get('amount'))}</b>\n💳 Saldo sekarang: <b>{_fmt_rp(result['reseller'].get('saldo'))}</b>\n\nKetik /beli untuk mulai belanja! 🛒")
@@ -623,7 +627,28 @@ def _handle_rekap(chat_id, period, cfg):
 
 
 def _handle_pppoe(chat_id, cfg):
-    send_message(cfg, chat_id, "🔌 <b>PPPoE Aktif</b>\n\nPPPoE ops belum diekspos melalui gRPC → Go. Akan aktif setelah port.")
+    session_id = cfg.get("sessionId", "")
+    if not session_id:
+        send_message(cfg, chat_id, "⚠️ Session router belum dikonfigurasi pada bot.")
+        return
+    res = mikrotik_grpc.list_ppp_active(session_id)
+    if not res.get("success"):
+        send_message(cfg, chat_id, f"⚠️ Gagal mengambil PPPoE aktif.\n{res.get('error') or 'Router service tidak tersedia.'}")
+        return
+    connections = res.get("connections") or []
+    if not connections:
+        send_message(cfg, chat_id, "🔌 <b>PPPoE Aktif</b>\n\n📭 Tidak ada koneksi PPPoE aktif.")
+        return
+    lines = []
+    for i, conn in enumerate(connections[:25], start=1):
+        name = conn.get("name") or "—"
+        address = conn.get("address") or "—"
+        uptime = conn.get("uptime") or "—"
+        service = conn.get("service") or "pppoe"
+        profile = conn.get("profile") or "—"
+        lines.append(f"<b>{i:02d}. {name}</b>\n   IP: <code>{address}</code> · Up: {uptime}\n   Service: {service} · Profile: {profile}")
+    extra = f"\n\nMenampilkan {min(len(connections), 25)} dari {len(connections)} koneksi." if len(connections) > 25 else ""
+    send_message(cfg, chat_id, "🔌 <b>PPPoE Aktif</b>\n\n" + "\n\n".join(lines) + extra)
 
 
 def _handle_hapus(chat_id, args, cfg):
