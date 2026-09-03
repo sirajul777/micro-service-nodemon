@@ -163,6 +163,29 @@ class BotInternalService(bot_internal_pb2_grpc.BotInternalServiceServicer):
         message_result = f"Broadcast selesai: {delivered} berhasil, {failed} gagal dari {total} agen"
         return bot_internal_pb2.MutationResponse(success=success, message=message_result, error="Sebagian pesan gagal terkirim" if failed else "")
 
+    def SendTelegramReminder(self, request, context):
+        cfg = tg_config_service.get_config(request.id or None)
+        if not cfg:
+            return bot_internal_pb2.MutationResponse(success=False, error="Konfigurasi Telegram tidak ditemukan")
+        if not cfg.get("token") or not cfg.get("botEnabled"):
+            return bot_internal_pb2.MutationResponse(success=False, error="Bot Telegram tidak aktif atau token kosong")
+        chat_id = str(request.chat_id or "").strip()
+        message = str(request.message or "").strip()
+        if not chat_id:
+            return bot_internal_pb2.MutationResponse(success=False, error="Telegram chat ID kosong")
+        if not message:
+            return bot_internal_pb2.MutationResponse(success=False, error="Pesan reminder kosong")
+        try:
+            result = tg_bot.send_message(cfg, chat_id, message)
+            ok = bool(result.get("ok")) if isinstance(result, dict) else bool(result)
+            return bot_internal_pb2.MutationResponse(
+                success=ok,
+                message="Reminder terkirim" if ok else "Gagal mengirim reminder",
+                error="Telegram API menolak pesan" if not ok else "",
+            )
+        except Exception as exc:
+            return bot_internal_pb2.MutationResponse(success=False, error=str(exc))
+
     def ListTelegramLogs(self, request, context):
         rows = tg_config_service.load_topup_requests()
         logs = [bot_internal_pb2.TelegramLog(id=str(r.get("id", "")), payload=json.dumps(r, default=str)) for r in rows]
