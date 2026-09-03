@@ -146,17 +146,15 @@ def deduct_saldo(telegram_id, amount, note):
             return False
 
         after = before - amount
-        s.add(
-            TopupLog(
-                reselerId=row.id,
-                amount=-amount,
-                type="purchase",
-                note=note,
-                by="bot",
-                balanceBefore=before,
-                balanceAfter=after,
-            )
-        )
+        s.add(TopupLog(
+            reselerId=row.id,
+            amount=-amount,
+            type="purchase",
+            note=note,
+            by="bot",
+            balanceBefore=before,
+            balanceAfter=after,
+        ))
         s.commit()
         return True
     except Exception:
