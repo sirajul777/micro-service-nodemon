@@ -40,7 +40,6 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
       let failures = 0;
 
       for (const session of sessions) {
-        // Billing reminder flow.
         const items = await this.billingService.getRemindableInvoices(session);
         for (const item of items) {
           const claimed = await this.billingService.claimReminder(item.invoice.id);
@@ -55,16 +54,13 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
             dueDate: item.invoice.dueDate || '',
             daysLeft: item.daysLeft,
           });
-          if (published) {
-            reminders++;
-          } else {
+          if (published) reminders++;
+          else {
             failures++;
             this.logger.warn(`Billing reminder event could not be published for invoice ${item.invoice.id}`);
           }
         }
 
-        // Automatic overdue processing. flagOverdueInvoices performs the DB
-        // transition first; this sweep then applies the matching router lock.
         const { count, customers } = await this.billingService.flagOverdueInvoices(session);
         overdue += count;
         for (const customer of customers) {
@@ -85,9 +81,7 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (reminders || overdue || suspended || failures) {
-        this.logger.log(
-          `Billing sweep complete: reminders=${reminders} overdue=${overdue} suspended=${suspended} failures=${failures}`,
-        );
+        this.logger.log(`Billing sweep complete: reminders=${reminders} overdue=${overdue} suspended=${suspended} failures=${failures}`);
       }
     } catch (error: any) {
       this.logger.error(`Billing sweep failed: ${error?.message || error}`);
