@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { BillingService } from './billing.service';
+import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
 import { RedisPublisherService } from '../redis/redis-publisher.service';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly billingService: BillingService,
+    private readonly mikrotikGrpc: MikrotikGrpcClient,
     private readonly redis: RedisPublisherService,
   ) {}
 
@@ -33,7 +35,12 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
     try {
       const sessions = await this.billingService.listReminderSessions();
       let reminders = 0;
+      let overdue = 0;
+      let suspended = 0;
+      let failures = 0;
+
       for (const session of sessions) {
+        // Billing reminder flow.
         const items = await this.billingService.getRemindableInvoices(session);
         for (const item of items) {
           const claimed = await this.billingService.claimReminder(item.invoice.id);
@@ -51,13 +58,39 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
           if (published) {
             reminders++;
           } else {
+            failures++;
             this.logger.warn(`Billing reminder event could not be published for invoice ${item.invoice.id}`);
           }
         }
+
+        // Automatic overdue processing. flagOverdueInvoices performs the DB
+        // transition first; this sweep then applies the matching router lock.
+        const { count, customers } = await this.billingService.flagOverdueInvoices(session);
+        overdue += count;
+        for (const customer of customers) {
+          if (customer.status === 'suspended' || !customer.mikrotikUser) continue;
+          const result = customer.type === 'pppoe'
+            ? await this.mikrotikGrpc.disablePppSecret(session, customer.mikrotikUser)
+            : await this.mikrotikGrpc.disableHotspotUser(session, customer.mikrotikUser);
+
+          if (result.success) {
+            customer.status = 'suspended';
+            await this.billingService.saveCustomer(customer);
+            suspended++;
+          } else {
+            failures++;
+            this.logger.warn(`Failed to suspend overdue customer ${customer.name || customer.mikrotikUser}: ${result.error || 'unknown error'}`);
+          }
+        }
       }
-      if (reminders) this.logger.log(`Published ${reminders} billing reminder event(s)`);
+
+      if (reminders || overdue || suspended || failures) {
+        this.logger.log(
+          `Billing sweep complete: reminders=${reminders} overdue=${overdue} suspended=${suspended} failures=${failures}`,
+        );
+      }
     } catch (error: any) {
-      this.logger.error(`Billing reminder sweep failed: ${error?.message || error}`);
+      this.logger.error(`Billing sweep failed: ${error?.message || error}`);
     } finally {
       this.running = false;
     }
