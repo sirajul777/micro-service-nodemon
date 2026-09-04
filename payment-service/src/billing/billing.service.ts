@@ -277,6 +277,31 @@ export class BillingService {
     });
   }
 
+  async markOverdueNotificationSentByCustomer(customerId: string): Promise<boolean> {
+    const invoices = await this.invoiceRepo.find({ where: { customerId, status: 'overdue' }, order: { createdAt: 'ASC' } });
+    const today = new Date().toISOString().slice(0, 10);
+    const candidate = invoices.find((invoice) => {
+      const sent = Array.isArray(invoice.overdueNotificationSent) ? invoice.overdueNotificationSent : [];
+      return !sent.some((value) => String(value).startsWith(today));
+    });
+    if (!candidate) return false;
+    return this.markOverdueNotificationSent(candidate.id);
+  }
+
+  async rollbackOverdueNotificationClaim(customerId: string): Promise<boolean> {
+    const invoices = await this.invoiceRepo.find({ where: { customerId, status: 'overdue' }, order: { createdAt: 'ASC' } });
+    const today = new Date().toISOString().slice(0, 10);
+    for (const invoice of invoices) {
+      const sent = Array.isArray(invoice.overdueNotificationSent) ? invoice.overdueNotificationSent : [];
+      const index = sent.findIndex((value) => String(value).startsWith(today));
+      if (index < 0) continue;
+      invoice.overdueNotificationSent = sent.filter((_, i) => i !== index);
+      await this.invoiceRepo.save(invoice);
+      return true;
+    }
+    return false;
+  }
+
   async loadSettlements(sessionId: string): Promise<BillingSettlementEntity[]> {
     return this.settlementRepo.find({ where: { sessionId }, order: { createdAt: 'DESC' } });
   }
