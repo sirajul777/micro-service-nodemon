@@ -10,6 +10,11 @@ export interface ReminderClaim {
   token?: string;
 }
 
+export interface PaymentReenableResult {
+  invoice: BillingInvoiceEntity;
+  customerReenabled: boolean;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
