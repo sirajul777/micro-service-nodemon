@@ -97,41 +97,50 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
         overdue += count;
         for (const customer of customers) {
           if (this.stopping) break;
-          if (customer.status === 'suspended' || !customer.mikrotikUser) continue;
-          const result = customer.type === 'pppoe'
-            ? await this.mikrotikGrpc.disablePppSecret(session, customer.mikrotikUser)
-            : await this.mikrotikGrpc.disableHotspotUser(session, customer.mikrotikUser);
 
-          if (result.success) {
-            customer.status = 'suspended';
-            await this.billingService.saveCustomer(customer);
-            suspended++;
+          // Suspension and notification are deliberately separate. If the
+          // router action succeeds but Redis is unavailable, the customer is
+          // already suspended and must still be eligible for notification retry
+          // on the next sweep.
+          if (customer.status !== 'suspended') {
+            if (!customer.mikrotikUser) continue;
+            const result = customer.type === 'pppoe'
+              ? await this.mikrotikGrpc.disablePppSecret(session, customer.mikrotikUser)
+              : await this.mikrotikGrpc.disableHotspotUser(session, customer.mikrotikUser);
 
-            try {
-              const claimed = await this.billingService.claimOverdueNotification(customer.id);
-              if (!claimed) continue;
-              const published = await this.redis.publish('billing.invoice.overdue', {
-                customerId: customer.id,
-                sessionId: customer.sessionId,
-                customerName: customer.name,
-                telegramId: customer.telegramId || '',
-                mikrotikUser: customer.mikrotikUser || '',
-                type: customer.type || 'hotspot',
-              });
-              if (!published) {
-                failures++;
-                await this.billingService.rollbackOverdueNotification(customer.id, claimed.token);
-                this.logger.warn(`Billing overdue event could not be published for customer ${customer.id}; notification claim released for retry`);
-              } else {
-                await this.billingService.confirmOverdueNotification(customer.id, claimed.token);
-              }
-            } catch (error: any) {
+            if (result.success) {
+              customer.status = 'suspended';
+              await this.billingService.saveCustomer(customer);
+              suspended++;
+            } else {
               failures++;
-              this.logger.warn(`Billing overdue notification failed for customer ${customer.id}: ${error?.message || error}`);
+              this.logger.warn(`Failed to suspend overdue customer ${customer.name || customer.mikrotikUser}: ${result.error || 'unknown error'}`);
+              continue;
             }
-          } else {
+          }
+
+          if (!customer.telegramId) continue;
+          try {
+            const claimed = await this.billingService.claimOverdueNotification(customer.id);
+            if (!claimed) continue;
+            const published = await this.redis.publish('billing.invoice.overdue', {
+              customerId: customer.id,
+              sessionId: customer.sessionId,
+              customerName: customer.name,
+              telegramId: customer.telegramId,
+              mikrotikUser: customer.mikrotikUser || '',
+              type: customer.type || 'hotspot',
+            });
+            if (!published) {
+              failures++;
+              await this.billingService.rollbackOverdueNotification(customer.id, claimed.token);
+              this.logger.warn(`Billing overdue event could not be published for customer ${customer.id}; notification claim released for retry`);
+            } else {
+              await this.billingService.confirmOverdueNotification(customer.id, claimed.token);
+            }
+          } catch (error: any) {
             failures++;
-            this.logger.warn(`Failed to suspend overdue customer ${customer.name || customer.mikrotikUser}: ${result.error || 'unknown error'}`);
+            this.logger.warn(`Billing overdue notification failed for customer ${customer.id}: ${error?.message || error}`);
           }
         }
       }
