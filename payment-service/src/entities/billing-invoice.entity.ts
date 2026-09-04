@@ -63,6 +63,10 @@ export class BillingInvoiceEntity {
   @Column({ type: 'simple-json', nullable: true })
   reminderSent: string[];
 
+  /** ISO timestamps when the invoice was automatically suspended/processed. */
+  @Column({ type: 'simple-json', nullable: true })
+  overdueNotificationSent: string[];
+
   @CreateDateColumn()
   createdAt: string;
 
