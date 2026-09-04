@@ -10,6 +10,8 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
   private initialSweep: NodeJS.Timeout | null = null;
   private interval: NodeJS.Timeout | null = null;
   private running = false;
+  private stopping = false;
+  private activeSweep: Promise<void> | null = null;
 
   constructor(
     private readonly billingService: BillingService,
@@ -18,19 +20,33 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.initialSweep = setTimeout(() => this.sweep().catch(() => {}), 5000);
-    this.interval = setInterval(() => this.sweep().catch(() => {}), BillingSchedulerService.INTERVAL_MS);
+    this.stopping = false;
+    this.initialSweep = setTimeout(() => {
+      if (!this.stopping) void this.sweep();
+    }, 5000);
+    this.interval = setInterval(() => {
+      if (!this.stopping) void this.sweep();
+    }, BillingSchedulerService.INTERVAL_MS);
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
+    this.stopping = true;
     if (this.initialSweep) clearTimeout(this.initialSweep);
     if (this.interval) clearInterval(this.interval);
     this.initialSweep = null;
     this.interval = null;
+    if (this.activeSweep) await this.activeSweep;
   }
 
-  async sweep() {
-    if (this.running) return;
+  sweep(): Promise<void> {
+    if (this.stopping || this.running) return Promise.resolve();
+    const task = this.runSweep();
+    this.activeSweep = task;
+    return task;
+  }
+
+  private async runSweep(): Promise<void> {
+    if (this.running || this.stopping) return;
     this.running = true;
     try {
       const sessions = await this.billingService.listReminderSessions();
@@ -40,8 +56,11 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
       let failures = 0;
 
       for (const session of sessions) {
+        if (this.stopping) break;
+
         const items = await this.billingService.getRemindableInvoices(session);
         for (const item of items) {
+          if (this.stopping) break;
           const claimed = await this.billingService.claimReminder(item.invoice.id);
           if (!claimed) continue;
           const published = await this.redis.publish('billing.invoice.reminder', {
@@ -61,9 +80,11 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
           }
         }
 
+        if (this.stopping) break;
         const { count, customers } = await this.billingService.flagOverdueInvoices(session);
         overdue += count;
         for (const customer of customers) {
+          if (this.stopping) break;
           if (customer.status === 'suspended' || !customer.mikrotikUser) continue;
           const result = customer.type === 'pppoe'
             ? await this.mikrotikGrpc.disablePppSecret(session, customer.mikrotikUser)
@@ -84,9 +105,12 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`Billing sweep complete: reminders=${reminders} overdue=${overdue} suspended=${suspended} failures=${failures}`);
       }
     } catch (error: any) {
-      this.logger.error(`Billing sweep failed: ${error?.message || error}`);
+      if (!this.stopping) {
+        this.logger.error(`Billing sweep failed: ${error?.message || error}`);
+      }
     } finally {
       this.running = false;
+      this.activeSweep = null;
     }
   }
 }
