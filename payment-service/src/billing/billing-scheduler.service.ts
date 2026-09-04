@@ -107,20 +107,25 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
             await this.billingService.saveCustomer(customer);
             suspended++;
 
-            // This notification is intentionally best-effort. The Redis Stream
-            // itself is reliable; a later dedicated recovery can republish when
-            // needed without rolling back an already successful router action.
-            const published = await this.redis.publish('billing.invoice.overdue', {
-              customerId: customer.id,
-              sessionId: customer.sessionId,
-              customerName: customer.name,
-              telegramId: customer.telegramId || '',
-              mikrotikUser: customer.mikrotikUser || '',
-              type: customer.type || 'hotspot',
-            });
-            if (!published) {
+            try {
+              const claim = await this.billingService.markOverdueNotificationSentByCustomer(customer.id);
+              if (!claim) continue;
+              const published = await this.redis.publish('billing.invoice.overdue', {
+                customerId: customer.id,
+                sessionId: customer.sessionId,
+                customerName: customer.name,
+                telegramId: customer.telegramId || '',
+                mikrotikUser: customer.mikrotikUser || '',
+                type: customer.type || 'hotspot',
+              });
+              if (!published) {
+                failures++;
+                await this.billingService.rollbackOverdueNotificationClaim(customer.id);
+                this.logger.warn(`Billing overdue event could not be published for customer ${customer.id}; notification claim released for retry`);
+              }
+            } catch (error: any) {
               failures++;
-              this.logger.warn(`Billing overdue event could not be published for customer ${customer.id}`);
+              this.logger.warn(`Billing overdue notification failed for customer ${customer.id}: ${error?.message || error}`);
             }
           } else {
             failures++;
