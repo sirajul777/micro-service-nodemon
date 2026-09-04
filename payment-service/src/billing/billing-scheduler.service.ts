@@ -107,6 +107,9 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
             await this.billingService.saveCustomer(customer);
             suspended++;
 
+            // This notification is intentionally best-effort. The Redis Stream
+            // itself is reliable; a later dedicated recovery can republish when
+            // needed without rolling back an already successful router action.
             const published = await this.redis.publish('billing.invoice.overdue', {
               customerId: customer.id,
               sessionId: customer.sessionId,
