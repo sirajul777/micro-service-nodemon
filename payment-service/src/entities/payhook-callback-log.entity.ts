@@ -7,9 +7,8 @@ import {
 } from 'typeorm';
 
 /**
- * Monitoring log for every webhook received from the PayHook Android app
- * (or any callback source). Used by the admin "Monitoring Callback PayHook"
- * feature: time, amount, raw payload, and verification status.
+ * Monitoring/audit log for every webhook received from PayHook Android app
+ * (or any callback source), including unmatched-payment reconciliation state.
  */
 @Entity('payhook_callback_logs')
 export class PayhookCallbackLogEntity {
@@ -21,8 +20,7 @@ export class PayhookCallbackLogEntity {
   source: string;
 
   /**
-   * PayHook's official idempotency key (`event_id` in the payload). Stays
-   * identical across delivery retries, so it must be unique whenever present.
+   * PayHook's idempotency key. When present it is unique across callbacks.
    */
   @Index({ unique: true })
   @Column({ nullable: true })
@@ -32,19 +30,31 @@ export class PayhookCallbackLogEntity {
   @Column({ type: 'int', default: 0 })
   amount: number;
 
-  /** Status as reported by the sender (e.g. 'COMPLETED', 'SUCCESS', 'PENDING'). */
+  /** Status as reported by the sender (e.g. 'COMPLETED', 'SUCCESS'). */
   @Column({ nullable: true })
   status: string;
 
-  /** Whether the amount matched a pending voucher order. */
+  /** Whether the amount matched a pending voucher order at receipt time. */
   @Column({ default: false })
   matched: boolean;
 
-  /** The orderId of the matched voucher order (if any). */
+  /** The orderId of the matched order (if any). */
   @Column({ nullable: true })
   matchedOrderId: string;
 
-  /** Human-readable note about what happened when processing this callback. */
+  /** Current reconciliation lifecycle: none | candidate | reconciled | rejected. */
+  @Column({ default: 'none' })
+  reconciliationStatus: string;
+
+  /** Operator ID/name when a callback candidate is reconciled/rejected. */
+  @Column({ nullable: true })
+  reconciledBy: string;
+
+  /** ISO timestamp when reconciliation was completed/rejected. */
+  @Column({ nullable: true })
+  reconciledAt: string;
+
+  /** Human-readable audit note. */
   @Column({ type: 'text', nullable: true })
   note: string;
 
