@@ -50,6 +50,7 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     try {
       const sessions = await this.billingService.listReminderSessions();
+      let generated = 0;
       let reminders = 0;
       let overdue = 0;
       let suspended = 0;
@@ -57,6 +58,14 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
 
       for (const session of sessions) {
         if (this.stopping) break;
+
+        try {
+          const generatedResult = await this.billingService.generateMonthlyInvoices(session);
+          generated += generatedResult.count;
+        } catch (error: any) {
+          failures++;
+          this.logger.warn(`Failed to generate monthly invoices for session ${session}: ${error?.message || error}`);
+        }
 
         const items = await this.billingService.getRemindableInvoices(session);
         for (const item of items) {
@@ -104,8 +113,8 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      if (reminders || overdue || suspended || failures) {
-        this.logger.log(`Billing sweep complete: reminders=${reminders} overdue=${overdue} suspended=${suspended} failures=${failures}`);
+      if (generated || reminders || overdue || suspended || failures) {
+        this.logger.log(`Billing sweep complete: generated=${generated} reminders=${reminders} overdue=${overdue} suspended=${suspended} failures=${failures}`);
       }
     } catch (error: any) {
       if (!this.stopping) {
