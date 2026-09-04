@@ -5,6 +5,11 @@ import { BillingCustomerEntity } from '../entities/billing-customer.entity';
 import { BillingInvoiceEntity } from '../entities/billing-invoice.entity';
 import { BillingSettlementEntity } from '../entities/billing-settlement.entity';
 
+export interface ReminderClaim {
+  claimed: boolean;
+  token?: string;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -204,35 +209,54 @@ export class BillingService {
     return result;
   }
 
-  async claimReminder(invoiceId: string): Promise<boolean> {
+  async claimReminder(invoiceId: string): Promise<ReminderClaim> {
+    return this.invoiceRepo.manager.transaction(async (manager) => {
+      const invoice = await manager.findOne(BillingInvoiceEntity, { where: { id: invoiceId }, lock: { mode: 'pessimistic_write' } });
+      if (!invoice) return { claimed: false };
+      const today = new Date().toISOString().slice(0, 10);
+      const sent = Array.isArray(invoice.reminderSent) ? invoice.reminderSent : [];
+      if (sent.some((value) => {
+        const text = String(value);
+        return text.startsWith(today) || text.startsWith('__claim__:' + today);
+      })) return { claimed: false };
+      const token = `__claim__:${today}:${crypto.randomUUID()}`;
+      invoice.reminderSent = [...sent, token];
+      await manager.save(invoice);
+      return { claimed: true, token };
+    });
+  }
+
+  async confirmReminderClaim(invoiceId: string, token: string): Promise<boolean> {
     return this.invoiceRepo.manager.transaction(async (manager) => {
       const invoice = await manager.findOne(BillingInvoiceEntity, { where: { id: invoiceId }, lock: { mode: 'pessimistic_write' } });
       if (!invoice) return false;
-      const today = new Date().toISOString().slice(0, 10);
       const sent = Array.isArray(invoice.reminderSent) ? invoice.reminderSent : [];
-      if (sent.some((value) => String(value).startsWith(today))) return false;
-      invoice.reminderSent = [...sent, new Date().toISOString()];
+      const index = sent.findIndex((value) => String(value) === token);
+      if (index < 0) return false;
+      const next = [...sent];
+      next[index] = new Date().toISOString();
+      invoice.reminderSent = next;
       await manager.save(invoice);
       return true;
     });
   }
 
-  async rollbackReminderClaim(invoiceId: string, claimDate = new Date()): Promise<boolean> {
+  async rollbackReminderClaim(invoiceId: string, token: string): Promise<boolean> {
     return this.invoiceRepo.manager.transaction(async (manager) => {
       const invoice = await manager.findOne(BillingInvoiceEntity, { where: { id: invoiceId }, lock: { mode: 'pessimistic_write' } });
       if (!invoice) return false;
-      const day = claimDate.toISOString().slice(0, 10);
       const sent = Array.isArray(invoice.reminderSent) ? invoice.reminderSent : [];
-      const index = sent.findIndex((value) => String(value).startsWith(day));
-      if (index < 0) return false;
-      invoice.reminderSent = sent.filter((_, i) => i !== index);
+      const next = sent.filter((value) => String(value) !== token);
+      if (next.length === sent.length) return false;
+      invoice.reminderSent = next;
       await manager.save(invoice);
       return true;
     });
   }
 
   async markReminderSent(id: string): Promise<void> {
-    await this.claimReminder(id);
+    const claim = await this.claimReminder(id);
+    if (claim.claimed && claim.token) await this.confirmReminderClaim(id, claim.token);
   }
 
   async loadSettlements(sessionId: string): Promise<BillingSettlementEntity[]> {
