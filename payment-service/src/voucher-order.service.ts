@@ -292,56 +292,78 @@ export class VoucherOrderService {
     const actor = String(params.reconciledBy || '').trim();
     if (!actor) throw new BadRequestException('reconciledBy wajib diisi');
 
-    const log = await this.logRepo.findOne({ where: { id: params.callbackLogId } });
-    if (!log) throw new NotFoundException('Callback log not found');
-    if (log.reconciliationStatus !== 'candidate') throw new BadRequestException('Callback bukan kandidat rekonsiliasi');
-    if (log.matchedOrderId) throw new BadRequestException('Callback sudah memiliki order');
+    const result = await this.dataSource.transaction(async (manager) => {
+      const logRepo = manager.getRepository(PayhookCallbackLogEntity);
+      const orderRepo = manager.getRepository(VoucherOrderEntity);
 
-    const order = await this.orderRepo.findOne({ where: { orderId: params.orderId } });
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== 'expired') throw new BadRequestException('Order harus berstatus expired');
-    if (Number(order.uniqueAmount) !== Number(log.amount)) throw new BadRequestException('Nominal order dan callback tidak sama');
+      const log = await logRepo.findOne({
+        where: { id: params.callbackLogId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!log) throw new NotFoundException('Callback log not found');
+      if (log.reconciliationStatus !== 'candidate') throw new BadRequestException('Callback bukan kandidat rekonsiliasi');
+      if (log.matchedOrderId) throw new BadRequestException('Callback sudah memiliki order');
 
-    const siblingMatches = await this.orderRepo
-      .createQueryBuilder('o')
-      .where('o.status = :status', { status: 'expired' })
-      .andWhere('o.uniqueAmount = :amount', { amount: log.amount })
-      .getCount();
-    if (siblingMatches !== 1) throw new BadRequestException('Nominal expired tidak unik; rekonsiliasi ditolak');
+      const order = await orderRepo.findOne({
+        where: { orderId: params.orderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order) throw new NotFoundException('Order not found');
+      if (order.status !== 'expired') throw new BadRequestException('Order harus berstatus expired');
+      if (Number(order.uniqueAmount) !== Number(log.amount)) throw new BadRequestException('Nominal order dan callback tidak sama');
 
-    await this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(PayhookCallbackLogEntity);
-      const current = await repo.findOne({ where: { id: log.id }, lock: { mode: 'pessimistic_write' } });
-      if (!current || current.reconciliationStatus !== 'candidate' || current.matchedOrderId) {
-        throw new BadRequestException('Callback sudah direkonsiliasi oleh operator lain');
-      }
-      current.matchedOrderId = order.orderId;
-      current.reconciliationStatus = 'reconciled';
-      current.reconciledBy = actor;
-      current.reconciledAt = new Date().toISOString();
-      current.matched = true;
-      current.note = `Reconciled to expired order ${order.orderId} by ${actor}`;
-      await repo.save(current);
+      const siblingMatches = await orderRepo
+        .createQueryBuilder('o')
+        .where('o.status = :status', { status: 'expired' })
+        .andWhere('o.uniqueAmount = :amount', { amount: log.amount })
+        .getCount();
+      if (siblingMatches !== 1) throw new BadRequestException('Nominal expired tidak unik; rekonsiliasi ditolak');
+
+      log.matchedOrderId = order.orderId;
+      log.reconciliationStatus = 'reconciled';
+      log.reconciledBy = actor;
+      log.reconciledAt = new Date().toISOString();
+      log.matched = true;
+      log.note = `Reconciled to expired order ${order.orderId} by ${actor}`;
+      await logRepo.save(log);
+
+      await orderRepo.update({ id: order.id }, { status: 'pending' });
+      return { orderId: order.orderId, orderIdInternal: order.id };
     });
 
-    await this.orderRepo.update({ id: order.id }, { status: 'pending' });
-    const refreshed = await this.getOrder(order.orderId);
+    const refreshed = await this.getOrder(result.orderId);
     if (!refreshed) throw new NotFoundException('Order disappeared during reconciliation');
     try {
       await this.settleOrder(refreshed, `reconciliation:${actor}`);
     } catch (error) {
-      await this.logRepo.update({ id: log.id }, {
-        reconciliationStatus: 'candidate',
-        matchedOrderId: null,
-        reconciledBy: null,
-        reconciledAt: null,
-        matched: false,
-        note: `Reconciliation settlement failed; candidate released: ${(error as any)?.message || error}`,
+      await this.dataSource.transaction(async (manager) => {
+        const logRepo = manager.getRepository(PayhookCallbackLogEntity);
+        const orderRepo = manager.getRepository(VoucherOrderEntity);
+        const currentLog = await logRepo.findOne({
+          where: { id: params.callbackLogId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        const currentOrder = await orderRepo.findOne({
+          where: { id: result.orderIdInternal },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (currentLog?.matchedOrderId === result.orderId && currentLog.reconciliationStatus === 'reconciled') {
+          await logRepo.update({ id: params.callbackLogId }, {
+            reconciliationStatus: 'candidate',
+            matchedOrderId: null,
+            reconciledBy: null,
+            reconciledAt: null,
+            matched: false,
+            note: `Reconciliation settlement failed; candidate released: ${(error as any)?.message || error}`,
+          });
+        }
+        if (currentOrder?.status === 'pending') {
+          await orderRepo.update({ id: result.orderIdInternal }, { status: 'expired' });
+        }
       });
-      await this.orderRepo.update({ id: order.id }, { status: 'expired' });
       throw error;
     }
-    return this.getOrder(order.orderId) as Promise<VoucherOrderEntity>;
+    return this.getOrder(result.orderId) as Promise<VoucherOrderEntity>;
   }
 
   async settleOrder(order: VoucherOrderEntity, source: string): Promise<{ note: string }> {
