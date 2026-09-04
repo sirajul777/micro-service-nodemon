@@ -2,11 +2,6 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { BillingService } from './billing.service';
 import { RedisPublisherService } from '../redis/redis-publisher.service';
 
-/**
- * Periodically evaluates billing invoices and emits reminder events.
- * The bot service owns Telegram delivery; payment-service only decides which
- * invoices are due for a reminder and publishes the event through Redis.
- */
 @Injectable()
 export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BillingSchedulerService.name);
@@ -41,6 +36,8 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
       for (const session of sessions) {
         const items = await this.billingService.getRemindableInvoices(session);
         for (const item of items) {
+          const claimed = await this.billingService.claimReminder(item.invoice.id);
+          if (!claimed) continue;
           const published = await this.redis.publish('billing.invoice.reminder', {
             invoiceId: item.invoice.id,
             customerId: item.customer.id,
@@ -52,8 +49,9 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
             daysLeft: item.daysLeft,
           });
           if (published) {
-            await this.billingService.markReminderSent(item.invoice.id);
             reminders++;
+          } else {
+            this.logger.warn(`Billing reminder event could not be published for invoice ${item.invoice.id}`);
           }
         }
       }
