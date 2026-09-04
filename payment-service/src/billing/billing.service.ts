@@ -92,16 +92,9 @@ export class BillingService {
     return due.toISOString().slice(0, 10);
   }
 
-  async createInvoice(
-    customer: BillingCustomerEntity,
-    period?: string,
-    dueDate?: string,
-  ): Promise<BillingInvoiceEntity> {
+  async createInvoice(customer: BillingCustomerEntity, period?: string, dueDate?: string): Promise<BillingInvoiceEntity> {
     const now = new Date();
-    const months = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-    ];
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     const p = period || `${months[now.getMonth()]} ${now.getFullYear()}`;
     const entity = this.invoiceRepo.create({
       sessionId: customer.sessionId,
@@ -122,10 +115,7 @@ export class BillingService {
   async generateMonthlyInvoices(sessionId: string): Promise<{ success: boolean; count: number }> {
     const customers = (await this.loadCustomers(sessionId)).filter((c) => c.status === 'active');
     const now = new Date();
-    const months = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-    ];
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     const period = `${months[now.getMonth()]} ${now.getFullYear()}`;
     let count = 0;
     for (const customer of customers) {
@@ -222,6 +212,20 @@ export class BillingService {
       const sent = Array.isArray(invoice.reminderSent) ? invoice.reminderSent : [];
       if (sent.some((value) => String(value).startsWith(today))) return false;
       invoice.reminderSent = [...sent, new Date().toISOString()];
+      await manager.save(invoice);
+      return true;
+    });
+  }
+
+  async rollbackReminderClaim(invoiceId: string, claimDate = new Date()): Promise<boolean> {
+    return this.invoiceRepo.manager.transaction(async (manager) => {
+      const invoice = await manager.findOne(BillingInvoiceEntity, { where: { id: invoiceId }, lock: { mode: 'pessimistic_write' } });
+      if (!invoice) return false;
+      const day = claimDate.toISOString().slice(0, 10);
+      const sent = Array.isArray(invoice.reminderSent) ? invoice.reminderSent : [];
+      const index = sent.findIndex((value) => String(value).startsWith(day));
+      if (index < 0) return false;
+      invoice.reminderSent = sent.filter((_, i) => i !== index);
       await manager.save(invoice);
       return true;
     });
