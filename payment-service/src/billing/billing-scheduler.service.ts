@@ -61,9 +61,8 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
         const items = await this.billingService.getRemindableInvoices(session);
         for (const item of items) {
           if (this.stopping) break;
-          const claimAt = new Date();
-          const claimed = await this.billingService.claimReminder(item.invoice.id);
-          if (!claimed) continue;
+          const claim = await this.billingService.claimReminder(item.invoice.id);
+          if (!claim.claimed || !claim.token) continue;
           const published = await this.redis.publish('billing.invoice.reminder', {
             invoiceId: item.invoice.id,
             customerId: item.customer.id,
@@ -74,9 +73,11 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
             dueDate: item.invoice.dueDate || '',
             daysLeft: item.daysLeft,
           });
-          if (published) reminders++;
-          else {
-            await this.billingService.rollbackReminderClaim(item.invoice.id, claimAt);
+          if (published) {
+            await this.billingService.confirmReminderClaim(item.invoice.id, claim.token);
+            reminders++;
+          } else {
+            await this.billingService.rollbackReminderClaim(item.invoice.id, claim.token);
             failures++;
             this.logger.warn(`Billing reminder event could not be published for invoice ${item.invoice.id}; claim released for retry`);
           }
