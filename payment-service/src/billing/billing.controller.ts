@@ -105,7 +105,30 @@ export class BillingController {
     const collectorName = String(body?.paidBy || 'Admin').trim();
     if (!collectorName) return { error: 'paidBy wajib diisi' };
     const paid = await this.billingService.payInvoice(id, collectorName, body?.note);
-    return paid ? { success: true, invoice: paid } : { error: 'Not found' };
+    if (!paid) return { error: 'Not found' };
+
+    let reenabled = false;
+    const customer = await this.billingService.getCustomer(paid.customerId);
+    if (customer && customer.sessionId === session && customer.status === 'suspended' && customer.autoDisable !== false) {
+      if (customer.mikrotikUser) {
+        const routerResult = customer.type === 'pppoe'
+          ? await this.mikrotikGrpc.enablePppSecret(session, customer.mikrotikUser)
+          : await this.mikrotikGrpc.enableHotspotUser(session, customer.mikrotikUser);
+        if (!routerResult.success) {
+          return {
+            success: true,
+            invoice: paid,
+            reenabled: false,
+            reenableError: routerResult.error || 'Gagal mengaktifkan kembali akses di router',
+          };
+        }
+      }
+      customer.status = 'active';
+      await this.billingService.saveCustomer(customer);
+      reenabled = true;
+    }
+
+    return { success: true, invoice: paid, reenabled };
   }
 
   @Post('invoices/manual')
