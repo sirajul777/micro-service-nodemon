@@ -106,6 +106,19 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
             customer.status = 'suspended';
             await this.billingService.saveCustomer(customer);
             suspended++;
+
+            const published = await this.redis.publish('billing.invoice.overdue', {
+              customerId: customer.id,
+              sessionId: customer.sessionId,
+              customerName: customer.name,
+              telegramId: customer.telegramId || '',
+              mikrotikUser: customer.mikrotikUser || '',
+              type: customer.type || 'hotspot',
+            });
+            if (!published) {
+              failures++;
+              this.logger.warn(`Billing overdue event could not be published for customer ${customer.id}`);
+            }
           } else {
             failures++;
             this.logger.warn(`Failed to suspend overdue customer ${customer.name || customer.mikrotikUser}: ${result.error || 'unknown error'}`);
