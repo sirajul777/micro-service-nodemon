@@ -14,6 +14,7 @@ import { BillingService } from './billing.service';
 import { MikrotikGrpcClient } from '../clients/mikrotik-grpc.client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermission } from '../auth/permissions.decorator';
+import { RedisPublisherService } from '../redis/redis-publisher.service';
 
 @Controller('billing/:session')
 @UseGuards(JwtAuthGuard)
@@ -22,10 +23,28 @@ export class BillingController {
   constructor(
     private readonly billingService: BillingService,
     private readonly mikrotikGrpc: MikrotikGrpcClient,
+    private readonly redis: RedisPublisherService,
   ) {}
 
   private sessionMatches(entity: { sessionId?: string } | null | undefined, session: string): boolean {
     return !!entity && entity.sessionId === session;
+  }
+
+  private buildReminderPayload(
+    invoice: { id: string; customerId: string; customerName?: string; amount?: number; dueDate?: string },
+    customer: { sessionId: string; name?: string; telegramId?: string },
+  ) {
+    const daysLeft = this.billingService.getDaysUntilDue(invoice.dueDate);
+    return {
+      invoiceId: invoice.id,
+      customerId: invoice.customerId,
+      sessionId: customer.sessionId,
+      customerName: customer.name || invoice.customerName || '',
+      telegramId: customer.telegramId || '',
+      amount: Number(invoice.amount || 0),
+      dueDate: invoice.dueDate || '',
+      daysLeft,
+    };
   }
 
   @Get('stats')
@@ -105,12 +124,25 @@ export class BillingController {
   async sendReminder(@Param('session') session: string, @Param('id') id: string) {
     const inv = await this.billingService.getInvoice(id);
     if (!this.sessionMatches(inv, session)) return { error: 'Invoice not found' };
+    if (inv!.status === 'paid' || inv!.status === 'cancelled') {
+      return { error: 'Invoice sudah tidak dapat dikirimkan sebagai tagihan aktif' };
+    }
     const cust = await this.billingService.getCustomer(inv!.customerId);
     if (!this.sessionMatches(cust, session)) return { error: 'Invoice not found' };
     if (!cust?.telegramId) return { error: 'Pelanggan tidak memiliki Telegram ID' };
-    const daysLeft = this.billingService.getDaysUntilDue(inv!.dueDate);
+
+    const payload = this.buildReminderPayload(inv!, cust);
+    const published = await this.redis.publish('billing.invoice.reminder', payload);
+    if (!published) {
+      return { success: false, error: 'Gagal mengantrikan reminder Telegram' };
+    }
+
     await this.billingService.markReminderSent(id);
-    return { success: true, message: `Reminder sent to ${cust.name} (${daysLeft} days left)` };
+    return {
+      success: true,
+      queued: true,
+      message: `Reminder queued for ${cust.name} (${payload.daysLeft} days left)`,
+    };
   }
 
   @Post('run-overdue')
@@ -257,36 +289,5 @@ export class BillingController {
     const settlements = await this.billingService.loadSettlements(session);
     if (!settlements.some((s) => s.id === id)) return { success: false };
     return { success: await this.billingService.verifySettlement(id) };
-  }
-
-  @Get('collector/:name')
-  async collector(@Param('session') session: string, @Param('name') name: string) {
-    const customers = await this.billingService.loadCustomers(session);
-    const collector = customers.find((c) => c.name === name);
-    if (!collector) return { error: 'Collector not found' };
-    return {
-      name: collector.name,
-      unsettledCash: collector.unsettledCash || 0,
-      history: (await this.billingService.loadSettlements(session)).filter((s) => s.collectorName === name),
-    };
-  }
-
-  @Get('settlement/summary/:collectorName')
-  async settlementSummary(@Param('session') session: string, @Param('collectorName') collectorName: string) {
-    const customers = await this.billingService.loadCustomers(session);
-    const collector = customers.find((c) => c.name === collectorName);
-    const history = (await this.billingService.loadSettlements(session)).filter((s) => s.collectorName === collectorName);
-    return {
-      success: true,
-      data: {
-        unsettled: collector?.unsettledCash || 0,
-        history: history.map((h) => ({
-          id: h.id,
-          date: new Date(h.createdAt).toLocaleDateString('id-ID'),
-          amount: h.amount,
-          status: h.status,
-        })),
-      },
-    };
   }
 }
