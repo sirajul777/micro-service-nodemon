@@ -107,17 +107,27 @@ export class BillingSchedulerService implements OnModuleInit, OnModuleDestroy {
             await this.billingService.saveCustomer(customer);
             suspended++;
 
-            const published = await this.redis.publish('billing.invoice.overdue', {
-              customerId: customer.id,
-              sessionId: customer.sessionId,
-              customerName: customer.name,
-              telegramId: customer.telegramId || '',
-              mikrotikUser: customer.mikrotikUser || '',
-              type: customer.type || 'hotspot',
-            });
-            if (!published) {
+            try {
+              const claimed = await this.billingService.claimOverdueNotification(customer.id);
+              if (!claimed) continue;
+              const published = await this.redis.publish('billing.invoice.overdue', {
+                customerId: customer.id,
+                sessionId: customer.sessionId,
+                customerName: customer.name,
+                telegramId: customer.telegramId || '',
+                mikrotikUser: customer.mikrotikUser || '',
+                type: customer.type || 'hotspot',
+              });
+              if (!published) {
+                failures++;
+                await this.billingService.rollbackOverdueNotification(customer.id, claimed.token);
+                this.logger.warn(`Billing overdue event could not be published for customer ${customer.id}; notification claim released for retry`);
+              } else {
+                await this.billingService.confirmOverdueNotification(customer.id, claimed.token);
+              }
+            } catch (error: any) {
               failures++;
-              this.logger.warn(`Billing overdue event could not be published for customer ${customer.id}`);
+              this.logger.warn(`Billing overdue notification failed for customer ${customer.id}: ${error?.message || error}`);
             }
           } else {
             failures++;

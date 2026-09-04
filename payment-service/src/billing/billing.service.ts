@@ -15,6 +15,12 @@ export interface PaymentReenableResult {
   customerReenabled: boolean;
 }
 
+export interface OverdueNotificationClaim {
+  claimed: boolean;
+  token?: string;
+  invoiceId?: string;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -262,6 +268,65 @@ export class BillingService {
   async markReminderSent(id: string): Promise<void> {
     const claim = await this.claimReminder(id);
     if (claim.claimed && claim.token) await this.confirmReminderClaim(id, claim.token);
+  }
+
+  async claimOverdueNotification(customerId: string): Promise<OverdueNotificationClaim> {
+    return this.invoiceRepo.manager.transaction(async (manager) => {
+      const invoices = await manager.find(BillingInvoiceEntity, {
+        where: { customerId, status: 'overdue' },
+        order: { createdAt: 'ASC' },
+      });
+      const today = new Date().toISOString().slice(0, 10);
+      for (const invoice of invoices) {
+        const sent = Array.isArray(invoice.overdueNotificationSent) ? invoice.overdueNotificationSent : [];
+        if (sent.some((value) => String(value).startsWith(today))) continue;
+        const token = `__overdue_claim__:${today}:${crypto.randomUUID()}`;
+        invoice.overdueNotificationSent = [...sent, token];
+        await manager.save(invoice);
+        return { claimed: true, token, invoiceId: invoice.id };
+      }
+      return { claimed: false };
+    });
+  }
+
+  async confirmOverdueNotification(customerId: string, token?: string): Promise<boolean> {
+    if (!token) return false;
+    return this.invoiceRepo.manager.transaction(async (manager) => {
+      const invoices = await manager.find(BillingInvoiceEntity, {
+        where: { customerId, status: 'overdue' },
+        order: { createdAt: 'ASC' },
+      });
+      for (const invoice of invoices) {
+        const sent = Array.isArray(invoice.overdueNotificationSent) ? invoice.overdueNotificationSent : [];
+        const index = sent.findIndex((value) => String(value) === token);
+        if (index < 0) continue;
+        const next = [...sent];
+        next[index] = new Date().toISOString();
+        invoice.overdueNotificationSent = next;
+        await manager.save(invoice);
+        return true;
+      }
+      return false;
+    });
+  }
+
+  async rollbackOverdueNotification(customerId: string, token?: string): Promise<boolean> {
+    if (!token) return false;
+    return this.invoiceRepo.manager.transaction(async (manager) => {
+      const invoices = await manager.find(BillingInvoiceEntity, {
+        where: { customerId, status: 'overdue' },
+        order: { createdAt: 'ASC' },
+      });
+      for (const invoice of invoices) {
+        const sent = Array.isArray(invoice.overdueNotificationSent) ? invoice.overdueNotificationSent : [];
+        const next = sent.filter((value) => String(value) !== token);
+        if (next.length === sent.length) continue;
+        invoice.overdueNotificationSent = next;
+        await manager.save(invoice);
+        return true;
+      }
+      return false;
+    });
   }
 
   async loadSettlements(sessionId: string): Promise<BillingSettlementEntity[]> {
