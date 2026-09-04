@@ -84,6 +84,13 @@ export class VoucherOrderEntity {
   @Column({ nullable: true })
   expiresAt: string;
 
+  /**
+   * When a valid payment is reconciled after the checkout order expired.
+   * Keeps the reconciliation state visible to operators/auditors.
+   */
+  @Column({ nullable: true })
+  reconciledAt: string;
+
   @Column({ type: 'text', nullable: true })
   note: string;
 
