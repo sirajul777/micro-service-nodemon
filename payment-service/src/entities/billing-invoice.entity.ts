@@ -13,6 +13,7 @@ import {
  * the payment service.
  */
 @Entity('billing_invoices')
+@Index(['sessionId', 'customerId', 'period'], { unique: true })
 export class BillingInvoiceEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
