@@ -264,6 +264,19 @@ export class BillingService {
     if (claim.claimed && claim.token) await this.confirmReminderClaim(id, claim.token);
   }
 
+  async markOverdueNotificationSent(invoiceId: string): Promise<boolean> {
+    return this.invoiceRepo.manager.transaction(async (manager) => {
+      const invoice = await manager.findOne(BillingInvoiceEntity, { where: { id: invoiceId }, lock: { mode: 'pessimistic_write' } });
+      if (!invoice) return false;
+      const sent = Array.isArray(invoice.overdueNotificationSent) ? invoice.overdueNotificationSent : [];
+      const today = new Date().toISOString().slice(0, 10);
+      if (sent.some((value) => String(value).startsWith(today))) return false;
+      invoice.overdueNotificationSent = [...sent, new Date().toISOString()];
+      await manager.save(invoice);
+      return true;
+    });
+  }
+
   async loadSettlements(sessionId: string): Promise<BillingSettlementEntity[]> {
     return this.settlementRepo.find({ where: { sessionId }, order: { createdAt: 'DESC' } });
   }
