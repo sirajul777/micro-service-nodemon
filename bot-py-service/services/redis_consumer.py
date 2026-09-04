@@ -168,17 +168,24 @@ class RedisConsumer:
                 return False
 
         try:
-            tg_notifier.notify_sale(payload)
+            delivered = tg_notifier.notify_sale(payload)
+            if delivered is False:
+                log.warning("[TG] sale notification returned failure")
+                return False
         except Exception as exc:
             log.warning(f"[TG] sale notification failed: {exc}")
+            return False
         return True
 
     def _handle_order_paid(self, payload: dict) -> bool:
         """Notify enabled Telegram admin bots when an order is paid."""
         try:
-            tg_notifier.notify_sale(payload)
+            delivered = tg_notifier.notify_sale(payload)
+            if delivered is False:
+                return False
         except Exception as exc:
             log.warning(f"[TG] paid notification failed: {exc}")
+            return False
         order_id = payload.get("orderId", "")
         amount = payload.get("uniqueAmount", 0)
         profile = payload.get("profile", "")
@@ -187,9 +194,12 @@ class RedisConsumer:
 
     def _handle_payment_failed(self, payload: dict) -> bool:
         try:
-            tg_notifier.notify_payment_failed(payload)
+            delivered = tg_notifier.notify_payment_failed(payload)
+            if delivered is False:
+                return False
         except Exception as exc:
             log.warning(f"[TG] failure notification failed: {exc}")
+            return False
         order_id = payload.get("orderId", "")
         reason = payload.get("reason", "unknown")
         log.warning(f"[FAILED] Order {order_id}: {reason}")
@@ -197,9 +207,12 @@ class RedisConsumer:
 
     def _handle_invoice_overdue(self, payload: dict) -> bool:
         try:
-            tg_notifier.notify_invoice_overdue(payload)
+            delivered = tg_notifier.notify_invoice_overdue(payload)
+            if delivered is False:
+                return False
         except Exception as exc:
             log.warning(f"[TG] overdue notification failed: {exc}")
+            return False
         invoice_id = payload.get("invoiceId", "")
         customer = payload.get("customerId", "")
         log.warning(f"[OVERDUE] Invoice {invoice_id} for customer {customer}")
@@ -214,10 +227,11 @@ class RedisConsumer:
                     "[TG] billing reminder could not be delivered for invoice %s",
                     payload.get("invoiceId", ""),
                 )
+                return False
             return True
         except Exception as exc:
             log.warning(f"[TG] billing reminder failed: {exc}")
-            return True
+            return False
 
     def _claim_stale_pending(self, r, stream: str, group: str, consumer: str, min_idle_ms: int):
         start = "-"
