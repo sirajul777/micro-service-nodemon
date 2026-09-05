@@ -97,7 +97,7 @@ export class VoucherGenerateController {
     const prefix = String(body?.prefix || '').trim();
     if (prefix.length > 32) throw new BadRequestException('prefix maksimal 32 karakter');
 
-    const price = body?.price === undefined || body?.price === null || body?.price === '' ? 0 : Number(body.price);
+    const price = body?.price === undefined || body?.price === null ? 0 : Number(body.price);
     if (!Number.isFinite(price) || price < 0) throw new BadRequestException('price harus berupa angka >= 0');
 
     const validity = String(body?.validity || '').trim();
