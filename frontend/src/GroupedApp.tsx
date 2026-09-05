@@ -71,23 +71,42 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
   const labelByTarget = useMemo(() => new Map(groups.flatMap(group => group.items.map(item => [hasPath(item) ? item.path : item.target, item.label]))), []);
 
   useEffect(() => {
-    const sidebar = document.querySelector<HTMLElement>('.sidebar');
-    const content = document.querySelector<HTMLElement>('.content');
-    if (!sidebar || !content) return;
-    setMountNode(sidebar);
-    setContentNode(content);
+    let cancelled = false;
+    const attach = () => {
+      const sidebar = document.querySelector<HTMLElement>('.sidebar');
+      const content = document.querySelector<HTMLElement>('.content');
+      if (!sidebar || !content) return false;
+      if (!cancelled) {
+        setMountNode(sidebar);
+        setContentNode(content);
+      }
 
-    const syncActive = () => {
-      if (sessionMode) return;
-      const activeButton = sidebar.querySelector<HTMLElement>('nav:not(.grouped-nav) .nav.active');
-      const text = activeButton?.textContent?.trim() || 'Overview';
-      setActive(labelByTarget.get(text) || (text === 'Overview' ? 'Dashboard' : text));
+      const syncActive = () => {
+        if (sessionMode) return;
+        const activeButton = sidebar.querySelector<HTMLElement>('nav:not(.grouped-nav) .nav.active');
+        const text = activeButton?.textContent?.trim() || 'Overview';
+        setActive(labelByTarget.get(text) || (text === 'Overview' ? 'Dashboard' : text));
+      };
+
+      syncActive();
+      const observer = new MutationObserver(syncActive);
+      observer.observe(sidebar, { subtree: true, attributes: true, attributeFilter: ['class'] });
+      return () => observer.disconnect();
     };
 
-    syncActive();
-    const observer = new MutationObserver(syncActive);
-    observer.observe(sidebar, { subtree: true, attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+    let cleanup: (() => void) | undefined;
+    if (!attach()) {
+      const timer = window.setTimeout(() => { cleanup = attach() || undefined; }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+        cleanup?.();
+      };
+    }
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
   }, [labelByTarget, sessionMode]);
 
   if (!mountNode) return null;
