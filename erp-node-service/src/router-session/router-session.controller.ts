@@ -70,7 +70,7 @@ export class RouterSessionController {
       ip: String(body.ip),
       port: Number(body.port) || 0,
       user: body.user ? String(body.user) : '',
-      password: body.password ? String(body.password) : '',
+      password: body.password ? String(body.password) : (existing.success ? String(existing.session?.password || '') : ''),
       hotspotName: body.hotspotName ? String(body.hotspotName) : '',
       dnsName: body.dnsName ? String(body.dnsName) : '',
       currency: body.currency ? String(body.currency) : '',
