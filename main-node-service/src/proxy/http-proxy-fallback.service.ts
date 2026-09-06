@@ -81,9 +81,12 @@ export class HttpProxyFallbackService {
       }
     }
 
-    if (target === 'erp' && /^\/sessions(?:\/[^/]+)?$/.test(path)) {
+    const requestMethod = String(method).toUpperCase();
+    const requestPath = String(path || '/').replace(/\/+$/, '') || '/';
+
+    if (target === 'erp' && /^\/sessions(?:\/[^/]+)?$/.test(requestPath)) {
       try {
-        if (method === 'POST' && path === '/sessions') {
+        if (requestMethod === 'POST' && requestPath === '/sessions') {
           const input = (body && typeof body === 'object') ? body as Record<string, any> : {};
           if (!input.id || !input.name || !input.ip) {
             throw new BadGatewayException('id, name, dan ip wajib diisi');
@@ -122,8 +125,8 @@ export class HttpProxyFallbackService {
           };
         }
 
-        const idMatch = path.match(/^\/sessions\/([^/]+)$/);
-        if (method === 'DELETE' && idMatch) {
+        const idMatch = requestPath.match(/^\/sessions\/([^/]+)$/);
+        if (requestMethod === 'DELETE' && idMatch) {
           const response = await this.erpGrpc.deleteSession(
             decodeURIComponent(idMatch[1]),
           );
@@ -143,7 +146,7 @@ export class HttpProxyFallbackService {
       } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
         this.logger.error(
-          `ERP gRPC router session mutation failed for ${method} ${path}: ${error.message}`,
+          `ERP gRPC router session mutation failed for ${requestMethod} ${requestPath}: ${error.message}`,
           error.stack,
         );
         if (err instanceof BadGatewayException) throw err;
@@ -154,7 +157,7 @@ export class HttpProxyFallbackService {
     }
 
     throw new BadGatewayException(
-      `Internal route ${method} ${target}${path} wajib menggunakan gRPC`,
+      `Internal route ${requestMethod} ${target}${requestPath} wajib menggunakan gRPC`,
     );
   }
 
