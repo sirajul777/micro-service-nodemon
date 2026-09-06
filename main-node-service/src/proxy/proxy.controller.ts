@@ -155,6 +155,24 @@ export class ProxyController {
       } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
     }
 
+    const connectTestMatch = canonical.match(/^\/mikrotik\/([^/]+)\/connect\/test$/);
+    if (targetRaw === 'mikrotik' && req.method === 'GET' && connectTestMatch) {
+      try {
+        const routerSession = decodeURIComponent(connectTestMatch[1]);
+        const response = await this.hotspotGrpc.testConnect(routerSession);
+        if (!response?.success) {
+          return res.status(502).json({ success: false, message: response?.error || 'MikroTik gRPC TestConnect failed' });
+        }
+        return res.status(200).json({
+          success: true,
+          identity: response.identity || '',
+          rosVersion: response.rosVersion || response.version || '',
+        });
+      } catch (err: any) {
+        return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` });
+      }
+    }
+
     const dashboardMatch = canonical.match(/^\/mikrotik\/([^/]+)\/(dashboard|system\/resource|interfaces|hotspot\/log)$/);
     if (targetRaw === 'mikrotik' && req.method === 'GET' && dashboardMatch) {
       try {
