@@ -74,7 +74,7 @@ export default function PppoeProfilesPage({ session }: Props) {
     } catch (e: any) { setNotice(e?.message || 'Unable to save PPPoE profile.'); setBusy(false); }
   };
   const remove = async (name: string) => {
-    if (!window.confirm(`Delete PPPoE profile \"${name}\"?`)) return;
+    if (!window.confirm(`Delete PPPoE profile "${name}"?`)) return;
     setBusy(true); setNotice('');
     try { const result = await router.deletePppProfile(session, name); if (result?.success === false) throw new Error(result.error || 'Delete failed.'); await load(); setNotice(`PPPoE profile ${name} deleted.`); }
     catch (e: any) { setNotice(e?.message || 'Unable to delete PPPoE profile.'); setBusy(false); }
