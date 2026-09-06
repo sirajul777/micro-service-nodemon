@@ -6,6 +6,21 @@ type Profile = Record<string, any>;
 type Props = { session: string };
 const empty = { name: '', rateLimit: '', sharedUsers: '', addressPool: '', sessionTimeout: '', idleTimeout: '', price: '', validity: '', expiryMode: '', lockUser: false, caption: '', color: '#2563eb' };
 
+const toApiBody = (form: typeof empty) => ({
+  name: form.name.trim(),
+  'rate-limit': form.rateLimit,
+  'shared-users': form.sharedUsers ? Number(form.sharedUsers) : undefined,
+  'address-pool': form.addressPool,
+  'session-timeout': form.sessionTimeout,
+  'idle-timeout': form.idleTimeout,
+  price: form.price,
+  validity: form.validity,
+  expmode: form.expiryMode,
+  lockUser: form.lockUser,
+  caption: form.caption,
+  profileColor: form.color,
+});
+
 export default function HotspotProfilesPage({ session }: Props) {
   const [rows, setRows] = useState<Profile[]>([]);
   const [query, setQuery] = useState('');
@@ -34,7 +49,17 @@ export default function HotspotProfilesPage({ session }: Props) {
 
   const open = (row?: Profile) => {
     setEditing(row || null);
-    setForm({ ...empty, ...(row || {}) });
+    setForm({
+      ...empty,
+      ...(row || {}),
+      rateLimit: row?.rateLimit ?? row?.['rate-limit'] ?? '',
+      sharedUsers: row?.sharedUsers ?? row?.['shared-users'] ?? '',
+      addressPool: row?.addressPool ?? row?.['address-pool'] ?? '',
+      sessionTimeout: row?.sessionTimeout ?? row?.['session-timeout'] ?? '',
+      idleTimeout: row?.idleTimeout ?? row?.['idle-timeout'] ?? '',
+      expiryMode: row?.expiryMode ?? row?.expmode ?? '',
+      color: row?.color ?? row?.profileColor ?? '#2563eb',
+    });
   };
 
   const close = () => { setEditing(null); setForm({ ...empty }); };
@@ -43,7 +68,7 @@ export default function HotspotProfilesPage({ session }: Props) {
     if (!session || !form.name.trim()) { setNotice('Profile name is required.'); return; }
     setBusy(true); setNotice('');
     try {
-      const body = { ...form, sharedUsers: form.sharedUsers ? Number(form.sharedUsers) : undefined };
+      const body = toApiBody(form);
       const result = editing
         ? await router.updateHotspotProfile(session, String(editing.name), body)
         : await router.addHotspotProfile(session, body);
@@ -88,7 +113,7 @@ export default function HotspotProfilesPage({ session }: Props) {
         <div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search profiles..."/></div>
       </div>
       <div className="table-wrap"><table><thead><tr><th>Name</th><th>Rate Limit</th><th>Shared Users</th><th>Address Pool</th><th>Session Timeout</th><th>Price</th><th>Validity</th><th>Actions</th></tr></thead>
-        <tbody>{visible.map((r, i) => { const name = String(r.name || i); return <tr key={name}><td><b>{name}</b></td><td>{r.rateLimit || '—'}</td><td>{r.sharedUsers ?? '—'}</td><td>{r.addressPool || '—'}</td><td>{r.sessionTimeout || '—'}</td><td>{r.price ?? '—'}</td><td>{r.validity || '—'}</td><td><div className="row-actions"><button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(r)}><Pencil size={14}/></button><button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14}/></button></div></td></tr>; })}</tbody>
+        <tbody>{visible.map((r, i) => { const name = String(r.name || i); return <tr key={name}><td><b>{name}</b></td><td>{r.rateLimit || r['rate-limit'] || '—'}</td><td>{r.sharedUsers ?? r['shared-users'] ?? '—'}</td><td>{r.addressPool || r['address-pool'] || '—'}</td><td>{r.sessionTimeout || r['session-timeout'] || '—'}</td><td>{r.price ?? '—'}</td><td>{r.validity || '—'}</td><td><div className="row-actions"><button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(r)}><Pencil size={14}/></button><button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14}/></button></div></td></tr>; })}</tbody>
       </table>{!visible.length && <div className="empty">No hotspot profiles found.</div>}</div>
     </section>
     {editing !== null || form.name !== '' ? <Modal form={form} setForm={setForm} editing={editing} busy={busy} close={close} save={() => void save()} /> : null}
