@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Pause, Play, RefreshCw, Search } from 'lucide-react';
 import { router } from '../api';
 
@@ -13,6 +13,7 @@ export default function InterfaceTrafficPage({ session }: Props) {
   const [paused, setPaused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const requestRef = useRef(0);
 
   const loadInterfaces = async () => {
     if (!session) return;
@@ -20,25 +21,45 @@ export default function InterfaceTrafficPage({ session }: Props) {
       const result = await router.interfaces(session);
       const rows = Array.isArray(result) ? result : result?.interfaces || result?.data || [];
       setInterfaces(rows);
-      if (!selected && rows[0]?.name) setSelected(String(rows[0].name));
+      setSelected(current => {
+        const currentExists = current && rows.some((row: Row) => String(row.name || row.id || '') === current);
+        return currentExists ? current : String(rows[0]?.name || rows[0]?.id || '');
+      });
     } catch (e: any) {
+      setInterfaces([]);
+      setSelected('');
+      setTraffic(null);
       setNotice(e?.message || 'Unable to load interfaces.');
     }
   };
 
   const loadTraffic = async () => {
     if (!session || !selected || paused) return;
+    const requestId = ++requestRef.current;
     setBusy(true);
     try {
       const result = await router.interfaceTraffic(session, selected);
+      if (requestId !== requestRef.current) return;
       setTraffic(result?.traffic || result?.data || result || null);
       setNotice('');
     } catch (e: any) {
+      if (requestId !== requestRef.current) return;
       setNotice(e?.message || 'Unable to load interface traffic.');
-    } finally { setBusy(false); }
+    } finally {
+      if (requestId === requestRef.current) setBusy(false);
+    }
   };
 
-  useEffect(() => { void loadInterfaces(); }, [session]);
+  useEffect(() => {
+    requestRef.current += 1;
+    setInterfaces([]);
+    setSelected('');
+    setTraffic(null);
+    setNotice('');
+    setQuery('');
+    void loadInterfaces();
+  }, [session]);
+
   useEffect(() => {
     if (!session || !selected) return;
     void loadTraffic();
@@ -49,13 +70,19 @@ export default function InterfaceTrafficPage({ session }: Props) {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return !q ? interfaces : interfaces.filter((r) => Object.values(r).some((v) => String(v ?? '').toLowerCase().includes(q)));
+    if (!q) return interfaces;
+    return interfaces.filter((r) => Object.values(r).some((v) => String(v ?? '').toLowerCase().includes(q)));
   }, [interfaces, query]);
 
   const field = (keys: string[]) => {
     for (const key of keys) if (traffic?.[key] !== undefined && traffic?.[key] !== null && traffic?.[key] !== '') return traffic[key];
     return '—';
   };
+
+  const selectedInVisible = selected && visible.some((row) => String(row.name || row.id || '') === selected);
+  const selectOptions = selected && !selectedInVisible
+    ? [...interfaces.filter((row) => String(row.name || row.id || '') === selected), ...visible]
+    : visible;
 
   return <div className="stack">
     <div className="hero">
@@ -70,7 +97,7 @@ export default function InterfaceTrafficPage({ session }: Props) {
       <div className="panel-head"><div><h3><Activity size={15}/> Interface Monitor</h3><span>{paused ? 'Paused' : 'Live · 5s'}</span></div><span className="badge">{busy ? 'WORKING' : paused ? 'PAUSED' : 'LIVE'}</span></div>
       <div className="table-controls">
         <div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search interface, type, MAC..."/></div>
-        <div className="panel-actions"><select value={selected} onChange={e => { setSelected(e.target.value); setTraffic(null); }}><option value="">— Select Interface —</option>{visible.map((r, i) => <option key={String(r.name || i)} value={String(r.name || '')}>{r.name || r.id || `Interface ${i + 1}`}</option>)}</select></div>
+        <div className="panel-actions"><select value={selected} onChange={e => { setSelected(e.target.value); setTraffic(null); }}><option value="">— Select Interface —</option>{selectOptions.map((r, i) => <option key={String(r.name || r.id || i)} value={String(r.name || r.id || '')}>{r.name || r.id || `Interface ${i + 1}`}</option>)}</select></div>
       </div>
       <div className="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>MAC Address</th><th>Running</th><th>TX</th><th>RX</th></tr></thead><tbody>{visible.map((r, i) => { const name = String(r.name || r.id || i); const active = name === selected; return <tr key={name} className={active ? 'active-row' : ''}><td><b>{name}</b></td><td>{r.type || '—'}</td><td>{r.macAddress || r.mac_address || '—'}</td><td>{String(r.running).toLowerCase() === 'true' ? 'Yes' : String(r.running).toLowerCase() === 'false' ? 'No' : r.running || '—'}</td><td>{r.tx || '—'}</td><td>{r.rx || '—'}</td></tr>; })}</tbody></table>{!visible.length && <div className="empty">No interfaces found.</div>}</div>
     </section>
