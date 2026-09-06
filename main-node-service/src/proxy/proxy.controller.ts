@@ -81,7 +81,7 @@ export class ProxyController {
         if (req.method === 'POST' && canonical === '/payments/test') {
           const response = await this.paymentGrpc.test(Number(body?.amount) || 1000, String(body?.profile || 'test'));
           if (!response?.success) return res.status(400).json({ success: false, message: response?.error || 'Payment gRPC test failed' });
-          return res.status(200).json({ success: true, orderId: response.orderId, amount: response.amount, qrString: response.qrString, qrImage: response.qrImage, status: response.status });
+          return res.status(200).json({ success: true, orderId: response.orderId, amount: response.amount, qrString: response.qrString, status: response.status });
         }
         const detailMatch = canonical.match(/^\/payments\/([^/]+)$/);
         const checkMatch = canonical.match(/^\/payments\/([^/]+)\/check$/);
@@ -153,6 +153,24 @@ export class ProxyController {
         if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC PPPoE active failed' });
         return res.status(200).json(normalizePppoeActiveList(response.connections));
       } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
+    }
+
+    const connectTestMatch = canonical.match(/^\/mikrotik\/([^/]+)\/connect\/test$/);
+    if (targetRaw === 'mikrotik' && req.method === 'GET' && connectTestMatch) {
+      try {
+        const routerSession = decodeURIComponent(connectTestMatch[1]);
+        const response = await this.hotspotGrpc.testConnect(routerSession);
+        if (!response?.success) {
+          return res.status(502).json({ success: false, message: response?.error || 'MikroTik gRPC TestConnect failed' });
+        }
+        return res.status(200).json({
+          success: true,
+          identity: response.identity || '',
+          rosVersion: response.rosVersion || response.version || '',
+        });
+      } catch (err: any) {
+        return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` });
+      }
     }
 
     const dashboardMatch = canonical.match(/^\/mikrotik\/([^/]+)\/(dashboard|system\/resource|interfaces|hotspot\/log)$/);
@@ -258,12 +276,12 @@ export class ProxyController {
     if (targetRaw === 'voucher') { if (/^\/([^/]+)\/profiles$/.test(restPath)) return `/voucher/batches/${restPath.split('/')[1]}/import/profiles`; return restPath; }
     if (targetRaw === 'users') return `/api/users${restPath}`;
     if (targetRaw === 'mobile') return `/api/mobile-auth${restPath}`;
-    if (targetRaw === 'sessions') return `/sessions${restPath}`;
-    if (targetRaw === 'mikrotik') return `/mikrotik${restPath}`;
-    return `/${targetRaw}${restPath}`;
+    return restPath;
   }
 
   private isPublicRequest(target: Target, canonical: string, method: string): boolean {
-    return (target === 'payment' && canonical.startsWith('/payments/payhook/app-webhook')) || (target === 'payment' && method === 'POST' && (canonical === '/api/qris/orders' || /^\/api\/qris\/orders\/[^/]+\/qr$/.test(canonical))) || (target === 'payment' && canonical.startsWith('/qris/status/'));
+    if (target === 'auth' && canonical.startsWith('/api/auth/')) return true;
+    if (target === 'payment' && method === 'POST' && canonical === '/api/payments/webhook') return true;
+    return false;
   }
 }
