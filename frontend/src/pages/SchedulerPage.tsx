@@ -24,7 +24,14 @@ export default function SchedulerPage({ session }: Props) {
       setNotice(e?.message || 'Unable to load schedulers.');
     } finally { setBusy(false); }
   };
-  useEffect(() => { void load(); }, [session]);
+  useEffect(() => {
+    setRows([]);
+    setQuery('');
+    setNotice('');
+    setEditing(null);
+    setForm({ ...empty });
+    void load();
+  }, [session]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -33,7 +40,16 @@ export default function SchedulerPage({ session }: Props) {
 
   const open = (row?: Row) => {
     setEditing(row || null);
-    setForm({ ...empty, ...(row || {}), disabled: row?.disabled === true || row?.disabled === 'true' });
+    setForm({
+      ...empty,
+      name: row?.name ?? row?.id ?? '',
+      startDate: row?.startDate ?? row?.start_date ?? '',
+      startTime: row?.startTime ?? row?.start_time ?? '',
+      interval: row?.interval ?? '',
+      onEvent: row?.onEvent ?? row?.on_event ?? '',
+      disabled: row?.disabled === true || row?.disabled === 'true',
+      comment: row?.comment ?? '',
+    });
   };
   const close = () => { setEditing(null); setForm({ ...empty }); };
 

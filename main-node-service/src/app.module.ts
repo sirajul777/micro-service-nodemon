@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AuthController } from './auth/auth.controller';
 import { UserProxyController } from './auth/user-proxy.controller';
 import { ProxyController } from './proxy/proxy.controller';
+import { SchedulerGrpcController } from './proxy/scheduler-grpc.controller';
 import { PaymentWebhookController } from './proxy/payment-webhook.controller';
 import { QrisGrpcController } from './payment/qris-grpc.controller';
 import { SessionController } from './session/session.controller';
@@ -40,6 +41,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     PppoeWriteController,
     VoucherBatchGrpcController,
     PaymentWebhookController,
+    SchedulerGrpcController,
     ProxyController,
     HealthController,
   ],
