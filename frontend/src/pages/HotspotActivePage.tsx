@@ -25,7 +25,12 @@ export default function HotspotActivePage({ session }: Props) {
     }
   };
 
-  useEffect(() => { void load(); }, [session]);
+  useEffect(() => {
+    setRows([]);
+    setQuery('');
+    setNotice('');
+    void load();
+  }, [session]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
