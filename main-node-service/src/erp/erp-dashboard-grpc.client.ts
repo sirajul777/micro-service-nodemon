@@ -54,6 +54,7 @@ export class ErpDashboardGrpcClient implements OnModuleDestroy {
   listLogs(sessionId: string, topics = '') { return this.call('ListLogs', { sessionId, topics }, 15000); }
   getSystemResource(sessionId: string) { return this.call('GetSystemResource', { sessionId }, 15000); }
   getInterfaces(sessionId: string) { return this.call('GetInterfaces', { sessionId }, 15000); }
+  listSchedulers(sessionId: string) { return this.call('ListSchedulers', { sessionId }, 30000); }
 
   addPppSecret(params: Record<string, any>) { return this.call('AddPppSecret', params, 15000); }
   updatePppSecret(params: Record<string, any>) { return this.call('UpdatePppSecret', params, 15000); }
@@ -64,6 +65,8 @@ export class ErpDashboardGrpcClient implements OnModuleDestroy {
   addPppProfile(params: Record<string, any>) { return this.call('AddPppProfile', params, 15000); }
   updatePppProfile(params: Record<string, any>) { return this.call('UpdatePppProfile', params, 15000); }
   deletePppProfile(sessionId: string, name: string) { return this.call('DeletePppProfile', { sessionId, name }, 15000); }
+  addScheduler(params: Record<string, any>) { return this.call('AddScheduler', params, 15000); }
+  updateScheduler(params: Record<string, any>) { return this.call('UpdateScheduler', params, 15000); }
 
   close() { this.client?.close?.(); }
   onModuleDestroy() { this.close(); }
