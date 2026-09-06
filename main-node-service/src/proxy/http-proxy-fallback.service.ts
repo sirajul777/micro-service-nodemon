@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ReportGrpcClient } from '../erp/report-grpc.client';
+import { ErpGrpcClient } from '../erp/erp-grpc.client';
 
 type LegacyProxyResponse = {
   status: number;
@@ -22,14 +23,17 @@ type LegacyProxyResponse = {
 export class HttpProxyFallbackService {
   private readonly logger = new Logger(HttpProxyFallbackService.name);
 
-  constructor(private readonly reportGrpc: ReportGrpcClient) {}
+  constructor(
+    private readonly reportGrpc: ReportGrpcClient,
+    private readonly erpGrpc: ErpGrpcClient,
+  ) {}
 
   async forward(
     target: 'auth' | 'erp' | 'payment' | 'bot',
     path: string,
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     _token: string | null,
-    _body?: unknown,
+    body?: unknown,
     _query?: unknown,
   ): Promise<LegacyProxyResponse> {
     const match = path.match(/^\/report\/([^/]+)\/live$/);
@@ -73,6 +77,78 @@ export class HttpProxyFallbackService {
         if (err instanceof BadGatewayException) throw err;
         throw new ServiceUnavailableException(
           `Report gRPC live report tidak tersedia: ${error.message}`,
+        );
+      }
+    }
+
+    if (target === 'erp' && /^\/sessions(?:\/[^/]+)?$/.test(path)) {
+      try {
+        if (method === 'POST' && path === '/sessions') {
+          const input = (body && typeof body === 'object') ? body as Record<string, any> : {};
+          if (!input.id || !input.name || !input.ip) {
+            throw new BadGatewayException('id, name, dan ip wajib diisi');
+          }
+
+          const existing = await this.erpGrpc.getSession(String(input.id));
+          const session = {
+            id: String(input.id),
+            name: String(input.name),
+            ip: String(input.ip),
+            port: Number(input.port) || 8728,
+            user: input.user ? String(input.user) : '',
+            password: input.password ? String(input.password) : '',
+            hotspotName: input.hotspotName ? String(input.hotspotName) : '',
+            dnsName: input.dnsName ? String(input.dnsName) : '',
+            currency: input.currency ? String(input.currency) : 'Rp',
+            reloadInterval: Number(input.reloadInterval) || 10,
+            iface: input.iface ? String(input.iface) : 'ether1',
+            idleTo: Number(input.idleTo) || 0,
+            livereport: input.livereport ? String(input.livereport) : 'enable',
+          };
+          const response = existing?.success
+            ? await this.erpGrpc.updateSession(session)
+            : await this.erpGrpc.createSession(session);
+          if (!response?.success) {
+            throw new BadGatewayException(
+              response?.error || 'ERP gRPC router session mutation failed',
+            );
+          }
+          return {
+            status: 200,
+            statusText: 'OK',
+            data: { success: true, session: response.session || null },
+            headers: {},
+            config: {},
+          };
+        }
+
+        const idMatch = path.match(/^\/sessions\/([^/]+)$/);
+        if (method === 'DELETE' && idMatch) {
+          const response = await this.erpGrpc.deleteSession(
+            decodeURIComponent(idMatch[1]),
+          );
+          if (!response?.success) {
+            throw new BadGatewayException(
+              response?.error || 'ERP gRPC router session delete failed',
+            );
+          }
+          return {
+            status: 200,
+            statusText: 'OK',
+            data: { success: true },
+            headers: {},
+            config: {},
+          };
+        }
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.logger.error(
+          `ERP gRPC router session mutation failed for ${method} ${path}: ${error.message}`,
+          error.stack,
+        );
+        if (err instanceof BadGatewayException) throw err;
+        throw new ServiceUnavailableException(
+          `ERP gRPC router session tidak tersedia: ${error.message}`,
         );
       }
     }
