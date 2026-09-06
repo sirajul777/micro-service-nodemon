@@ -5,7 +5,16 @@ import { router } from '../api';
 type Profile = Record<string, any>;
 type Props = { session: string };
 
-const empty = { name: '', localAddress: '', remoteAddress: '', rateLimit: '' };
+const empty = {
+  name: '',
+  localAddress: '',
+  remoteAddress: '',
+  rateLimit: '',
+  dns: '',
+  bridge: '',
+  onlyOne: '',
+  changeTcpMss: '',
+};
 
 export default function PppoeProfilesPage({ session }: Props) {
   const [rows, setRows] = useState<Profile[]>([]);
@@ -32,10 +41,14 @@ export default function PppoeProfilesPage({ session }: Props) {
     setEditing(row || null);
     setForm({
       ...empty,
-      ...(row || {}),
+      name: row?.name ?? '',
       localAddress: row?.localAddress ?? row?.local_address ?? '',
       remoteAddress: row?.remoteAddress ?? row?.remote_address ?? '',
       rateLimit: row?.rateLimit ?? row?.rate_limit ?? '',
+      dns: row?.dns ?? '',
+      bridge: row?.bridge ?? '',
+      onlyOne: row?.onlyOne ?? row?.only_one ?? '',
+      changeTcpMss: row?.changeTcpMss ?? row?.change_tcp_mss ?? '',
     });
   };
   const close = () => { setEditing(null); setForm({ ...empty }); };
@@ -43,7 +56,16 @@ export default function PppoeProfilesPage({ session }: Props) {
     if (!session || !form.name.trim()) { setNotice('Profile name is required.'); return; }
     setBusy(true); setNotice('');
     try {
-      const body = { name: form.name.trim(), localAddress: form.localAddress.trim(), remoteAddress: form.remoteAddress.trim(), rateLimit: form.rateLimit.trim() };
+      const body = {
+        name: form.name.trim(),
+        localAddress: form.localAddress.trim(),
+        remoteAddress: form.remoteAddress.trim(),
+        rateLimit: form.rateLimit.trim(),
+        dns: form.dns.trim(),
+        bridge: form.bridge.trim(),
+        onlyOne: form.onlyOne.trim(),
+        changeTcpMss: form.changeTcpMss.trim(),
+      };
       const result = editing
         ? await router.updatePppProfile(session, String(editing.name), body)
         : await router.addPppProfile(session, body);
@@ -52,7 +74,7 @@ export default function PppoeProfilesPage({ session }: Props) {
     } catch (e: any) { setNotice(e?.message || 'Unable to save PPPoE profile.'); setBusy(false); }
   };
   const remove = async (name: string) => {
-    if (!window.confirm(`Delete PPPoE profile "${name}"?`)) return;
+    if (!window.confirm(`Delete PPPoE profile \"${name}\"?`)) return;
     setBusy(true); setNotice('');
     try { const result = await router.deletePppProfile(session, name); if (result?.success === false) throw new Error(result.error || 'Delete failed.'); await load(); setNotice(`PPPoE profile ${name} deleted.`); }
     catch (e: any) { setNotice(e?.message || 'Unable to delete PPPoE profile.'); setBusy(false); }
@@ -62,7 +84,7 @@ export default function PppoeProfilesPage({ session }: Props) {
     {notice && <div className="error banner">{notice}</div>}
     <section className="panel"><div className="panel-head"><div><h3><Server size={15}/> Profiles</h3><span>{visible.length} of {rows.length} profiles</span></div><span className="badge">{busy ? 'WORKING' : 'LIVE'}</span></div>
       <div className="table-controls"><div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search PPPoE profiles..."/></div></div>
-      <div className="table-wrap"><table><thead><tr><th>Name</th><th>Local Address</th><th>Remote Address</th><th>Rate Limit</th><th>Actions</th></tr></thead><tbody>{visible.map((row, i) => { const name = String(row.name || i); return <tr key={name}><td><b>{name}</b></td><td>{row.localAddress || row.local_address || '—'}</td><td>{row.remoteAddress || row.remote_address || '—'}</td><td>{row.rateLimit || row.rate_limit || '—'}</td><td><div className="row-actions"><button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(row)}><Pencil size={14}/></button><button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14}/></button></div></td></tr>; })}</tbody></table>{!visible.length && <div className="empty">No PPPoE profiles found.</div>}</div>
+      <div className="table-wrap"><table><thead><tr><th>Name</th><th>Local Address</th><th>Remote Address</th><th>Rate Limit</th><th>DNS</th><th>Bridge</th><th>Only One</th><th>Change TCP MSS</th><th>Actions</th></tr></thead><tbody>{visible.map((row, i) => { const name = String(row.name || i); return <tr key={name}><td><b>{name}</b></td><td>{row.localAddress || row.local_address || '—'}</td><td>{row.remoteAddress || row.remote_address || '—'}</td><td>{row.rateLimit || row.rate_limit || '—'}</td><td>{row.dns || '—'}</td><td>{row.bridge || '—'}</td><td>{row.onlyOne || row.only_one || '—'}</td><td>{row.changeTcpMss || row.change_tcp_mss || '—'}</td><td><div className="row-actions"><button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(row)}><Pencil size={14}/></button><button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14}/></button></div></td></tr>; })}</tbody></table>{!visible.length && <div className="empty">No PPPoE profiles found.</div>}</div>
     </section>
     {editing !== null || form.name !== '' ? <Modal form={form} setForm={setForm} editing={editing} busy={busy} close={close} save={() => void save()} /> : null}
   </div>;
@@ -70,5 +92,5 @@ export default function PppoeProfilesPage({ session }: Props) {
 
 function Modal({ form, setForm, editing, busy, close, save }: { form: any; setForm: any; editing: Profile | null; busy: boolean; close: () => void; save: () => void }) {
   const field = (key: string, label: string, placeholder = '') => <label><span>{label}</span><input value={form[key] ?? ''} placeholder={placeholder} disabled={key === 'name' && !!editing} onChange={e => setForm((current: any) => ({ ...current, [key]: e.target.value }))}/></label>;
-  return <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="eyebrow">PPPOE PROFILE</span><h3>{editing ? 'Edit Profile' : 'Add Profile'}</h3></div><button className="icon" onClick={close} aria-label="Close"><X size={18}/></button></div><form onSubmit={e => { e.preventDefault(); save(); }}><div className="form-grid">{field('name', 'Name')}{field('localAddress', 'Local Address')}{field('remoteAddress', 'Remote Address')}{field('rateLimit', 'Rate Limit', '10M/10M')}</div><div className="modal-actions"><button type="button" className="button secondary" onClick={close}>Cancel</button><button className="button primary" disabled={busy}><Plus size={15}/>{editing ? 'Save Changes' : 'Create Profile'}</button></div></form></div></div>;
+  return <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="eyebrow">PPPOE PROFILE</span><h3>{editing ? 'Edit Profile' : 'Add Profile'}</h3></div><button className="icon" onClick={close} aria-label="Close"><X size={18}/></button></div><form onSubmit={e => { e.preventDefault(); save(); }}><div className="form-grid">{field('name', 'Name')}{field('localAddress', 'Local Address')}{field('remoteAddress', 'Remote Address')}{field('rateLimit', 'Rate Limit', '10M/10M')}{field('dns', 'DNS', '8.8.8.8,1.1.1.1')}{field('bridge', 'Bridge')}{field('onlyOne', 'Only One', 'yes/no')}{field('changeTcpMss', 'Change TCP MSS', 'yes/no')}</div><div className="modal-actions"><button type="button" className="button secondary" onClick={close}>Cancel</button><button className="button primary" disabled={busy}><Plus size={15}/>{editing ? 'Save Changes' : 'Create Profile'}</button></div></form></div></div>;
 }
