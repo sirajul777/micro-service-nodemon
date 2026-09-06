@@ -59,6 +59,46 @@ export class ErpGrpcClient implements OnModuleDestroy {
     return this.call('GetSession', { id }, 10000);
   }
 
+  async createSession(session: Record<string, any>) {
+    return this.call('CreateSession', {
+      id: String(session.id || ''),
+      name: String(session.name || ''),
+      ip: String(session.ip || ''),
+      port: Number(session.port) || 8728,
+      user: String(session.user || ''),
+      password: String(session.password || ''),
+      hotspotName: String(session.hotspotName || ''),
+      dnsName: String(session.dnsName || ''),
+      currency: String(session.currency || 'Rp'),
+      reloadInterval: Number(session.reloadInterval) || 10,
+      iface: String(session.iface || 'ether1'),
+      idleTo: Number(session.idleTo) || 0,
+      livereport: String(session.livereport || 'enable'),
+    }, 10000);
+  }
+
+  async updateSession(session: Record<string, any>) {
+    return this.call('UpdateSession', {
+      id: String(session.id || ''),
+      name: String(session.name || ''),
+      ip: String(session.ip || ''),
+      port: Number(session.port) || 8728,
+      user: String(session.user || ''),
+      password: String(session.password || ''),
+      hotspotName: String(session.hotspotName || ''),
+      dnsName: String(session.dnsName || ''),
+      currency: String(session.currency || 'Rp'),
+      reloadInterval: Number(session.reloadInterval) || 10,
+      iface: String(session.iface || 'ether1'),
+      idleTo: Number(session.idleTo) || 0,
+      livereport: String(session.livereport || 'enable'),
+    }, 10000);
+  }
+
+  async deleteSession(id: string) {
+    return this.call('DeleteSession', { id: String(id) }, 10000);
+  }
+
   async getLiveReport(session: string) {
     const raw = Number.parseInt(process.env.ERP_LIVE_REPORT_TIMEOUT_MS || '90000', 10);
     const timeoutMs = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 120000) : 90000;
