@@ -10,6 +10,7 @@ import { HotspotGrpcClient } from '../erp/hotspot-grpc.client';
 import { VoucherBatchGrpcClient } from '../erp/voucher-batch-grpc.client';
 import { VoucherGenerateGrpcClient } from '../erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from '../erp/voucher-type-grpc.client';
+import { ReportRouterGrpcClient } from '../erp/report-router-grpc.client';
 import { BotGrpcClient } from '../bot/bot-grpc.client';
 import { PaymentGrpcClient } from '../payment/payment-grpc.client';
 import { handleBotGrpcRoute } from './bot.routes';
@@ -34,6 +35,7 @@ export class ProxyController {
     private readonly voucherBatchGrpc: VoucherBatchGrpcClient,
     private readonly voucherGenerateGrpc: VoucherGenerateGrpcClient,
     private readonly voucherTypeGrpc: VoucherTypeGrpcClient,
+    private readonly reportRouterGrpc: ReportRouterGrpcClient,
     private readonly botGrpc: BotGrpcClient,
     private readonly paymentGrpc: PaymentGrpcClient,
   ) {}
@@ -104,6 +106,30 @@ export class ProxyController {
     if ((targetRaw === 'resellers' || targetRaw === 'bot-resellers' || targetRaw === 'telegram') &&
         await handleBotGrpcRoute(this.botGrpc, req, res, canonical, body, query)) return;
 
+    const sellingMatch = canonical.match(/^\/report\/([^/]+)\/selling$/);
+    if (targetRaw === 'report' && req.method === 'GET' && sellingMatch) {
+      try {
+        const routerSession = decodeURIComponent(sellingMatch[1]);
+        const response = await this.reportRouterGrpc.listSellingScripts(
+          routerSession,
+          String(query?.idhr || ''),
+          String(query?.idbl || ''),
+        );
+        if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Report gRPC selling failed' });
+        const records = (response.scripts || []).map((row: any) => ({
+          date: String(row.date || ''),
+          time: String(row.time || ''),
+          username: String(row.username || ''),
+          price: Number(row.price || 0),
+          profile: String(row.profile || ''),
+          comment: String(row.comment || ''),
+        }));
+        return res.status(200).json({ records, summary: { totalVouchers: records.length, totalIncome: records.reduce((sum: number, row: any) => sum + row.price, 0), currency: 'Rp', isIndo: true }, resellerGroups: [], filter: { idhr: query?.idhr, idbl: query?.idbl, prefix: query?.prefix, datacomments: query?.datacomments, dataprofile: query?.dataprofile, reseller: query?.reseller } });
+      } catch (err: any) {
+        return res.status(502).json({ success: false, message: `Report gRPC unavailable: ${err?.message || err}` });
+      }
+    }
+
     if (targetRaw === 'sessions' && req.method === 'GET' && (canonical === '/sessions' || /^\/sessions\/[^/]+$/.test(canonical))) {
       try {
         if (canonical === '/sessions') {
@@ -163,14 +189,8 @@ export class ProxyController {
         if (!response?.success) {
           return res.status(502).json({ success: false, message: response?.error || 'MikroTik gRPC TestConnect failed' });
         }
-        return res.status(200).json({
-          success: true,
-          identity: response.identity || '',
-          rosVersion: response.rosVersion || response.version || '',
-        });
-      } catch (err: any) {
-        return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` });
-      }
+        return res.status(200).json({ success: true, identity: response.identity || '', rosVersion: response.rosVersion || response.version || '' });
+      } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
     }
 
     const dashboardMatch = canonical.match(/^\/mikrotik\/([^/]+)\/(dashboard|system\/resource|interfaces|hotspot\/log)$/);
