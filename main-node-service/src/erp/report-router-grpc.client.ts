@@ -13,7 +13,9 @@ export class ReportRouterGrpcClient implements OnModuleDestroy {
       process.env.REPORT_ROUTER_PROTO_PATH,
       join(process.cwd(), 'src', 'proto', 'report_router.proto'),
       join(process.cwd(), 'router-proto', 'report_router.proto'),
+      join(process.cwd(), 'report-proto', 'report_router.proto'),
       '/app/router-proto/report_router.proto',
+      '/app/report-proto/report_router.proto',
     ].filter(Boolean) as string[];
     const protoPath = candidates.find((path) => existsSync(path));
     if (!protoPath) throw new Error(`Report Router gRPC proto not found; checked: ${candidates.join(', ')}`);
