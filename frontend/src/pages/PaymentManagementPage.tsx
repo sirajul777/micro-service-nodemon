@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, Eye, RefreshCw, Settings2, TestTube2 } from 'lucide-react';
 import { payment } from '../api';
 import { TableControlBar, useTableControls } from '../components/TableControls';
+import '../payment-management-page.css';
 
 type Item = Record<string, any>;
 const money = (value: unknown) => { const n = Number(value || 0); return Number.isFinite(n) ? `Rp ${n.toLocaleString('id-ID')}` : '—'; };
