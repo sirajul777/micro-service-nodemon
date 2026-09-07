@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Network, RefreshCw, Search } from 'lucide-react';
 import { router } from '../api';
+import '../dhcp-leases-page.css';
 
 type Row = Record<string, any>;
 type Props = { session: string };
@@ -34,7 +35,7 @@ export default function DhcpLeasesPage({ session }: Props) {
     return row.status || '—';
   };
 
-  return <div className="stack">
+  return <div className="stack dhcp-leases-page">
     <div className="hero">
       <div><span className="eyebrow">NETWORK SERVICES</span><h3>DHCP Leases</h3><p>Inspect DHCP client leases from the active RouterOS instance.</p></div>
       <div className="top-actions"><button className="button" disabled={busy || !session} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button></div>
@@ -44,7 +45,7 @@ export default function DhcpLeasesPage({ session }: Props) {
       <div className="panel-head"><div><h3><Network size={15}/> Lease Table</h3><span>{visible.length} of {rows.length} leases</span></div><span className="badge">{busy ? 'WORKING' : 'LIVE'}</span></div>
       <div className="table-controls"><div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search address, MAC, hostname, status..."/></div></div>
       <div className="table-wrap"><table><thead><tr><th>Address</th><th>MAC Address</th><th>Hostname</th><th>Server</th><th>Status</th><th>Expires After</th><th>Last Seen</th><th>Comment</th></tr></thead>
-        <tbody>{visible.map((r, i) => <tr key={String(r.id || r.address || i)}><td><b>{r.address || '—'}</b></td><td>{r.macAddress || r.mac_address || '—'}</td><td>{r.hostName || r.host_name || '—'}</td><td>{r.server || '—'}</td><td>{status(r)}</td><td>{r.expiresAfter || r.expires_after || '—'}</td><td>{r.lastSeen || r.last_seen || '—'}</td><td>{r.comment || '—'}</td></tr>)}</tbody>
+        <tbody>{visible.map((r, i) => <tr key={String(r.id || r.address || i)}><td className="address-cell"><b>{r.address || '—'}</b></td><td className="mac-cell">{r.macAddress || r.mac_address || '—'}</td><td className="hostname-cell">{r.hostName || r.host_name || '—'}</td><td><span className="server-chip">{r.server || '—'}</span></td><td><span className={`status-chip${status(r) === 'Disabled' ? ' disabled' : ''}`}>{status(r)}</span></td><td className="time-cell">{r.expiresAfter || r.expires_after || '—'}</td><td className="time-cell">{r.lastSeen || r.last_seen || '—'}</td><td className="comment-cell">{r.comment || '—'}</td></tr>)}</tbody>
       </table>{!visible.length && <div className="empty">No DHCP leases found.</div>}</div>
     </section>
   </div>;
