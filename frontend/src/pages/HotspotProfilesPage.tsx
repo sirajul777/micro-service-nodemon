@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Network, Plus, RefreshCw, Search, Trash2, X, Pencil } from 'lucide-react';
 import { router } from '../api';
+import '../hotspot-profiles-page.css';
 
 type Profile = Record<string, any>;
 type Props = { session: string };
@@ -95,7 +96,7 @@ export default function HotspotProfilesPage({ session }: Props) {
     }
   };
 
-  return <div className="stack">
+  return <div className="stack hotspot-profiles-page">
     <div className="hero">
       <div><span className="eyebrow">HOTSPOT MANAGEMENT</span><h3>Hotspot Profiles</h3><p>Manage RouterOS profiles and commercial metadata.</p></div>
       <div className="top-actions">
@@ -110,10 +111,10 @@ export default function HotspotProfilesPage({ session }: Props) {
         <span className="badge">{busy ? 'WORKING' : 'LIVE'}</span>
       </div>
       <div className="table-controls">
-        <div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search profiles..."/></div>
+        <div className="table-search hotspot-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search profiles..."/></div>
       </div>
       <div className="table-wrap"><table><thead><tr><th>Name</th><th>Rate Limit</th><th>Shared Users</th><th>Address Pool</th><th>Session Timeout</th><th>Price</th><th>Validity</th><th>Actions</th></tr></thead>
-        <tbody>{visible.map((r, i) => { const name = String(r.name || i); return <tr key={name}><td><b>{name}</b></td><td>{r.rateLimit || r['rate-limit'] || '—'}</td><td>{r.sharedUsers ?? r['shared-users'] ?? '—'}</td><td>{r.addressPool || r['address-pool'] || '—'}</td><td>{r.sessionTimeout || r['session-timeout'] || '—'}</td><td>{r.price ?? '—'}</td><td>{r.validity || '—'}</td><td><div className="row-actions"><button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(r)}><Pencil size={14}/></button><button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14}/></button></div></td></tr>; })}</tbody>
+        <tbody>{visible.map((r, i) => { const name = String(r.name || i); return <tr key={name}><td><b>{name}</b></td><td><span className="profile-value rate-chip">{r.rateLimit || r['rate-limit'] || '—'}</span></td><td><span className="profile-value count-chip">{r.sharedUsers ?? r['shared-users'] ?? '—'}</span></td><td>{r.addressPool || r['address-pool'] || '—'}</td><td><span className="profile-value timeout-chip">{r.sessionTimeout || r['session-timeout'] || '—'}</span></td><td><span className="profile-value price-chip">{r.price ?? '—'}</span></td><td><span className="profile-value validity-chip">{r.validity || '—'}</span></td><td><div className="row-actions"><button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(r)}><Pencil size={14}/></button><button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14}/></button></div></td></tr>; })}</tbody>
       </table>{!visible.length && <div className="empty">No hotspot profiles found.</div>}</div>
     </section>
     {editing !== null || form.name !== '' ? <Modal form={form} setForm={setForm} editing={editing} busy={busy} close={close} save={() => void save()} /> : null}
