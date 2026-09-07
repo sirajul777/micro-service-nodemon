@@ -22,6 +22,7 @@ import { VoucherBatchGrpcClient } from './erp/voucher-batch-grpc.client';
 import { VoucherGenerateGrpcClient } from './erp/voucher-generate-grpc.client';
 import { VoucherTypeGrpcClient } from './erp/voucher-type-grpc.client';
 import { ReportGrpcClient } from './erp/report-grpc.client';
+import { ReportRouterGrpcClient } from './erp/report-router-grpc.client';
 import { BotGrpcClient } from './bot/bot-grpc.client';
 import { PaymentGrpcClient } from './payment/payment-grpc.client';
 import { HttpProxyFallbackService } from './proxy/http-proxy-fallback.service';
@@ -45,7 +46,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     ProxyController,
     HealthController,
   ],
-  providers: [AuthService, AuthGrpcClient, ErpGrpcClient, ErpDashboardGrpcClient, HotspotGrpcClient, PppoeGrpcClient, VoucherBatchGrpcClient, VoucherGenerateGrpcClient, VoucherTypeGrpcClient, ReportGrpcClient, BotGrpcClient, PaymentGrpcClient, HttpProxyFallbackService, ViewService],
+  providers: [AuthService, AuthGrpcClient, ErpGrpcClient, ErpDashboardGrpcClient, HotspotGrpcClient, PppoeGrpcClient, VoucherBatchGrpcClient, VoucherGenerateGrpcClient, VoucherTypeGrpcClient, ReportGrpcClient, ReportRouterGrpcClient, BotGrpcClient, PaymentGrpcClient, HttpProxyFallbackService, ViewService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
