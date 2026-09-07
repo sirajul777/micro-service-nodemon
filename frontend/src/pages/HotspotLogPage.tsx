@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FileText, RefreshCw, Search } from 'lucide-react';
 import { router } from '../api';
+import '../hotspot-log-page.css';
 
 type Row = Record<string, any>;
 type Props = { session: string; };
@@ -49,26 +50,25 @@ export default function HotspotLogPage({ session }: Props) {
     return '—';
   };
 
+  const topicClass = (raw: unknown) => {
+    const text = String(raw || '').toLowerCase();
+    return text.includes('error') ? 'topic-error' : text.includes('warning') ? 'topic-warning' : text.includes('hotspot') ? 'topic-hotspot' : 'topic-info';
+  };
+
   const setTopicAndReload = async (nextTopic: string) => {
     setTopic(nextTopic);
     await load(nextTopic);
   };
 
-  return <div className="stack">
+  return <div className="stack hotspot-log-page">
     <div className="hero">
       <div><span className="eyebrow">ROUTEROS EVENTS</span><h3>Hotspot Log</h3><p>Inspect recent hotspot events and messages from the active RouterOS instance.</p></div>
       <div className="top-actions"><button className="button" disabled={busy || !session} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button></div>
     </div>
     {notice && <div className="error banner">{notice}</div>}
-    <section className="panel">
-      <div className="panel-head"><div><h3><FileText size={15}/> Event Log</h3><span>{visible.length} of {rows.length} entries</span></div><span className="badge">{busy ? 'WORKING' : 'LIVE'}</span></div>
-      <div className="table-controls">
-        <div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search time, topic, message..."/></div>
-        <div className="panel-actions"><select value={topic} onChange={e => { void setTopicAndReload(e.target.value); }} aria-label="Filter topic">{topicOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
-      </div>
-      <div className="table-wrap"><table><thead><tr><th>Time</th><th>Topics</th><th>Message</th></tr></thead>
-        <tbody>{visible.map((row, i) => <tr key={String(row.id || `${value(row, ['time', 'timestamp'])}-${i}`)}><td>{value(row, ['time', 'timestamp', 'createdAt'])}</td><td>{value(row, ['topics', 'topic'])}</td><td className="code-cell">{value(row, ['message', 'msg'])}</td></tr>)}</tbody>
-      </table>{!visible.length && <div className="empty">No hotspot log entries found.</div>}</div>
+    <section className="panel"><div className="panel-head"><div><h3><FileText size={15}/> Event Log</h3><span>{visible.length} of {rows.length} entries</span></div><span className="badge">{busy ? 'WORKING' : 'LIVE'}</span></div>
+      <div className="table-controls"><div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search time, topic, message..."/></div><div className="panel-actions"><select className="topic-select" value={topic} onChange={e => { void setTopicAndReload(e.target.value); }} aria-label="Filter topic">{topicOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div></div>
+      <div className="table-wrap"><table><thead><tr><th>Time</th><th>Topics</th><th>Message</th></tr></thead><tbody>{visible.map((row, i) => { const time = value(row, ['time', 'timestamp', 'createdAt']); const topics = value(row, ['topics', 'topic']); return <tr key={String(row.id || `${time}-${i}`)}><td><span className="log-time">{time}</span></td><td><span className={`topic-chip ${topicClass(topics)}`}>{topics}</span></td><td className="message-cell">{value(row, ['message', 'msg'])}</td></tr>; })}</tbody></table>{!visible.length && <div className="empty">No hotspot log entries found.</div>}</div>
     </section>
   </div>;
 }
