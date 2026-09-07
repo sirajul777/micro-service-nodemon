@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { request } from '../api';
+import '../bot-resellers-page.css';
 
 type Reseller = Record<string, any>;
 const emptyForm: Reseller = { id: '', name: '', username: '', sessionId: '', status: 'active', balance: 0 };
@@ -17,10 +18,8 @@ export default function BotResellersPage() {
 
   const load = async () => {
     setBusy(true); setNotice('');
-    try {
-      const data = await request('/api/bot-resellers');
-      setRows(Array.isArray(data) ? data : []);
-    } catch (e: any) { setNotice(e?.message || 'Unable to load bot resellers.'); }
+    try { const data = await request('/api/bot-resellers'); setRows(Array.isArray(data) ? data : []); }
+    catch (e: any) { setNotice(e?.message || 'Unable to load bot resellers.'); }
     finally { setBusy(false); }
   };
   useEffect(() => { void load(); }, []);
@@ -30,7 +29,6 @@ export default function BotResellersPage() {
     if (!q) return rows;
     return rows.filter((row) => Object.values(row).some((value) => String(value ?? '').toLowerCase().includes(q)));
   }, [rows, query]);
-
   const openNew = () => { setSelected({}); setForm({ ...emptyForm }); };
   const openEdit = (row: Reseller) => { setSelected(row); setForm({ ...row }); };
   const save = async () => {
@@ -71,16 +69,16 @@ export default function BotResellersPage() {
     finally { setBusy(false); }
   };
 
-  return <div className="stack">
-    <div className="hero"><div><span className="eyebrow">BOT OPERATIONS</span><h3>Bot Resellers</h3><p>Manage bot reseller accounts, balances, status, and activity logs.</p></div><div><button className="button" disabled={busy} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button> <button className="primary" onClick={openNew}>Add Reseller</button></div></div>
+  return <div className="stack bot-resellers-page">
+    <div className="hero"><div><span className="eyebrow">BOT OPERATIONS</span><h3>Bot Resellers</h3><p>Manage bot reseller accounts, balances, status, and activity logs.</p></div><div className="hero-actions"><button className="button" disabled={busy} onClick={() => void load()}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Refresh</button><button className="primary" onClick={openNew}>Add Reseller</button></div></div>
     {notice && <div className="error banner">{notice}</div>}
     <section className="panel">
       <div className="panel-head"><div><h3>Bot Resellers</h3><span>{filtered.length} of {rows.length} records</span></div><span className="badge">{busy ? 'WORKING' : 'LIVE'}</span></div>
       <div className="table-controls"><div className="table-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search reseller, username, router..."/></div></div>
-      <div className="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Router</th><th>Balance</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filtered.map((row, i) => { const id = String(row.id ?? i); return <tr key={id}><td>{row.name || '—'}</td><td>{row.username || '—'}</td><td>{row.sessionId || '—'}</td><td>{row.balance ?? 0}</td><td><span className="badge">{row.status || (row.active === false ? 'inactive' : 'active')}</span></td><td><button className="button tiny" onClick={() => openEdit(row)}>Edit</button> <button className="button tiny" onClick={() => void toggle(id)} disabled={busy}>Toggle</button> <button className="button tiny" onClick={() => void loadLogs(id)} disabled={busy}>Logs</button> <button className="button tiny" onClick={() => void doTopup(id)} disabled={busy}>Top Up</button> <button className="button tiny" onClick={() => void remove(id)} disabled={busy}>Delete</button></td></tr>; })}</tbody></table>{!filtered.length && <div className="empty">No bot resellers found.</div>}</div>
+      <div className="table-wrap"><table className="reseller-table"><thead><tr><th>Name</th><th>Username</th><th>Router</th><th>Balance</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filtered.map((row, i) => { const id = String(row.id ?? i); const active = String(row.status || (row.active === false ? 'inactive' : 'active')).toLowerCase() === 'active'; return <tr key={id}><td>{row.name || '—'}</td><td>{row.username || '—'}</td><td>{row.sessionId || '—'}</td><td className="balance-cell">{row.balance ?? 0}</td><td><span className={`badge ${active ? 'status-badge-active' : 'status-badge-inactive'}`}>{active ? 'active' : 'inactive'}</span></td><td><div className="reseller-actions"><button className="button tiny" onClick={() => openEdit(row)}>Edit</button><button className="button tiny" onClick={() => void toggle(id)} disabled={busy}>Toggle</button><button className="button tiny" onClick={() => void loadLogs(id)} disabled={busy}>Logs</button><button className="button tiny" onClick={() => void doTopup(id)} disabled={busy}>Top Up</button><button className="button tiny" onClick={() => void remove(id)} disabled={busy}>Delete</button></div></td></tr>; })}</tbody></table>{!filtered.length && <div className="empty">No bot resellers found.</div>}</div>
     </section>
-    <section className="panel"><div className="panel-head"><div><h3>Top Up</h3><span>Select a reseller action from the table</span></div></div><div className="grid"><label className="metric"><span>Amount</span><input type="number" min="1" value={topup.amount} onChange={e => setTopup({ ...topup, amount: e.target.value })}/></label><label className="metric"><span>Note</span><input value={topup.note} onChange={e => setTopup({ ...topup, note: e.target.value })}/></label></div></section>
+    <section className="panel topup-panel"><div className="panel-head"><div><h3>Top Up</h3><span>Select a reseller action from the table</span></div></div><div className="grid topup-grid"><label className="metric"><span>Amount</span><input type="number" min="1" value={topup.amount} onChange={e => setTopup({ ...topup, amount: e.target.value })}/></label><label className="metric"><span>Note</span><input value={topup.note} onChange={e => setTopup({ ...topup, note: e.target.value })}/></label></div></section>
     {selected && <div className="modal-backdrop"><div className="modal"><div className="modal-head"><div><span className="eyebrow">BOT RESELLER</span><h3>{selected.id ? 'Edit reseller' : 'New reseller'}</h3></div><button className="icon" onClick={() => setSelected(null)}>×</button></div><div className="detail-grid"><label className="metric"><span>ID</span><input value={form.id || ''} onChange={e => setForm({ ...form, id: e.target.value })} disabled={!!selected.id}/></label><label className="metric"><span>Name</span><input value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })}/></label><label className="metric"><span>Username</span><input value={form.username || ''} onChange={e => setForm({ ...form, username: e.target.value })}/></label><label className="metric"><span>Router Session</span><input value={form.sessionId || ''} onChange={e => setForm({ ...form, sessionId: e.target.value })}/></label><label className="metric"><span>Status</span><select value={form.status || 'active'} onChange={e => setForm({ ...form, status: e.target.value })}><option value="active">Active</option><option value="inactive">Inactive</option></select></label><label className="metric"><span>Balance</span><input type="number" value={form.balance ?? 0} onChange={e => setForm({ ...form, balance: e.target.value })}/></label></div><div className="modal-actions"><button className="button secondary" onClick={() => setSelected(null)}>Cancel</button><button className="primary" disabled={busy} onClick={() => void save()}>Save</button></div></div></div>}
-    {logs.length > 0 && <section className="panel"><div className="panel-head"><div><h3>Reseller Logs</h3><span>{logs.length} entries</span></div></div><div className="table-wrap"><table><thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead><tbody>{logs.map((log, i) => <tr key={String(log.id ?? i)}><td>{log.time || log.createdAt || '—'}</td><td>{log.event || log.type || log.action || '—'}</td><td>{typeof log === 'object' ? JSON.stringify(log) : String(log)}</td></tr>)}</tbody></table></div></section>}
+    {logs.length > 0 && <section className="panel logs-panel"><div className="panel-head"><div><h3>Reseller Logs</h3><span>{logs.length} entries</span></div></div><div className="table-wrap"><table><thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead><tbody>{logs.map((log, i) => <tr key={String(log.id ?? i)}><td>{log.time || log.createdAt || '—'}</td><td>{log.event || log.type || log.action || '—'}</td><td>{typeof log === 'object' ? JSON.stringify(log) : String(log)}</td></tr>)}</tbody></table></div></section>}
   </div>;
 }
