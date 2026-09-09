@@ -72,7 +72,7 @@ export class ProxyController {
         }
         if (req.method === 'GET' && canonical === '/payments/config') {
           const response = await this.paymentGrpc.getConfig();
-          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Payment gRPC config failed' });
+          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Payment gRPC config list failed' });
           return res.status(200).json({ success: true, config: response.config || null });
         }
         if (req.method === 'POST' && canonical === '/payments/config') {
@@ -117,12 +117,8 @@ export class ProxyController {
         );
         if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Report gRPC selling failed' });
         const records = (response.scripts || []).map((row: any) => ({
-          date: String(row.date || ''),
-          time: String(row.time || ''),
-          username: String(row.username || ''),
-          price: Number(row.price || 0),
-          profile: String(row.profile || ''),
-          comment: String(row.comment || ''),
+          date: String(row.date || ''), time: String(row.time || ''), username: String(row.username || ''),
+          price: Number(row.price || 0), profile: String(row.profile || ''), comment: String(row.comment || ''),
         }));
         return res.status(200).json({ records, summary: { totalVouchers: records.length, totalIncome: records.reduce((sum: number, row: any) => sum + row.price, 0), currency: 'Rp', isIndo: true }, resellerGroups: [], filter: { idhr: query?.idhr, idbl: query?.idbl, prefix: query?.prefix, datacomments: query?.datacomments, dataprofile: query?.dataprofile, reseller: query?.reseller } });
       } catch (err: any) {
@@ -130,155 +126,30 @@ export class ProxyController {
       }
     }
 
-    if (targetRaw === 'sessions' && req.method === 'GET' && (canonical === '/sessions' || /^\/sessions\/[^/]+$/.test(canonical))) {
+    const resumeMatch = canonical.match(/^\/report\/([^/]+)\/resume$/);
+    if (targetRaw === 'report' && req.method === 'GET' && resumeMatch) {
       try {
-        if (canonical === '/sessions') {
-          const response = await this.erpGrpc.listSessions();
-          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC ListSessions failed' });
-          return res.status(200).json(response.sessions || []);
-        }
-        const response = await this.erpGrpc.getSession(canonical.split('/')[2]);
-        if (!response?.success) return res.status(404).json({ error: response?.error || 'Router session tidak ditemukan' });
-        return res.status(200).json(response.session || null);
-      } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const voucherTypeMatch = canonical.match(/^\/voucher\/types(?:\/([^/]+)(?:\/(toggle))?)?$/);
-    if ((targetRaw === 'voucherTypes' || targetRaw === 'voucher-types') && voucherTypeMatch) {
-      try {
-        const id = voucherTypeMatch[1] ? decodeURIComponent(voucherTypeMatch[1]) : '';
-        const action = voucherTypeMatch[2] || '';
-        let response: any;
-        if (req.method === 'GET' && !id) response = await this.voucherTypeGrpc.list();
-        else if (req.method === 'GET' && id && !action) response = await this.voucherTypeGrpc.get(id);
-        else if (req.method === 'GET' && id && action === 'toggle') response = await this.voucherTypeGrpc.toggle(id);
-        else if (req.method === 'POST' && !id) response = await this.voucherTypeGrpc.create({ ...body, price: Number(body?.price) || 0 });
-        else if (req.method === 'PUT' && id) response = await this.voucherTypeGrpc.update({ ...body, id, price: Number(body?.price) || 0 });
-        else if (req.method === 'DELETE' && id) response = await this.voucherTypeGrpc.remove(id);
-        if (response) {
-          if (response.success === false) return res.status(id ? 404 : 502).json({ success: false, message: response.error || 'Voucher type gRPC failed' });
-          if (req.method === 'GET' && !id) return res.status(200).json(response.voucherTypes || []);
-          if (req.method === 'GET') return res.status(200).json(response.voucherType || null);
-          return res.status(200).json(response);
-        }
-      } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const pppoeMatch = canonical.match(/^\/pppoe\/([^/]+)\/(secrets|active)(?:\/([^/]+))?$/);
-    if (targetRaw === 'pppoe' && req.method === 'GET' && pppoeMatch) {
-      try {
-        const routerSession = decodeURIComponent(pppoeMatch[1]);
-        const kind = pppoeMatch[2];
-        const name = pppoeMatch[3] ? decodeURIComponent(pppoeMatch[3]) : '';
-        if (kind === 'secrets') {
-          const response = name ? await this.erpDashboardGrpc.getPppSecret(routerSession, name) : await this.erpDashboardGrpc.listPppSecrets(routerSession, String(query?.profile || ''), String(query?.name || ''));
-          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC PPPoE secrets failed' });
-          return res.status(200).json(name ? (response.secret || null) : (response.secrets || []));
-        }
-        const response = await this.erpDashboardGrpc.listPppActive(routerSession);
-        if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC PPPoE active failed' });
-        return res.status(200).json(normalizePppoeActiveList(response.connections));
-      } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const connectTestMatch = canonical.match(/^\/mikrotik\/([^/]+)\/connect\/test$/);
-    if (targetRaw === 'mikrotik' && req.method === 'GET' && connectTestMatch) {
-      try {
-        const routerSession = decodeURIComponent(connectTestMatch[1]);
-        const response = await this.hotspotGrpc.testConnect(routerSession);
-        if (!response?.success) {
-          return res.status(502).json({ success: false, message: response?.error || 'MikroTik gRPC TestConnect failed' });
-        }
-        return res.status(200).json({ success: true, identity: response.identity || '', rosVersion: response.rosVersion || response.version || '' });
-      } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const dashboardMatch = canonical.match(/^\/mikrotik\/([^/]+)\/(dashboard|system\/resource|interfaces|hotspot\/log)$/);
-    if (targetRaw === 'mikrotik' && req.method === 'GET' && dashboardMatch) {
-      try {
-        const routerSession = decodeURIComponent(dashboardMatch[1]);
-        const kind = dashboardMatch[2];
-        if (kind === 'dashboard') {
-          const response = await this.erpDashboardGrpc.getDashboard(routerSession);
-          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC dashboard failed' });
-          return res.status(200).json({ identity: response.identity, rosVersion: response.rosVersion || response.version?.charAt(0) || '7', resource: { version: response.version, uptime: response.uptime, 'cpu-load': response.cpuLoad, 'free-memory': response.freeMemory, 'total-memory': response.totalMemory, 'free-hdd-space': response.freeHdd, 'total-hdd-space': response.totalHdd }, routerboard: {}, clock: {}, health: [], hotspot: { active: response.activeHotspotUsers ?? 0, total: response.totalHotspotUsers ?? 0 } });
-        }
-        if (kind === 'system/resource') {
-          const response = await this.erpDashboardGrpc.getSystemResource(routerSession);
-          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC resource failed' });
-          const { success, error, ...restResponse } = response; return res.status(200).json(restResponse);
-        }
-        if (kind === 'interfaces') {
-          const response = await this.erpDashboardGrpc.getInterfaces(routerSession);
-          if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC interfaces failed' });
-          return res.status(200).json(response.interfaces || []);
-        }
-        const response = await this.erpDashboardGrpc.listLogs(routerSession, String(query?.topics || ''));
-        if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'ERP gRPC log failed' });
-        return res.status(200).json((response.logs || []).map((log: any) => ({ id: log.id, time: log.time, topics: log.topics, message: log.message })));
-      } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const hotspotUserMatch = canonical.match(/^\/mikrotik\/([^/]+)\/hotspot\/users(?:\/([^/]+))?$/);
-    if (targetRaw === 'mikrotik' && hotspotUserMatch && req.method === 'POST') {
-      try {
-        const routerSession = decodeURIComponent(hotspotUserMatch[1]);
-        const name = hotspotUserMatch[2];
-        const response = await this.hotspotGrpc.addUser({ sessionId: routerSession, name: String(body?.name || name || ''), password: String(body?.password || ''), profile: String(body?.profile || ''), comment: String(body?.comment || ''), limitUptime: String(body?.limitUptime || body?.['limit-uptime'] || '') });
-        return res.status(200).json(response || { success: false, error: 'AddHotspotUser failed' });
-      } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const hotspotDeleteMatch = canonical.match(/^\/mikrotik\/([^/]+)\/hotspot\/users\/([^/]+)$/);
-    if (targetRaw === 'mikrotik' && req.method === 'DELETE' && hotspotDeleteMatch) {
-      try {
-        const response = await this.hotspotGrpc.removeUser(decodeURIComponent(hotspotDeleteMatch[1]), decodeURIComponent(hotspotDeleteMatch[2]));
-        return res.status(200).json(response || { success: false, error: 'RemoveHotspotUser failed' });
-      } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const hotspotBulk = canonical.match(/^\/mikrotik\/([^/]+)\/hotspot\/users\/bulk-delete$/);
-    if (targetRaw === 'mikrotik' && req.method === 'POST' && hotspotBulk) {
-      try {
-        const names = Array.isArray(body?.names) ? body.names.filter(Boolean) : [];
-        const response = await this.hotspotGrpc.bulkRemoveUsers(decodeURIComponent(hotspotBulk[1]), names);
-        return res.status(200).json(response || { success: false, error: 'BulkRemoveHotspotUsers failed' });
-      } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const hotspotProfile = canonical.match(/^\/mikrotik\/([^/]+)\/hotspot\/profiles(?:\/([^/]+))?$/);
-    if (targetRaw === 'mikrotik' && hotspotProfile && ['POST', 'PUT', 'DELETE'].includes(req.method)) {
-      try {
-        const routerSession = decodeURIComponent(hotspotProfile[1]);
-        const name = hotspotProfile[2] ? decodeURIComponent(hotspotProfile[2]) : String(body?.name || '');
-        let response: any;
-        if (req.method === 'POST') response = await this.hotspotGrpc.addProfile({ sessionId: routerSession, name, onLogin: String(body?.onLogin || body?.['on-login'] || ''), sessionTimeout: String(body?.sessionTimeout || body?.['session-timeout'] || ''), idleTimeout: String(body?.idleTimeout || body?.['idle-timeout'] || ''), rateLimit: String(body?.rateLimit || body?.['rate-limit'] || ''), sharedUsers: String(body?.sharedUsers || body?.['shared-users'] || ''), addressPool: String(body?.addressPool || body?.['address-pool'] || '') });
-        else if (req.method === 'PUT') response = await this.hotspotGrpc.updateProfile({ sessionId: routerSession, name, onLogin: String(body?.onLogin || body?.['on-login'] || ''), sessionTimeout: String(body?.sessionTimeout || body?.['session-timeout'] || ''), idleTimeout: String(body?.idleTimeout || body?.['idle-timeout'] || ''), rateLimit: String(body?.rateLimit || body?.['rate-limit'] || ''), sharedUsers: String(body?.sharedUsers || body?.['shared-users'] || ''), addressPool: String(body?.addressPool || body?.['address-pool'] || '') });
-        else response = await this.hotspotGrpc.deleteProfile(routerSession, name);
-        return res.status(200).json(response || { success: false, error: 'Hotspot profile operation failed' });
-      } catch (err: any) { return res.status(502).json({ success: false, message: `MikroTik gRPC unavailable: ${err?.message || err}` }); }
-    }
-
-    const voucherBatchMatch = canonical.match(/^\/voucher\/batches\/([^/]+)(?:\/([^/]+)(?:\/(mark-used|sync-used|auto-sync-used))?)?$/);
-    if (targetRaw === 'batches' && voucherBatchMatch) {
-      try {
-        const routerSession = decodeURIComponent(voucherBatchMatch[1]);
-        const id = voucherBatchMatch[2] ? decodeURIComponent(voucherBatchMatch[2]) : '';
-        const action = voucherBatchMatch[3] || '';
-        let response: any;
-        if (req.method === 'GET' && !id) response = await this.voucherBatchGrpc.listBatches(routerSession);
-        else if (req.method === 'GET' && id && !action) response = await this.voucherBatchGrpc.getBatch(routerSession, id);
-        else if (req.method === 'POST' && !id) response = await this.voucherBatchGrpc.createBatch({ session: routerSession, batch: body });
-        else if (req.method === 'DELETE' && id) response = await this.voucherBatchGrpc.deleteBatch(routerSession, id, String(query?.deleteMikrotik || '') === 'true');
-        else if (req.method === 'POST' && id && action === 'mark-used') response = await this.voucherBatchGrpc.markUsed({ session: routerSession, id, username: String(body?.username || ''), usedBy: String(body?.usedBy || '') });
-        else if (req.method === 'POST' && id && action === 'sync-used') response = await this.voucherBatchGrpc.syncUsed(routerSession);
-        else if (req.method === 'POST' && id && action === 'auto-sync-used') response = await this.voucherBatchGrpc.autoSyncUsed(routerSession);
-        if (response) {
-          if (req.method === 'GET' && !id) return res.status(response.success === false ? 502 : 200).json(response.batches || []);
-          if (req.method === 'GET' && id) return res.status(response.success === false ? 404 : 200).json(response.batch || null);
-          return res.status(response.success === false ? 502 : 200).json(response);
-        }
-      } catch (err: any) { return res.status(502).json({ success: false, message: `ERP gRPC unavailable: ${err?.message || err}` }); }
+        const routerSession = decodeURIComponent(resumeMatch[1]);
+        const response = await this.reportRouterGrpc.getResumeReport(routerSession, String(query?.idbl || ''));
+        if (!response?.success) return res.status(502).json({ success: false, message: response?.error || 'Report gRPC resume failed' });
+        return res.status(200).json({
+          daily: (response.daily || []).map((row: any) => ({
+            date: String(row.date || ''),
+            vouchers: Number(row.vouchers || 0),
+            total: Number(row.total || 0),
+          })),
+          summary: {
+            totalVouchers: Number(response.totalVouchers || 0),
+            totalIncome: Number(response.totalIncome || 0),
+            currency: String(response.currency || 'Rp'),
+            isIndo: Boolean(response.isIndo),
+            month: String(response.month || ''),
+            year: String(response.year || ''),
+          },
+        });
+      } catch (err: any) {
+        return res.status(502).json({ success: false, message: `Report gRPC unavailable: ${err?.message || err}` });
+      }
     }
 
     const token = isPublic ? null : this.authService.getToken(session);
