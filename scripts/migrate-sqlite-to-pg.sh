@@ -7,7 +7,7 @@
 # must match, otherwise migrated payment/router/bot rows are silently shifted.
 set -euo pipefail
 
-DB="${1:-../nodemon/data/mikhmon.db}"
+DB="${1:-./mikhmon.db}"
 OUT="./out"
 MANIFEST="$OUT/migration_row_counts.tsv"
 mkdir -p "$OUT"

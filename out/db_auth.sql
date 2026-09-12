@@ -1,6 +1,6 @@
 -- db_auth migration
 -- ===========================================================
--- users (from SQLite) — runnable COPY
+-- users -> users
 -- ===========================================================
 COPY "users" ("id","username","password","name","role","active","allowedSessions","permissions","createdAt","lastLogin","note") FROM STDIN WITH (FORMAT csv, HEADER false);
 USR-1777454671404,testing123,$2b$10$MDInZm04f1r.070uzzc1W.ZvFkiVInCZQacnlmC/K8yfvKUik9Yvq,testing123,reseller,1,"[""SIWARNET""]","{""viewDashboard"":true,""manageVoucher"":true,""manageBilling"":false,""manageReseller"":false,""managePppoe"":false,""manageHotspot"":false,""viewReport"":true,""manageSystem"":false}","2026-04-29 09:24:31.524",2026-05-08T16:05:37.108Z,
@@ -10,14 +10,14 @@ USR-1778165428593,mirza,$2b$10$E69XcVir1gU/EKXnKLqh0.qdLI1xcxDZ65JZwyzEUC7GZ./k3
 \.
 
 -- ===========================================================
--- app_config (from SQLite) — runnable COPY
+-- app_config -> app_config
 -- ===========================================================
 COPY "app_config" ("key","adminUser","adminPass","currency") FROM STDIN WITH (FORMAT csv, HEADER false);
 default,mikhmon,NCljE82eMspaxz2NzhHcZg==:poz+PMteqFBJqwEbc2cvkA==,Rp
 \.
 
 -- ===========================================================
--- mobile_user_tokens (from SQLite) — runnable COPY
+-- mobile_user_tokens -> mobile_user_tokens
 -- ===========================================================
 COPY "mobile_user_tokens" ("id","token","userId","username","name","role","permissions","sessionId","createdAt","expiresAt","lastUsed") FROM STDIN WITH (FORMAT csv, HEADER false);
 d1789e6e-5c29-4ca6-981b-e8a0cad4b2b0,2d00bd998f9d4723fe4d0799053b4e4638fa779405a428f4e7ddff15d4ea77bc,USR-1777454671404,testing123,testing123,reseller,"{""viewDashboard"":true,""manageVoucher"":true,""manageBilling"":false,""manageReseller"":false,""managePppoe"":false,""manageHotspot"":false,""viewReport"":true,""manageSystem"":false}",S,"2026-05-08 16:05:37.109",2026-06-07T16:05:37.109Z,2026-05-08T16:06:04.367Z

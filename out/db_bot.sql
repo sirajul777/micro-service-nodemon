@@ -1,6 +1,6 @@
 -- db_bot migration
 -- ===========================================================
--- bot_resellers (from SQLite) — runnable COPY
+-- bot_resellers -> bot_resellers
 -- ===========================================================
 COPY "bot_resellers" ("id","name","username","telegramId","sessionId","saldo","totalVoucher","totalIncome","status","markup","discount","createdAt","lastActive","note") FROM STDIN WITH (FORMAT csv, HEADER false);
 RS-1782817445557,Nurhasanah,Nurhasanah,8281006579,,0.0,0,0,active,0.0,0.0,"2026-06-30 11:04:05.557",,
@@ -14,7 +14,7 @@ RS-1776568273859,"Sirajul Wathani",sirajulwathani,5510679225,SIWARNET,578200.0,5
 \.
 
 -- ===========================================================
--- bot_topup_logs (from SQLite) — runnable COPY
+-- bot_topup_logs -> topup_logs
 -- ===========================================================
 COPY "topup_logs" ("id","reselerId","amount","type","note","by","at","balanceBefore","balanceAfter") FROM STDIN WITH (FORMAT csv, HEADER false);
 1,RS-1777989607158,-4000,purchase,VOCER-5K,bot,2026-08-02T13:40:36.403Z,14310,10310
@@ -367,7 +367,7 @@ COPY "topup_logs" ("id","reselerId","amount","type","note","by","at","balanceBef
 \.
 
 -- ===========================================================
--- telegram_configs (from SQLite) — runnable COPY
+-- telegram_configs -> telegram_configs
 -- ===========================================================
 COPY "telegram_configs" ("id","token","chatId","sessionId","notifSale","notifDaily","dailyTime","botEnabled","allowedUsers","defaultProfile","welcomeMsg") FROM STDIN WITH (FORMAT csv, HEADER false);
 SIWARNET,8021307104:AAFxqV_y3a5EZkPtqkvM7MOEsLhfYSqmOlc,5510679225,SIWARNET,0,1,23:59,1,[],"",""

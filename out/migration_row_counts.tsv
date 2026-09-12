@@ -1,0 +1,14 @@
+# db	target	source	rows
+db_auth	users	users	4
+db_auth	app_config	app_config	1
+db_auth	mobile_user_tokens	mobile_user_tokens	2
+db_erp	voucher_types	voucher_types	8
+db_erp	voucher_batches	voucher_batches	28
+db_erp	profile_meta	profile_meta	14
+db_payment	payment_config	payment_config	1
+db_payment	voucher_orders	voucher_orders	8
+db_payment	payhook_callback_logs	payhook_callback_logs	10
+db_router	router_sessions	router_sessions	1
+db_bot	bot_resellers	bot_resellers	8
+db_bot	topup_logs	bot_topup_logs	347
+db_bot	telegram_configs	telegram_configs	1
