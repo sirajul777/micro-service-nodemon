@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Cpu, HardDrive, MemoryStick, RefreshCw, Server } from "lucide-react";
 import { router } from "../api";
+import "../system-resource-page.css";
 
 type Props = { session: string };
 type Row = Record<string, any>;
@@ -82,10 +83,7 @@ export default function SystemResourcePage({ session }: Props) {
         <div>
           <span className="eyebrow">ROUTEROS HEALTH</span>
           <h3>System Resource</h3>
-          <p>
-            Inspect CPU, memory, storage, uptime and RouterOS version for the
-            active router.
-          </p>
+          <p>Inspect CPU, memory, storage, uptime and RouterOS version for the active router.</p>
         </div>
         <div className="top-actions">
           <button
