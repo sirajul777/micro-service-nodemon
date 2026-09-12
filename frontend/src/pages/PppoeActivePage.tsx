@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search, WifiOff } from "lucide-react";
+import { Activity, RefreshCw, Search, Users, WifiOff } from "lucide-react";
 import { router } from "../api";
 import "../pppoe-active-page.css";
 
 type Row = Record<string, any>;
+
+const textOf = (row: Row, keys: string[], fallback = "") => {
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== "")
+      return String(row[key]);
+  }
+  return fallback;
+};
 
 export default function PppoeActivePage({ session }: { session: string }) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -28,6 +36,9 @@ export default function PppoeActivePage({ session }: { session: string }) {
   };
 
   useEffect(() => {
+    setRows([]);
+    setQuery("");
+    setError("");
     void load();
   }, [session]);
 
@@ -42,6 +53,20 @@ export default function PppoeActivePage({ session }: { session: string }) {
       ),
     );
   }, [rows, query]);
+
+  const profiles = useMemo(() => {
+    const values = filtered
+      .map((r) => textOf(r, ["profile"]))
+      .filter(Boolean);
+    return new Set(values).size;
+  }, [filtered]);
+
+  const services = useMemo(() => {
+    const values = filtered
+      .map((r) => textOf(r, ["service"]))
+      .filter(Boolean);
+    return new Set(values).size;
+  }, [filtered]);
 
   const disconnect = async (name: string) => {
     if (!name || !window.confirm(`Disconnect PPPoE session \"${name}\"?`))
@@ -76,6 +101,25 @@ export default function PppoeActivePage({ session }: { session: string }) {
         </div>
       </div>
       {error && <div className="error banner">{error}</div>}
+
+      <section className="stats active-summary">
+        <div className="stat">
+          <div className="stat-icon"><Users size={18} /></div>
+          <div><span>Active Sessions</span><strong>{filtered.length}</strong></div>
+          <small>{query ? "Matching current search" : "Current router snapshot"}</small>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><Activity size={18} /></div>
+          <div><span>Profiles in Use</span><strong>{profiles}</strong></div>
+          <small>{profiles === 0 ? "No profile data" : "Distinct active profiles"}</small>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><Activity size={18} /></div>
+          <div><span>Services</span><strong>{services}</strong></div>
+          <small>{services === 0 ? "No service data" : "Distinct session services"}</small>
+        </div>
+      </section>
+
       <section className="panel">
         <div className="panel-head">
           <div>
@@ -111,26 +155,14 @@ export default function PppoeActivePage({ session }: { session: string }) {
             </thead>
             <tbody>
               {filtered.map((r, i) => {
-                const name = String(
-                  r.name || r.user || r.username || `row-${i}`,
-                );
+                const name = textOf(r, ["name", "user", "username"], `row-${i}`);
                 return (
                   <tr key={`${name}-${i}`}>
-                    <td className="user-cell">
-                      <b>{name}</b>
-                    </td>
-                    <td className="address-cell">
-                      {r.address || r.remoteAddress || "—"}
-                    </td>
-                    <td className="uptime-cell">{r.uptime || "—"}</td>
-                    <td>
-                      <span className="service-chip">
-                        {r.service || "pppoe"}
-                      </span>
-                    </td>
-                    <td className="caller-cell">
-                      {r.callerId || r["caller-id"] || "—"}
-                    </td>
+                    <td className="user-cell"><b>{name}</b></td>
+                    <td className="address-cell">{textOf(r, ["address", "remoteAddress"], "—")}</td>
+                    <td className="uptime-cell">{textOf(r, ["uptime"], "—")}</td>
+                    <td><span className="service-chip">{textOf(r, ["service"], "pppoe")}</span></td>
+                    <td className="caller-cell">{textOf(r, ["callerId", "caller-id"], "—")}</td>
                     <td>
                       <button
                         className="button disconnect-button"

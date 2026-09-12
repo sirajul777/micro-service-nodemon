@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Network, RefreshCw, Search } from "lucide-react";
+import { CheckCircle2, Clock3, Network, RefreshCw, Search } from "lucide-react";
 import { router } from "../api";
 import "../dhcp-leases-page.css";
 
@@ -29,6 +29,9 @@ export default function DhcpLeasesPage({ session }: Props) {
   };
 
   useEffect(() => {
+    setRows([]);
+    setQuery("");
+    setNotice("");
     void load();
   }, [session]);
 
@@ -50,6 +53,15 @@ export default function DhcpLeasesPage({ session }: Props) {
     return row.status || "—";
   };
 
+  const activeCount = rows.filter((row) => {
+    const value = String(row.status ?? "").toLowerCase();
+    return value === "bound" || value === "active" || value === "running";
+  }).length;
+  const disabledCount = rows.filter(
+    (row) => String(row.disabled).toLowerCase() === "true",
+  ).length;
+  const expiringCount = rows.filter((row) => Boolean(row.expiresAfter || row.expires_after)).length;
+
   return (
     <div className="stack dhcp-leases-page">
       <div className="hero">
@@ -69,15 +81,31 @@ export default function DhcpLeasesPage({ session }: Props) {
         </div>
       </div>
       {notice && <div className="error banner">{notice}</div>}
+
+      <div className="stats">
+        <div className="stat">
+          <div className="stat-icon"><Network size={18} /></div>
+          <div><span>Total Leases</span><strong>{rows.length}</strong></div>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><CheckCircle2 size={18} /></div>
+          <div><span>Active</span><strong>{activeCount}</strong></div>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><Clock3 size={18} /></div>
+          <div><span>With Expiry</span><strong>{expiringCount}</strong></div>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><Network size={18} /></div>
+          <div><span>Disabled</span><strong>{disabledCount}</strong></div>
+        </div>
+      </div>
+
       <section className="panel">
         <div className="panel-head">
           <div>
-            <h3>
-              <Network size={15} /> Lease Table
-            </h3>
-            <span>
-              {visible.length} of {rows.length} leases
-            </span>
+            <h3><Network size={15} /> Lease Table</h3>
+            <span>{visible.length} of {rows.length} leases</span>
           </div>
           <span className="badge">{busy ? "WORKING" : "LIVE"}</span>
         </div>
@@ -108,39 +136,23 @@ export default function DhcpLeasesPage({ session }: Props) {
             <tbody>
               {visible.map((r, i) => (
                 <tr key={String(r.id || r.address || i)}>
-                  <td className="address-cell">
-                    <b>{r.address || "—"}</b>
-                  </td>
-                  <td className="mac-cell">
-                    {r.macAddress || r.mac_address || "—"}
-                  </td>
-                  <td className="hostname-cell">
-                    {r.hostName || r.host_name || "—"}
-                  </td>
+                  <td className="address-cell"><b>{r.address || "—"}</b></td>
+                  <td className="mac-cell">{r.macAddress || r.mac_address || "—"}</td>
+                  <td className="hostname-cell">{r.hostName || r.host_name || "—"}</td>
+                  <td><span className="server-chip">{r.server || "—"}</span></td>
                   <td>
-                    <span className="server-chip">{r.server || "—"}</span>
-                  </td>
-                  <td>
-                    <span
-                      className={`status-chip${status(r) === "Disabled" ? " disabled" : ""}`}
-                    >
+                    <span className={`status-chip${status(r) === "Disabled" ? " disabled" : ""}`}>
                       {status(r)}
                     </span>
                   </td>
-                  <td className="time-cell">
-                    {r.expiresAfter || r.expires_after || "—"}
-                  </td>
-                  <td className="time-cell">
-                    {r.lastSeen || r.last_seen || "—"}
-                  </td>
+                  <td className="time-cell">{r.expiresAfter || r.expires_after || "—"}</td>
+                  <td className="time-cell">{r.lastSeen || r.last_seen || "—"}</td>
                   <td className="comment-cell">{r.comment || "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {!visible.length && (
-            <div className="empty">No DHCP leases found.</div>
-          )}
+          {!visible.length && <div className="empty">No DHCP leases found.</div>}
         </div>
       </section>
     </div>

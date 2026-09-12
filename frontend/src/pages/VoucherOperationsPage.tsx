@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  RefreshCw,
-  Search,
-  Plus,
-  Trash2,
+  Activity,
   CheckCircle2,
+  Layers3,
+  Plus,
+  RefreshCw,
   RotateCcw,
+  Search,
+  Ticket,
+  Trash2,
 } from "lucide-react";
 import { router, voucher } from "../api";
 import "../voucher-operations-page.css";
 
 type Row = Record<string, any>;
-
 type Props = { session: string };
 
 const emptyBatch = {
@@ -50,7 +52,12 @@ export default function VoucherOperationsPage({ session }: Props) {
       setBusy(false);
     }
   };
+
   useEffect(() => {
+    setBatches([]);
+    setTypes([]);
+    setQuery("");
+    setNotice("");
     void load();
   }, [session]);
 
@@ -66,6 +73,20 @@ export default function VoucherOperationsPage({ session }: Props) {
       ),
     );
   }, [tab, batches, types, query]);
+
+  const batchUsed = useMemo(
+    () => batches.reduce((sum, row) => sum + Number(row?.stats?.used ?? 0), 0),
+    [batches],
+  );
+  const batchRemaining = useMemo(
+    () =>
+      batches.reduce(
+        (sum, row) => sum + Number(row?.stats?.remaining ?? 0),
+        0,
+      ),
+    [batches],
+  );
+  const batchTotal = batchUsed + batchRemaining;
 
   const createBatch = async () => {
     if (!session || !batchForm.profileName.trim()) {
@@ -93,6 +114,7 @@ export default function VoucherOperationsPage({ session }: Props) {
       setBusy(false);
     }
   };
+
   const deleteBatch = async (id: string) => {
     if (!window.confirm(`Delete voucher batch \"${id}\"?`)) return;
     setBusy(true);
@@ -106,6 +128,7 @@ export default function VoucherOperationsPage({ session }: Props) {
       setBusy(false);
     }
   };
+
   const sync = async (auto = false) => {
     if (!session) return;
     setBusy(true);
@@ -124,52 +147,52 @@ export default function VoucherOperationsPage({ session }: Props) {
     }
   };
 
+  const disabledTypes = types.filter(
+    (row) => row.enabled === false || String(row.enabled).toLowerCase() === "false",
+  ).length;
+
   return (
     <div className="stack voucher-operations-page">
       <div className="hero">
         <div>
           <span className="eyebrow">VOUCHER MANAGEMENT</span>
           <h3>Voucher Operations</h3>
-          <p>
-            Manage voucher batches, status synchronization, and voucher types.
-          </p>
+          <p>Manage voucher batches, synchronization, and voucher types.</p>
+          <div className="voucher-summary">
+            <span className="summary-chip"><Ticket size={12} /> {batches.length} batches</span>
+            <span className="summary-chip"><Layers3 size={12} /> {types.length} types</span>
+            <span className="summary-chip"><Activity size={12} /> {batchUsed} used · {batchRemaining} left</span>
+          </div>
         </div>
         <div className="top-actions">
-          <button
-            className="button"
-            disabled={busy}
-            onClick={() => void load()}
-          >
+          <button className="button" disabled={busy} onClick={() => void load()}>
             <RefreshCw size={15} className={busy ? "spin" : ""} /> Refresh
           </button>
           {tab === "batches" && (
             <>
-              <button
-                className="button"
-                disabled={busy || !session}
-                onClick={() => void sync(false)}
-              >
+              <button className="button" disabled={busy || !session} onClick={() => void sync(false)}>
                 <RotateCcw size={15} /> Sync Used
               </button>
-              <button
-                className="button"
-                disabled={busy || !session}
-                onClick={() => void sync(true)}
-              >
+              <button className="button" disabled={busy || !session} onClick={() => void sync(true)}>
                 <CheckCircle2 size={15} /> Auto Sync
               </button>
-              <button
-                className="button primary"
-                disabled={busy || !session}
-                onClick={() => setShowBatch(true)}
-              >
+              <button className="button primary" disabled={busy || !session} onClick={() => setShowBatch(true)}>
                 <Plus size={15} /> Add Batch
               </button>
             </>
           )}
         </div>
       </div>
+
       {notice && <div className="error banner">{notice}</div>}
+
+      <section className="stats voucher-stats">
+        <div className="stat"><div className="stat-icon"><Ticket size={18} /></div><div><span>{tab === "batches" ? "Voucher Batches" : "Voucher Types"}</span><strong>{tab === "batches" ? batches.length : types.length}</strong></div><small>{busy ? "Syncing data" : "Current router data"}</small></div>
+        <div className="stat"><div className="stat-icon"><CheckCircle2 size={18} /></div><div><span>Used</span><strong>{batchUsed}</strong></div><small>{batchTotal ? `${Math.round((batchUsed / batchTotal) * 100)}% of tracked vouchers` : "No usage data"}</small></div>
+        <div className="stat"><div className="stat-icon"><Activity size={18} /></div><div><span>Remaining</span><strong>{batchRemaining}</strong></div><small>{batchTotal ? `${Math.round((batchRemaining / batchTotal) * 100)}% available` : "No remaining data"}</small></div>
+        <div className="stat"><div className="stat-icon"><Layers3 size={18} /></div><div><span>Disabled Types</span><strong>{disabledTypes}</strong></div><small>{types.length ? `${types.length - disabledTypes} enabled` : "No type data"}</small></div>
+      </section>
+
       <section className="panel">
         <div className="panel-head">
           <div>
@@ -178,261 +201,63 @@ export default function VoucherOperationsPage({ session }: Props) {
           </div>
           <div className="panel-actions">
             <div className="voucher-tabs">
-              <button
-                className={
-                  tab === "batches" ? "button primary" : "button secondary"
-                }
-                onClick={() => {
-                  setTab("batches");
-                  setQuery("");
-                }}
-              >
-                Batches
-              </button>
-              <button
-                className={
-                  tab === "types" ? "button primary" : "button secondary"
-                }
-                onClick={() => {
-                  setTab("types");
-                  setQuery("");
-                }}
-              >
-                Types
-              </button>
+              <button className={tab === "batches" ? "button primary" : "button secondary"} onClick={() => { setTab("batches"); setQuery(""); }}>Batches</button>
+              <button className={tab === "types" ? "button primary" : "button secondary"} onClick={() => { setTab("types"); setQuery(""); }}>Types</button>
             </div>
-            <div className="table-search">
-              <Search size={14} />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search vouchers..."
-              />
-            </div>
+            <div className="table-search"><Search size={14} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search vouchers..." /></div>
           </div>
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               {tab === "batches" ? (
-                <tr>
-                  <th>ID</th>
-                  <th>Profile</th>
-                  <th>Price</th>
-                  <th>Validity</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Stats</th>
-                  <th>Actions</th>
-                </tr>
+                <tr><th>ID</th><th>Profile</th><th>Price</th><th>Validity</th><th>Status</th><th>Created</th><th>Stats</th><th>Actions</th></tr>
               ) : (
-                <tr>
-                  <th>Name</th>
-                  <th>Price</th>
-                  <th>Duration</th>
-                  <th>Profile</th>
-                  <th>Enabled</th>
-                  <th>Actions</th>
-                </tr>
+                <tr><th>Name</th><th>Price</th><th>Duration</th><th>Profile</th><th>Enabled</th><th>Actions</th></tr>
               )}
             </thead>
             <tbody>
-              {filtered.map((r, i) =>
-                tab === "batches" ? (
-                  <tr key={String(r.id || i)}>
-                    <td>
-                      <span className="record-id">{r.id || "—"}</span>
-                    </td>
-                    <td>
-                      <span className="profile-cell">
-                        {r.profileName || r.profile || "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="value-chip">{r.price ?? "—"}</span>
-                    </td>
-                    <td>
-                      <span className="value-chip">{r.validity || "—"}</span>
-                    </td>
-                    <td>
-                      <span className="status-chip">
-                        {r.status ||
-                          (r.stats?.remaining != null ? "active" : "—")}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="created-at">{r.createdAt || "—"}</span>
-                    </td>
-                    <td>
-                      <span className="metric-chip">
-                        {r.stats
-                          ? `${r.stats.used ?? 0} used / ${r.stats.remaining ?? 0} left`
-                          : "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="action-stack">
-                        <button
-                          className="icon tiny danger"
-                          disabled={busy}
-                          onClick={() => void deleteBatch(String(r.id))}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={String(r.id || r.name || i)}>
-                    <td>
-                      <b>{r.name || "—"}</b>
-                    </td>
-                    <td>
-                      <span className="value-chip">{r.price ?? "—"}</span>
-                    </td>
-                    <td>
-                      <span className="value-chip">
-                        {r.duration || r.validity || "—"}
-                      </span>
-                    </td>
-                    <td>{r.profile || "—"}</td>
-                    <td>
-                      <span
-                        className={
-                          r.enabled === false || r.enabled === "false"
-                            ? "value-chip disabled-chip"
-                            : "value-chip enabled-chip"
-                        }
-                      >
-                        {r.enabled === false || r.enabled === "false"
-                          ? "No"
-                          : "Yes"}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="action-stack">
-                        <button
-                          className="button secondary"
-                          disabled={busy}
-                          onClick={async () => {
-                            try {
-                              setBusy(true);
-                              await voucher.toggleVoucherType(String(r.id));
-                              await load();
-                            } catch (e: any) {
-                              setNotice(e?.message || "Unable to toggle type.");
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          {r.enabled === false || r.enabled === "false"
-                            ? "Enable"
-                            : "Disable"}
-                        </button>
-                        <button
-                          className="icon tiny danger"
-                          disabled={busy}
-                          onClick={async () => {
-                            if (
-                              !window.confirm(
-                                `Delete voucher type \"${r.name}\"?`,
-                              )
-                            )
-                              return;
-                            try {
-                              setBusy(true);
-                              await voucher.deleteVoucherType(String(r.id));
-                              await load();
-                            } catch (e: any) {
-                              setNotice(
-                                e?.message || "Unable to delete voucher type.",
-                              );
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ),
-              )}
+              {filtered.map((r, i) => tab === "batches" ? (
+                <tr key={String(r.id || i)}>
+                  <td><span className="record-id">{r.id || "—"}</span></td>
+                  <td><span className="profile-cell">{r.profileName || r.profile || "—"}</span></td>
+                  <td><span className="value-chip">{r.price ?? "—"}</span></td>
+                  <td><span className="value-chip">{r.validity || "—"}</span></td>
+                  <td><span className="status-chip">{r.status || (r.stats?.remaining != null ? "active" : "—")}</span></td>
+                  <td><span className="created-at">{r.createdAt || "—"}</span></td>
+                  <td><span className="metric-chip">{r.stats ? `${r.stats.used ?? 0} used / ${r.stats.remaining ?? 0} left` : "—"}</span></td>
+                  <td><div className="action-stack"><button className="icon tiny danger" disabled={busy} onClick={() => void deleteBatch(String(r.id))}><Trash2 size={14} /></button></div></td>
+                </tr>
+              ) : (
+                <tr key={String(r.id || r.name || i)}>
+                  <td><b>{r.name || "—"}</b></td>
+                  <td><span className="value-chip">{r.price ?? "—"}</span></td>
+                  <td><span className="value-chip">{r.duration || r.validity || "—"}</span></td>
+                  <td>{r.profile || "—"}</td>
+                  <td><span className={r.enabled === false || r.enabled === "false" ? "value-chip disabled-chip" : "value-chip enabled-chip"}>{r.enabled === false || r.enabled === "false" ? "No" : "Yes"}</span></td>
+                  <td><div className="action-stack"><button className="button secondary" disabled={busy} onClick={async () => { try { setBusy(true); await voucher.toggleVoucherType(String(r.id)); await load(); } catch (e: any) { setNotice(e?.message || "Unable to toggle type."); setBusy(false); } }}>{r.enabled === false || r.enabled === "false" ? "Enable" : "Disable"}</button><button className="icon tiny danger" disabled={busy} onClick={async () => { if (!window.confirm(`Delete voucher type \"${r.name}\"?`)) return; try { setBusy(true); await voucher.deleteVoucherType(String(r.id)); await load(); } catch (e: any) { setNotice(e?.message || "Unable to delete voucher type."); setBusy(false); } }}><Trash2 size={14} /></button></div></td>
+                </tr>
+              ))}
             </tbody>
           </table>
-          {!filtered.length && (
-            <div className="empty">No voucher records found.</div>
-          )}
+          {!filtered.length && <div className="empty">No voucher records found.</div>}
         </div>
       </section>
+
       {showBatch && (
         <div className="modal-backdrop">
           <div className="modal">
-            <div className="modal-head">
-              <div>
-                <span className="eyebrow">VOUCHER BATCH</span>
-                <h3>Create Batch</h3>
-              </div>
-              <button className="icon" onClick={() => setShowBatch(false)}>
-                ×
-              </button>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void createBatch();
-              }}
-            >
+            <div className="modal-head"><div><span className="eyebrow">VOUCHER BATCH</span><h3>Create Batch</h3></div><button className="icon" onClick={() => setShowBatch(false)}>×</button></div>
+            <form onSubmit={(e) => { e.preventDefault(); void createBatch(); }}>
               <div className="form-grid">
-                <Field
-                  label="Profile"
-                  value={batchForm.profileName}
-                  onChange={(v) =>
-                    setBatchForm((f) => ({ ...f, profileName: v }))
-                  }
-                />
-                <Field
-                  label="Quantity"
-                  value={batchForm.quantity}
-                  type="number"
-                  onChange={(v) => setBatchForm((f) => ({ ...f, quantity: v }))}
-                />
-                <Field
-                  label="Price"
-                  value={batchForm.price}
-                  type="number"
-                  onChange={(v) => setBatchForm((f) => ({ ...f, price: v }))}
-                />
-                <Field
-                  label="Validity"
-                  value={batchForm.validity}
-                  onChange={(v) => setBatchForm((f) => ({ ...f, validity: v }))}
-                />
-                <Field
-                  label="Caption"
-                  value={batchForm.caption}
-                  onChange={(v) => setBatchForm((f) => ({ ...f, caption: v }))}
-                />
-                <Field
-                  label="Color"
-                  value={batchForm.profileColor}
-                  onChange={(v) =>
-                    setBatchForm((f) => ({ ...f, profileColor: v }))
-                  }
-                />
+                <Field label="Profile" value={batchForm.profileName} onChange={(v) => setBatchForm((f) => ({ ...f, profileName: v }))} />
+                <Field label="Quantity" value={batchForm.quantity} type="number" onChange={(v) => setBatchForm((f) => ({ ...f, quantity: v }))} />
+                <Field label="Price" value={batchForm.price} type="number" onChange={(v) => setBatchForm((f) => ({ ...f, price: v }))} />
+                <Field label="Validity" value={batchForm.validity} onChange={(v) => setBatchForm((f) => ({ ...f, validity: v }))} />
+                <Field label="Caption" value={batchForm.caption} onChange={(v) => setBatchForm((f) => ({ ...f, caption: v }))} />
+                <Field label="Color" value={batchForm.profileColor} onChange={(v) => setBatchForm((f) => ({ ...f, profileColor: v }))} />
               </div>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => setShowBatch(false)}
-                >
-                  Cancel
-                </button>
-                <button className="button primary" disabled={busy}>
-                  <Plus size={15} /> Create Batch
-                </button>
-              </div>
+              <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setShowBatch(false)}>Cancel</button><button className="button primary" disabled={busy}><Plus size={15} /> Create Batch</button></div>
             </form>
           </div>
         </div>
@@ -441,25 +266,6 @@ export default function VoucherOperationsPage({ session }: Props) {
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
-  return (
-    <label>
-      <span>{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
+function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  return <label><span>{label}</span><input type={type} value={value} onChange={(e) => onChange(e.target.value)} /></label>;
 }

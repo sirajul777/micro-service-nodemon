@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CalendarDays,
-  ChevronDown,
   Filter,
   Trash2,
   Users,
   Wallet,
-  X,
 } from "lucide-react";
 import { reports } from "../api";
 
@@ -67,18 +65,14 @@ export function ReportSellingPage({ session }: { session: string }) {
       if (comment) params.datacomments = comment;
       if (reseller) params.reseller = reseller;
       if (from !== to) params.idbl = `${formatMonth(from)}${from.slice(0, 4)}`;
-      const result = (await reports.selling(
-        session,
-        params,
-      )) as SellingResponse;
+      const result = (await reports.selling(session, params)) as SellingResponse;
       const records = result.records || [];
-      const filtered =
-        from !== to
-          ? records.filter((r) => {
-              const d = parseMonolithDate(r.date);
-              return d >= from && d <= to;
-            })
-          : records;
+      const filtered = from !== to
+        ? records.filter((r) => {
+            const d = parseMonolithDate(r.date);
+            return d >= from && d <= to;
+          })
+        : records;
       setData({ ...result, records: filtered });
       setPage(1);
     } catch (e: any) {
@@ -87,7 +81,11 @@ export function ReportSellingPage({ session }: { session: string }) {
       setLoading(false);
     }
   };
+
   useEffect(() => {
+    setData({});
+    setPage(1);
+    setNotice("");
     void load();
   }, [session]);
 
@@ -101,10 +99,9 @@ export function ReportSellingPage({ session }: { session: string }) {
     setLoading(true);
     setNotice("");
     try {
-      const params =
-        from === to
-          ? { idhr: formatMonolithDate(from) }
-          : { idbl: `${formatMonth(from)}${from.slice(0, 4)}` };
+      const params = from === to
+        ? { idhr: formatMonolithDate(from) }
+        : { idbl: `${formatMonth(from)}${from.slice(0, 4)}` };
       await reports.clear(session, params);
       await load();
       setNotice("Report records cleared.");
@@ -115,7 +112,7 @@ export function ReportSellingPage({ session }: { session: string }) {
   };
 
   return (
-    <div className="report-page">
+    <div className="report-page stack">
       <div className="page-hero">
         <div>
           <span className="eyebrow">SALES ANALYTICS</span>
@@ -126,131 +123,45 @@ export function ReportSellingPage({ session }: { session: string }) {
           <Trash2 size={15} /> Clear
         </button>
       </div>
+
       <div className="panel filter-panel">
         <div className="filter-head">
-          <div>
-            <Filter size={16} />
-            <b>Filters</b>
-          </div>
+          <div><Filter size={16} /><b>Filters</b></div>
           <span>{loading ? "Loading…" : `${records.length} records`}</span>
         </div>
         <div className="filter-grid">
-          <label>
-            <span>From</span>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-          </label>
-          <label>
-            <span>To</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </label>
-          <label>
-            <span>Prefix</span>
-            <input
-              value={prefix}
-              onChange={(e) => setPrefix(e.target.value)}
-              placeholder="voucher prefix"
-            />
-          </label>
-          <label>
-            <span>Profile</span>
-            <input
-              value={profile}
-              onChange={(e) => setProfile(e.target.value)}
-              placeholder="profile"
-            />
-          </label>
-          <label>
-            <span>Comment</span>
-            <input
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="comment"
-            />
-          </label>
-          <label>
-            <span>Reseller</span>
-            <input
-              value={reseller}
-              onChange={(e) => setReseller(e.target.value)}
-              placeholder="reseller"
-            />
-          </label>
-          <button
-            className="primary"
-            disabled={loading}
-            onClick={() => void load()}
-          >
-            <CalendarDays size={15} /> Apply Filter
-          </button>
+          <label><span>From</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+          <label><span>To</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          <label><span>Prefix</span><input value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="voucher prefix" /></label>
+          <label><span>Profile</span><input value={profile} onChange={(e) => setProfile(e.target.value)} placeholder="profile" /></label>
+          <label><span>Comment</span><input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="comment" /></label>
+          <label><span>Reseller</span><input value={reseller} onChange={(e) => setReseller(e.target.value)} placeholder="reseller" /></label>
+          <button className="primary" disabled={loading} onClick={() => void load()}><CalendarDays size={15} /> Apply Filter</button>
         </div>
       </div>
+
       {notice && <div className="error banner">{notice}</div>}
+
       <div className="stats">
-        <div className="stat">
-          <div className="stat-icon">
-            <Users size={18} />
-          </div>
-          <div>
-            <span>Total Vouchers</span>
-            <strong>{summary.totalVouchers ?? records.length}</strong>
-          </div>
-        </div>
-        <div className="stat">
-          <div className="stat-icon">
-            <Wallet size={18} />
-          </div>
-          <div>
-            <span>Total Income</span>
-            <strong>{money(summary.totalIncome, summary.currency)}</strong>
-          </div>
-        </div>
-        <div className="stat">
-          <div className="stat-icon">
-            <Users size={18} />
-          </div>
-          <div>
-            <span>Reseller Groups</span>
-            <strong>{data.resellerGroups?.length ?? 0}</strong>
-          </div>
-        </div>
+        <Metric icon={<Users size={18} />} title="Total Vouchers" value={summary.totalVouchers ?? records.length} />
+        <Metric icon={<Wallet size={18} />} title="Total Income" value={money(summary.totalIncome, summary.currency)} />
+        <Metric icon={<Users size={18} />} title="Reseller Groups" value={data.resellerGroups?.length ?? 0} />
       </div>
+
       <div className="panel">
         <div className="panel-head">
-          <div>
-            <h3>Sales Records</h3>
-            <span>Paginated result set</span>
-          </div>
+          <div><h3>Sales Records</h3><span>Paginated result set</span></div>
           <span className="badge">{loading ? "LOADING" : "LIVE"}</span>
         </div>
         <div className="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Username</th>
-                <th>Profile</th>
-                <th>Reseller</th>
-                <th>Price</th>
-                <th>Comment</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Date</th><th>Time</th><th>Username</th><th>Profile</th><th>Reseller</th><th>Price</th><th>Comment</th></tr></thead>
             <tbody>
               {visible.map((r, i) => (
                 <tr key={`${r.username}-${r.date}-${i}`}>
                   <td>{r.date || "—"}</td>
                   <td>{r.time || "—"}</td>
-                  <td>
-                    <b>{r.username || "—"}</b>
-                  </td>
+                  <td><b>{r.username || "—"}</b></td>
                   <td>{r.profile || "—"}</td>
                   <td>{r.resellerTag || "—"}</td>
                   <td>{money(r.price, summary.currency)}</td>
@@ -262,57 +173,22 @@ export function ReportSellingPage({ session }: { session: string }) {
           {!visible.length && <div className="empty">No selling records.</div>}
         </div>
         <div className="report-pagination">
-          <span>
-            {records.length ? (page - 1) * pageSize + 1 : 0}-
-            {Math.min(page * pageSize, records.length)} of {records.length}
-          </span>
+          <span>{records.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, records.length)} of {records.length}</span>
           <div>
-            <button
-              className="icon tiny"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              ‹
-            </button>
-            <b>
-              {page}/{totalPages}
-            </b>
-            <button
-              className="icon tiny"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              ›
-            </button>
+            <button className="icon tiny" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page">‹</button>
+            <b>{page}/{totalPages}</b>
+            <button className="icon tiny" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page">›</button>
           </div>
         </div>
       </div>
+
       {data.resellerGroups?.length ? (
         <div className="panel">
-          <div className="panel-head">
-            <div>
-              <h3>Reseller Summary</h3>
-              <span>Grouped from report records</span>
-            </div>
-          </div>
+          <div className="panel-head"><div><h3>Reseller Summary</h3><span>Grouped from report records</span></div></div>
           <div className="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>Reseller</th>
-                  <th>Vouchers</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.resellerGroups.map((g) => (
-                  <tr key={g.tag}>
-                    <td>{g.tag}</td>
-                    <td>{g.vouchers}</td>
-                    <td>{money(g.total, summary.currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
+              <thead><tr><th>Reseller</th><th>Vouchers</th><th>Total</th></tr></thead>
+              <tbody>{data.resellerGroups.map((g) => <tr key={g.tag}><td>{g.tag}</td><td>{g.vouchers}</td><td>{money(g.total, summary.currency)}</td></tr>)}</tbody>
             </table>
           </div>
         </div>
@@ -321,103 +197,58 @@ export function ReportSellingPage({ session }: { session: string }) {
   );
 }
 
+function Metric({ icon, title, value }: { icon?: ReactNode; title: string; value: unknown }) {
+  return <div className="stat">{icon ? <div className="stat-icon">{icon}</div> : null}<div><span>{title}</span><strong>{String(value)}</strong></div></div>;
+}
+
 export function ReportResumePage({ session }: { session: string }) {
   const [data, setData] = useState<ResumeResponse>({});
   const [idbl, setIdbl] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+
   const load = async () => {
+    if (!session) return;
     setLoading(true);
     setNotice("");
     try {
-      setData(
-        (await reports.resume(session, idbl || undefined)) as ResumeResponse,
-      );
+      setData((await reports.resume(session, idbl || undefined)) as ResumeResponse);
     } catch (e: any) {
       setNotice(e?.message || "Unable to load resume report.");
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
+    setData({});
+    setNotice("");
     if (session) void load();
   }, [session]);
+
   const summary = data.summary || {};
   return (
-    <div className="report-page">
+    <div className="report-page stack">
       <div className="page-hero">
-        <div>
-          <span className="eyebrow">DAILY BREAKDOWN</span>
-          <h3>Resume Report</h3>
-          <p>Daily voucher and income summary for the selected month.</p>
-        </div>
+        <div><span className="eyebrow">DAILY BREAKDOWN</span><h3>Resume Report</h3><p>Daily voucher and income summary for the selected month.</p></div>
         <div className="page-hero-actions">
-          <input
-            className="month-input"
-            value={idbl}
-            onChange={(e) => setIdbl(e.target.value)}
-            placeholder="e.g. aug2026"
-          />
-          <button
-            className="button primary"
-            onClick={() => void load()}
-            disabled={loading}
-          >
-            Refresh
-          </button>
+          <input className="month-input" value={idbl} onChange={(e) => setIdbl(e.target.value)} placeholder="e.g. aug2026" />
+          <button className="button primary" onClick={() => void load()} disabled={loading}>Refresh</button>
         </div>
       </div>
       {notice && <div className="error banner">{notice}</div>}
       <div className="stats">
-        <div className="stat">
-          <div>
-            <span>Total Vouchers</span>
-            <strong>{summary.totalVouchers ?? 0}</strong>
-          </div>
-        </div>
-        <div className="stat">
-          <div>
-            <span>Total Income</span>
-            <strong>{money(summary.totalIncome, summary.currency)}</strong>
-          </div>
-        </div>
-        <div className="stat">
-          <div>
-            <span>Period</span>
-            <strong>
-              {summary.month ? `${summary.month}/${summary.year}` : "—"}
-            </strong>
-          </div>
-        </div>
+        <Metric title="Total Vouchers" value={summary.totalVouchers ?? 0} />
+        <Metric title="Total Income" value={money(summary.totalIncome, summary.currency)} />
+        <Metric title="Period" value={summary.month ? `${summary.month}/${summary.year}` : "—"} />
       </div>
       <div className="panel">
-        <div className="panel-head">
-          <div>
-            <h3>Daily Sales</h3>
-            <span>
-              {loading ? "Loading…" : "Monolith-compatible daily summary"}
-            </span>
-          </div>
-        </div>
+        <div className="panel-head"><div><h3>Daily Sales</h3><span>{loading ? "Loading…" : "Monolith-compatible daily summary"}</span></div><span className="badge">{loading ? "LOADING" : "LIVE"}</span></div>
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Vouchers</th>
-                <th>Income</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data.daily || []).map((d) => (
-                <tr key={d.date}>
-                  <td>{d.date}</td>
-                  <td>{d.vouchers}</td>
-                  <td>{money(d.total, summary.currency)}</td>
-                </tr>
-              ))}
-            </tbody>
+          <table><thead><tr><th>Date</th><th>Vouchers</th><th>Income</th></tr></thead>
+            <tbody>{(data.daily || []).map((d) => <tr key={d.date}><td>{d.date}</td><td>{d.vouchers}</td><td>{money(d.total, summary.currency)}</td></tr>)}</tbody>
           </table>
+          {!(data.daily || []).length && <div className="empty">No daily sales records.</div>}
         </div>
       </div>
     </div>
@@ -425,121 +256,77 @@ export function ReportResumePage({ session }: { session: string }) {
 }
 
 function formatMonth(v: string) {
-  const m = [
-    "jan",
-    "feb",
-    "mar",
-    "apr",
-    "may",
-    "jun",
-    "jul",
-    "aug",
-    "sep",
-    "oct",
-    "nov",
-    "dec",
-  ][Math.max(0, Number(v.slice(5, 7)) - 1)];
+  const m = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][Math.max(0, Number(v.slice(5, 7)) - 1)];
   return m || "jan";
 }
 function formatMonolithDate(v: string) {
-  const [y, m, d] = v.split("-");
+  const [y, , d] = v.split("-");
   return `${formatMonth(v)}/${d}/${y}`;
 }
 function parseMonolithDate(v: string | undefined) {
   if (!v) return "";
   const [m, d, y] = v.split("/");
-  const idx = [
-    "jan",
-    "feb",
-    "mar",
-    "apr",
-    "may",
-    "jun",
-    "jul",
-    "aug",
-    "sep",
-    "oct",
-    "nov",
-    "dec",
-  ].indexOf(m?.toLowerCase());
-  return idx >= 0
-    ? `${y}-${String(idx + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-    : v;
+  const idx = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"].indexOf(m?.toLowerCase());
+  return idx >= 0 ? `${y}-${String(idx + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}` : v;
 }
 
-export function ReportPageTabs({
-  session,
-  initial = "selling",
-}: {
-  session: string;
-  initial?: "selling" | "resume" | "live";
-}) {
+export function ReportPageTabs({ session, initial = "selling" }: { session: string; initial?: "selling" | "resume" | "live" }) {
   const [tab, setTab] = useState(initial);
+  useEffect(() => setTab(initial), [initial]);
   return (
     <div className="report-tabs">
       <div className="tabbar">
-        <button
-          className={tab === "selling" ? "active" : ""}
-          onClick={() => setTab("selling")}
-        >
-          Selling
-        </button>
-        <button
-          className={tab === "resume" ? "active" : ""}
-          onClick={() => setTab("resume")}
-        >
-          Resume
-        </button>
-        <button
-          className={tab === "live" ? "active" : ""}
-          onClick={() => setTab("live")}
-        >
-          Live
-        </button>
+        <button className={tab === "selling" ? "active" : ""} onClick={() => setTab("selling")}>Selling</button>
+        <button className={tab === "resume" ? "active" : ""} onClick={() => setTab("resume")}>Resume</button>
+        <button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}>Live</button>
       </div>
-      {tab === "selling" ? (
-        <ReportSellingPage session={session} />
-      ) : tab === "resume" ? (
-        <ReportResumePage session={session} />
-      ) : (
-        <LegacyLiveReport session={session} />
-      )}
+      {tab === "selling" && <ReportSellingPage session={session} />}
+      {tab === "resume" && <ReportResumePage session={session} />}
+      {tab === "live" && <LivePanel session={session} />}
     </div>
   );
 }
-function LegacyLiveReport({ session }: { session: string }) {
-  const [data, setData] = useState<any>();
+
+function LivePanel({ session }: { session: string }) {
+  const [data, setData] = useState<Record<string, unknown>>({});
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  const load = async () => {
+    if (!session) return;
+    setLoading(true);
+    setNotice("");
+    try {
+      setData((await reports.live(session)) as Record<string, unknown>);
+    } catch (e: any) {
+      setNotice(e?.message || "Unable to load live report.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    reports
-      .live(session)
-      .then(setData)
-      .catch(() => setData(null));
+    setData({});
+    setNotice("");
+    if (session) void load();
   }, [session]);
+
+  const entries = useMemo(() => Object.entries(data), [data]);
   return (
-    <div className="stats">
-      <div className="stat">
-        <div>
-          <span>Today vouchers</span>
-          <strong>{data?.today?.vouchers ?? 0}</strong>
-        </div>
+    <div className="report-page stack">
+      <div className="page-hero">
+        <div><span className="eyebrow">REALTIME SALES</span><h3>Live Report</h3><p>Current report values from the active router session.</p></div>
+        <button className="button primary" onClick={() => void load()} disabled={loading}>Refresh</button>
       </div>
-      <div className="stat">
-        <div>
-          <span>Today income</span>
-          <strong>{money(data?.today?.income, data?.currency)}</strong>
-        </div>
+      {notice && <div className="error banner">{notice}</div>}
+      <div className="stats">
+        <Metric title="Fields" value={entries.length} />
+        <Metric title="Status" value={loading ? "Loading" : "Live"} />
       </div>
-      <div className="stat">
-        <div>
-          <span>Month vouchers</span>
-          <strong>{data?.month?.vouchers ?? 0}</strong>
-        </div>
-      </div>
-      <div className="stat">
-        <div>
-          <span>Month income</span>
-          <strong>{money(data?.month?.income, data?.currency)}</strong>
-        </div>
+      <div className="panel">
+        <div className="panel-head"><div><h3>Live Values</h3><span>Report values exposed by the live service</span></div><span className="badge">{loading ? "LOADING" : "LIVE"}</span></div>
+        <div className="grid">{entries.map(([key, value]) => <div className="metric" key={key}><span>{key}</span><b>{typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")}</b></div>)}</div>
+        {!entries.length && <div className="empty">No live report values.</div>}
       </div>
     </div>
   );

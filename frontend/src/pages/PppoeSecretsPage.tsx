@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   ShieldOff,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { router } from "../api";
@@ -25,6 +26,8 @@ const empty = {
   comment: "",
   disabled: false,
 };
+
+const isDisabled = (row: Secret) => String(row.disabled).toLowerCase() === "true";
 
 export default function PppoeSecretsPage({ session }: Props) {
   const [rows, setRows] = useState<Secret[]>([]);
@@ -66,6 +69,12 @@ export default function PppoeSecretsPage({ session }: Props) {
           ),
         );
   }, [rows, query]);
+  const enabledCount = useMemo(() => visible.filter((row) => !isDisabled(row)).length, [visible]);
+  const disabledCount = visible.length - enabledCount;
+  const profilesCount = useMemo(() => {
+    const values = visible.map((r) => String(r.profile || "")).filter(Boolean);
+    return new Set(values).size;
+  }, [visible]);
   const open = (row?: Secret) => {
     setEditing(row || null);
     setForm({ ...empty, ...(row || {}), password: "" });
@@ -131,7 +140,7 @@ export default function PppoeSecretsPage({ session }: Props) {
     setBusy(true);
     setNotice("");
     try {
-      const disabled = String(row.disabled).toLowerCase() === "true";
+      const disabled = isDisabled(row);
       const result = disabled
         ? await router.enablePppSecret(session, name)
         : await router.disablePppSecret(session, name);
@@ -155,32 +164,44 @@ export default function PppoeSecretsPage({ session }: Props) {
           <p>Manage PPPoE subscribers, profiles and secret state.</p>
         </div>
         <div className="top-actions">
-          <button
-            className="button"
-            disabled={busy}
-            onClick={() => void load()}
-          >
+          <button className="button" disabled={busy} onClick={() => void load()}>
             <RefreshCw size={15} className={busy ? "spin" : ""} /> Refresh
           </button>
-          <button
-            className="button primary"
-            disabled={busy}
-            onClick={() => open()}
-          >
+          <button className="button primary" disabled={busy} onClick={() => open()}>
             <Plus size={15} /> Add Secret
           </button>
         </div>
       </div>
       {notice && <div className="error banner">{notice}</div>}
+
+      <section className="stats secret-summary">
+        <div className="stat">
+          <div className="stat-icon"><Users size={18} /></div>
+          <div><span>Subscribers</span><strong>{visible.length}</strong></div>
+          <small>{query ? "Matching current search" : "Configured PPPoE secrets"}</small>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><ShieldCheck size={18} /></div>
+          <div><span>Enabled</span><strong>{enabledCount}</strong></div>
+          <small>Ready to authenticate</small>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><ShieldOff size={18} /></div>
+          <div><span>Disabled</span><strong>{disabledCount}</strong></div>
+          <small>Currently blocked</small>
+        </div>
+        <div className="stat">
+          <div className="stat-icon"><KeyRound size={18} /></div>
+          <div><span>Profiles Used</span><strong>{profilesCount}</strong></div>
+          <small>Distinct assigned profiles</small>
+        </div>
+      </section>
+
       <section className="panel">
         <div className="panel-head">
           <div>
-            <h3>
-              <KeyRound size={15} /> Secrets
-            </h3>
-            <span className="secret-count">
-              {visible.length} of {rows.length} subscribers
-            </span>
+            <h3><KeyRound size={15} /> Secrets</h3>
+            <span className="secret-count">{visible.length} of {rows.length} subscribers</span>
           </div>
           <span className="badge">{busy ? "WORKING" : "LIVE"}</span>
         </div>
@@ -212,71 +233,26 @@ export default function PppoeSecretsPage({ session }: Props) {
             <tbody>
               {visible.map((r, i) => {
                 const name = String(r.name || r.username || i);
-                const disabled = String(r.disabled).toLowerCase() === "true";
+                const disabled = isDisabled(r);
                 return (
                   <tr key={name}>
+                    <td><div className="secret-user"><strong>{name}</strong><span className="secret-sub">PPPoE secret</span></div></td>
+                    <td><span className="service-chip">{r.service || "—"}</span></td>
+                    <td><span className="profile-chip">{r.profile || "—"}</span></td>
+                    <td className="address-cell">{r.remoteAddress || r.remote_address || "—"}</td>
                     <td>
-                      <div className="secret-user">
-                        <strong>{name}</strong>
-                        <span className="secret-sub">PPPoE secret</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="service-chip">{r.service || "—"}</span>
-                    </td>
-                    <td>
-                      <span className="profile-chip">{r.profile || "—"}</span>
-                    </td>
-                    <td className="address-cell">
-                      {r.remoteAddress || r.remote_address || "—"}
-                    </td>
-                    <td>
-                      <span
-                        className={
-                          disabled ? "state-badge is-disabled" : "state-badge"
-                        }
-                      >
-                        {disabled ? (
-                          <ShieldOff size={12} />
-                        ) : (
-                          <ShieldCheck size={12} />
-                        )}{" "}
-                        {disabled ? "DISABLED" : "ENABLED"}
+                      <span className={disabled ? "state-badge is-disabled" : "state-badge"}>
+                        {disabled ? <ShieldOff size={12} /> : <ShieldCheck size={12} />} {disabled ? "DISABLED" : "ENABLED"}
                       </span>
                     </td>
-                    <td className="comment-cell" title={r.comment || undefined}>
-                      {r.comment || "—"}
-                    </td>
+                    <td className="comment-cell" title={r.comment || undefined}>{r.comment || "—"}</td>
                     <td>
                       <div className="row-actions secret-actions">
-                        <button
-                          className="icon tiny"
-                          title="Edit"
-                          disabled={busy}
-                          onClick={() => open(r)}
-                        >
-                          <Pencil size={14} />
+                        <button className="icon tiny" title="Edit" disabled={busy} onClick={() => open(r)}><Pencil size={14} /></button>
+                        <button className="icon tiny" title={disabled ? "Enable" : "Disable"} disabled={busy} onClick={() => void toggle(r)}>
+                          {disabled ? <ShieldCheck size={14} /> : <ShieldOff size={14} />}
                         </button>
-                        <button
-                          className="icon tiny"
-                          title={disabled ? "Enable" : "Disable"}
-                          disabled={busy}
-                          onClick={() => void toggle(r)}
-                        >
-                          {disabled ? (
-                            <ShieldCheck size={14} />
-                          ) : (
-                            <ShieldOff size={14} />
-                          )}
-                        </button>
-                        <button
-                          className="icon tiny danger"
-                          title="Delete"
-                          disabled={busy}
-                          onClick={() => void remove(name)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <button className="icon tiny danger" title="Delete" disabled={busy} onClick={() => void remove(name)}><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -284,20 +260,11 @@ export default function PppoeSecretsPage({ session }: Props) {
               })}
             </tbody>
           </table>
-          {!visible.length && (
-            <div className="empty">No PPPoE secrets found.</div>
-          )}
+          {!visible.length && <div className="empty">No PPPoE secrets found.</div>}
         </div>
       </section>
       {editing !== null || form.name !== "" ? (
-        <Modal
-          form={form}
-          setForm={setForm}
-          editing={editing}
-          busy={busy}
-          close={close}
-          save={() => void save()}
-        />
+        <Modal form={form} setForm={setForm} editing={editing} busy={busy} close={close} save={() => void save()} />
       ) : null}
     </div>
   );
@@ -309,11 +276,7 @@ function Modal({ form, setForm, editing, busy, close, save }: any) {
       <input
         type={key === "password" ? "password" : "text"}
         value={form[key] ?? ""}
-        placeholder={
-          key === "password" && editing
-            ? "Leave blank to keep current password"
-            : placeholder
-        }
+        placeholder={key === "password" && editing ? "Leave blank to keep current password" : placeholder}
         disabled={key === "name" && !!editing}
         onChange={(e) => setForm((f: any) => ({ ...f, [key]: e.target.value }))}
       />
@@ -323,20 +286,10 @@ function Modal({ form, setForm, editing, busy, close, save }: any) {
     <div className="modal-backdrop">
       <div className="modal">
         <div className="modal-head">
-          <div>
-            <span className="eyebrow">PPPOE SECRET</span>
-            <h3>{editing ? "Edit Secret" : "Add Secret"}</h3>
-          </div>
-          <button className="icon" onClick={close}>
-            <X size={18} />
-          </button>
+          <div><span className="eyebrow">PPPOE SECRET</span><h3>{editing ? "Edit Secret" : "Add Secret"}</h3></div>
+          <button className="icon" onClick={close}><X size={18} /></button>
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            save();
-          }}
-        >
+        <form onSubmit={(e) => { e.preventDefault(); save(); }}>
           <div className="form-grid">
             {field("name", "Username")}
             {field("password", "Password")}
@@ -345,24 +298,11 @@ function Modal({ form, setForm, editing, busy, close, save }: any) {
             {field("localAddress", "Local Address")}
             {field("remoteAddress", "Remote Address")}
             {field("comment", "Comment")}
-            <label>
-              <span>Disabled</span>
-              <input
-                type="checkbox"
-                checked={!!form.disabled}
-                onChange={(e) =>
-                  setForm((f: any) => ({ ...f, disabled: e.target.checked }))
-                }
-              />
-            </label>
+            <label><span>Disabled</span><input type="checkbox" checked={!!form.disabled} onChange={(e) => setForm((f: any) => ({ ...f, disabled: e.target.checked }))} /></label>
           </div>
           <div className="modal-actions">
-            <button type="button" className="button secondary" onClick={close}>
-              Cancel
-            </button>
-            <button className="button primary" disabled={busy}>
-              {editing ? "Save Changes" : "Create Secret"}
-            </button>
+            <button type="button" className="button secondary" onClick={close}>Cancel</button>
+            <button className="button primary" disabled={busy}>{editing ? "Save Changes" : "Create Secret"}</button>
           </div>
         </form>
       </div>
