@@ -20,8 +20,8 @@ import (
 	"github.com/mikhmon/mikrotik-go-service/internal/redis"
 	"github.com/mikhmon/mikrotik-go-service/internal/server"
 	"github.com/mikhmon/mikrotik-go-service/internal/store"
-	reportpb "github.com/mikhmon/mikrotik-go-service/proto/reportproto"
 	pb "github.com/mikhmon/mikrotik-go-service/proto"
+	reportpb "github.com/mikhmon/mikrotik-go-service/proto/reportproto"
 )
 
 const defaultGRPCPort = ":50051"
