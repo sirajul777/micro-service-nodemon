@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  RefreshCw,
-  Search,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  RotateCcw,
-  Ticket,
-  Layers3,
   Activity,
+  CheckCircle2,
+  Layers3,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Ticket,
+  Trash2,
 } from "lucide-react";
 import { router, voucher } from "../api";
 import "../voucher-operations-page.css";
@@ -86,6 +86,7 @@ export default function VoucherOperationsPage({ session }: Props) {
       ),
     [batches],
   );
+  const batchTotal = batchUsed + batchRemaining;
 
   const createBatch = async () => {
     if (!session || !batchForm.profileName.trim()) {
@@ -113,6 +114,7 @@ export default function VoucherOperationsPage({ session }: Props) {
       setBusy(false);
     }
   };
+
   const deleteBatch = async (id: string) => {
     if (!window.confirm(`Delete voucher batch \"${id}\"?`)) return;
     setBusy(true);
@@ -126,6 +128,7 @@ export default function VoucherOperationsPage({ session }: Props) {
       setBusy(false);
     }
   };
+
   const sync = async (auto = false) => {
     if (!session) return;
     setBusy(true);
@@ -143,6 +146,10 @@ export default function VoucherOperationsPage({ session }: Props) {
       setBusy(false);
     }
   };
+
+  const disabledTypes = types.filter(
+    (row) => row.enabled === false || String(row.enabled).toLowerCase() === "false",
+  ).length;
 
   return (
     <div className="stack voucher-operations-page">
@@ -176,12 +183,16 @@ export default function VoucherOperationsPage({ session }: Props) {
           )}
         </div>
       </div>
+
       {notice && <div className="error banner">{notice}</div>}
+
       <section className="stats voucher-stats">
         <div className="stat"><div className="stat-icon"><Ticket size={18} /></div><div><span>{tab === "batches" ? "Voucher Batches" : "Voucher Types"}</span><strong>{tab === "batches" ? batches.length : types.length}</strong></div><small>{busy ? "Syncing data" : "Current router data"}</small></div>
-        <div className="stat"><div className="stat-icon"><CheckCircle2 size={18} /></div><div><span>Used</span><strong>{batchUsed}</strong></div><small>Across loaded batches</small></div>
-        <div className="stat"><div className="stat-icon"><Activity size={18} /></div><div><span>Remaining</span><strong>{batchRemaining}</strong></div><small>Across loaded batches</small></div>
+        <div className="stat"><div className="stat-icon"><CheckCircle2 size={18} /></div><div><span>Used</span><strong>{batchUsed}</strong></div><small>{batchTotal ? `${Math.round((batchUsed / batchTotal) * 100)}% of tracked vouchers` : "No usage data"}</small></div>
+        <div className="stat"><div className="stat-icon"><Activity size={18} /></div><div><span>Remaining</span><strong>{batchRemaining}</strong></div><small>{batchTotal ? `${Math.round((batchRemaining / batchTotal) * 100)}% available` : "No remaining data"}</small></div>
+        <div className="stat"><div className="stat-icon"><Layers3 size={18} /></div><div><span>Disabled Types</span><strong>{disabledTypes}</strong></div><small>{types.length ? `${types.length - disabledTypes} enabled` : "No type data"}</small></div>
       </section>
+
       <section className="panel">
         <div className="panel-head">
           <div>
@@ -232,6 +243,7 @@ export default function VoucherOperationsPage({ session }: Props) {
           {!filtered.length && <div className="empty">No voucher records found.</div>}
         </div>
       </section>
+
       {showBatch && (
         <div className="modal-backdrop">
           <div className="modal">
