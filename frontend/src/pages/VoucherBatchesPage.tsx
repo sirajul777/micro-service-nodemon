@@ -11,7 +11,6 @@ import {
   Activity,
 } from "lucide-react";
 import { voucher } from "../api";
-import "../voucher-batches-page.css";
 
 type Row = Record<string, any>;
 
@@ -27,9 +26,7 @@ export default function VoucherBatchesPage({ session }: { session: string }) {
     setNotice("");
     try {
       const result: any = await voucher.batches(session);
-      setRows(
-        Array.isArray(result) ? result : result?.batches || result?.data || [],
-      );
+      setRows(Array.isArray(result) ? result : result?.batches || result?.data || []);
     } catch (e: any) {
       setNotice(e?.message || "Unable to load voucher batches.");
     } finally {
@@ -46,25 +43,11 @@ export default function VoucherBatchesPage({ session }: { session: string }) {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return !q
-      ? rows
-      : rows.filter((r) =>
-          Object.values(r).some((v) =>
-            String(v ?? "")
-              .toLowerCase()
-              .includes(q),
-          ),
-        );
+    return !q ? rows : rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
   }, [rows, query]);
 
-  const usedCount = useMemo(
-    () => rows.reduce((sum, row) => sum + Number(row.used ?? row.usedCount ?? row?.stats?.used ?? 0), 0),
-    [rows],
-  );
-  const totalCount = useMemo(
-    () => rows.reduce((sum, row) => sum + Number(row.qty ?? row.count ?? row?.stats?.total ?? 0), 0),
-    [rows],
-  );
+  const usedCount = useMemo(() => rows.reduce((sum, row) => sum + Number(row.used ?? row.usedCount ?? row?.stats?.used ?? 0), 0), [rows]);
+  const totalCount = useMemo(() => rows.reduce((sum, row) => sum + Number(row.qty ?? row.count ?? row?.stats?.total ?? 0), 0), [rows]);
   const activeCount = rows.filter((row) => String(row.status ?? "").toLowerCase() === "active").length;
 
   const sync = async (auto = false) => {
@@ -72,15 +55,10 @@ export default function VoucherBatchesPage({ session }: { session: string }) {
     setBusy(true);
     setNotice("");
     try {
-      const result = auto
-        ? await voucher.autoSyncUsed(session)
-        : await voucher.syncUsed(session);
-      if (result?.success === false)
-        throw new Error(result.error || "Sync failed.");
+      const result = auto ? await voucher.autoSyncUsed(session) : await voucher.syncUsed(session);
+      if (result?.success === false) throw new Error(result.error || "Sync failed.");
       await load();
-      setNotice(
-        auto ? "Auto-sync completed." : "Voucher usage sync completed.",
-      );
+      setNotice(auto ? "Auto-sync completed." : "Voucher usage sync completed.");
     } catch (e: any) {
       setNotice(e?.message || "Unable to sync voucher usage.");
       setBusy(false);
@@ -93,8 +71,7 @@ export default function VoucherBatchesPage({ session }: { session: string }) {
     setNotice("");
     try {
       const result = await voucher.deleteBatch(session, id, false);
-      if (result?.success === false)
-        throw new Error(result.error || "Delete failed.");
+      if (result?.success === false) throw new Error(result.error || "Delete failed.");
       await load();
       setNotice(`Batch ${id} deleted.`);
     } catch (e: any) {
@@ -115,8 +92,7 @@ export default function VoucherBatchesPage({ session }: { session: string }) {
     setNotice("");
     try {
       const result = await voucher.markUsed(session, id, username, usedBy);
-      if (result?.success === false)
-        throw new Error(result.error || "Mark-used failed.");
+      if (result?.success === false) throw new Error(result.error || "Mark-used failed.");
       await load();
       setNotice(`Voucher ${username} marked as used.`);
     } catch (e: any) {
@@ -126,28 +102,22 @@ export default function VoucherBatchesPage({ session }: { session: string }) {
   };
 
   return (
-    <div className="stack voucher-batches-page">
+    <div className="stack voucher-operations-page">
       <div className="hero">
         <div>
           <span className="eyebrow">VOUCHER OPERATIONS</span>
           <h3>Voucher Batches</h3>
           <p>Track generated batches and synchronize voucher usage with RouterOS.</p>
-          <div className="voucher-batch-summary">
-            <span><Ticket size={12} /> {rows.length} batches</span>
-            <span><CheckCircle2 size={12} /> {usedCount} used</span>
-            <span><Activity size={12} /> {Math.max(0, totalCount - usedCount)} remaining</span>
+          <div className="voucher-summary">
+            <span className="summary-chip"><Ticket size={12} /> {rows.length} batches</span>
+            <span className="summary-chip"><CheckCircle2 size={12} /> {usedCount} used</span>
+            <span className="summary-chip"><Activity size={12} /> {Math.max(0, totalCount - usedCount)} remaining</span>
           </div>
         </div>
         <div className="top-actions">
-          <button className="button" disabled={busy} onClick={() => void load()}>
-            <RefreshCw size={15} className={busy ? "spin" : ""} /> Refresh
-          </button>
-          <button className="button" disabled={busy || !session} onClick={() => void sync(false)}>
-            <Upload size={15} /> Sync Used
-          </button>
-          <button className="button primary" disabled={busy || !session} onClick={() => void sync(true)}>
-            <Zap size={15} /> Auto Sync
-          </button>
+          <button className="button" disabled={busy} onClick={() => void load()}><RefreshCw size={15} className={busy ? "spin" : ""} /> Refresh</button>
+          <button className="button" disabled={busy || !session} onClick={() => void sync(false)}><Upload size={15} /> Sync Used</button>
+          <button className="button primary" disabled={busy || !session} onClick={() => void sync(true)}><Zap size={15} /> Auto Sync</button>
         </div>
       </div>
       {notice && <div className="error banner">{notice}</div>}
@@ -157,37 +127,11 @@ export default function VoucherBatchesPage({ session }: { session: string }) {
         <div className="stat"><div className="stat-icon"><CheckCircle2 size={18} /></div><div><span>Used</span><strong>{usedCount}</strong></div><small>{totalCount ? `${Math.round((usedCount / totalCount) * 100)}% of quantity` : "No quantity data"}</small></div>
       </section>
       <section className="panel">
-        <div className="panel-head">
-          <div>
-            <h3><FileText size={15} /> Batches</h3>
-            <span>{visible.length} of {rows.length} batches</span>
-          </div>
-          <span className="badge">{busy ? "WORKING" : "LIVE"}</span>
-        </div>
-        <div className="table-controls">
-          <div className="table-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search batch, profile, status..." /></div>
-        </div>
+        <div className="panel-head"><div><h3><FileText size={15} /> Batches</h3><span>{visible.length} of {rows.length} batches</span></div><span className="badge">{busy ? "WORKING" : "LIVE"}</span></div>
+        <div className="table-controls"><div className="table-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search batch, profile, status..." /></div></div>
         <div className="table-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Profile</th><th>Qty</th><th>Created</th><th>Used</th><th>Actions</th></tr></thead>
-            <tbody>
-              {visible.map((r, i) => {
-                const id = String(r.id ?? r.batchId ?? i);
-                const status = String(r.status || "—");
-                return (
-                  <tr key={id}>
-                    <td><b>{id}</b></td>
-                    <td>{r.name || "—"}</td>
-                    <td><span className="status-chip">{status}</span></td>
-                    <td>{r.profile || "—"}</td>
-                    <td>{r.qty ?? r.count ?? "—"}</td>
-                    <td>{r.createdAt || r.created_at || "—"}</td>
-                    <td>{r.used ?? r.usedCount ?? "—"}</td>
-                    <td><div className="row-actions"><button className="button" disabled={busy} onClick={() => void markUsed(r)}>Mark Used</button><button className="icon tiny danger" disabled={busy} title="Delete" onClick={() => void remove(id)}><Trash2 size={14} /></button></div></td>
-                  </tr>
-                );
-              })}
-            </tbody>
+          <table><thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Profile</th><th>Qty</th><th>Created</th><th>Used</th><th>Actions</th></tr></thead>
+            <tbody>{visible.map((r, i) => { const id = String(r.id ?? r.batchId ?? i); return <tr key={id}><td><b>{id}</b></td><td>{r.name || "—"}</td><td><span className="status-chip">{r.status || "—"}</span></td><td>{r.profile || "—"}</td><td>{r.qty ?? r.count ?? "—"}</td><td>{r.createdAt || r.created_at || "—"}</td><td>{r.used ?? r.usedCount ?? "—"}</td><td><div className="row-actions"><button className="button" disabled={busy} onClick={() => void markUsed(r)}>Mark Used</button><button className="icon tiny danger" disabled={busy} title="Delete" onClick={() => void remove(id)}><Trash2 size={14} /></button></div></td></tr>; })}</tbody>
           </table>
           {!visible.length && <div className="empty">No voucher batches found.</div>}
         </div>
