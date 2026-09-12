@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CalendarDays,
   Filter,
   Trash2,
   Users,
   Wallet,
-  X,
 } from "lucide-react";
 import { reports } from "../api";
 
@@ -68,10 +67,12 @@ export function ReportSellingPage({ session }: { session: string }) {
       if (from !== to) params.idbl = `${formatMonth(from)}${from.slice(0, 4)}`;
       const result = (await reports.selling(session, params)) as SellingResponse;
       const records = result.records || [];
-      const filtered = from !== to ? records.filter((r) => {
-        const d = parseMonolithDate(r.date);
-        return d >= from && d <= to;
-      }) : records;
+      const filtered = from !== to
+        ? records.filter((r) => {
+            const d = parseMonolithDate(r.date);
+            return d >= from && d <= to;
+          })
+        : records;
       setData({ ...result, records: filtered });
       setPage(1);
     } catch (e: any) {
@@ -82,6 +83,9 @@ export function ReportSellingPage({ session }: { session: string }) {
   };
 
   useEffect(() => {
+    setData({});
+    setPage(1);
+    setNotice("");
     void load();
   }, [session]);
 
@@ -193,8 +197,8 @@ export function ReportSellingPage({ session }: { session: string }) {
   );
 }
 
-function Metric({ icon, title, value }: { icon: React.ReactNode; title: string; value: unknown }) {
-  return <div className="stat"><div className="stat-icon">{icon}</div><div><span>{title}</span><strong>{String(value)}</strong></div></div>;
+function Metric({ icon, title, value }: { icon?: ReactNode; title: string; value: unknown }) {
+  return <div className="stat">{icon ? <div className="stat-icon">{icon}</div> : null}<div><span>{title}</span><strong>{String(value)}</strong></div></div>;
 }
 
 export function ReportResumePage({ session }: { session: string }) {
@@ -204,6 +208,7 @@ export function ReportResumePage({ session }: { session: string }) {
   const [notice, setNotice] = useState("");
 
   const load = async () => {
+    if (!session) return;
     setLoading(true);
     setNotice("");
     try {
@@ -216,6 +221,8 @@ export function ReportResumePage({ session }: { session: string }) {
   };
 
   useEffect(() => {
+    setData({});
+    setNotice("");
     if (session) void load();
   }, [session]);
 
@@ -265,6 +272,7 @@ function parseMonolithDate(v: string | undefined) {
 
 export function ReportPageTabs({ session, initial = "selling" }: { session: string; initial?: "selling" | "resume" | "live" }) {
   const [tab, setTab] = useState(initial);
+  useEffect(() => setTab(initial), [initial]);
   return (
     <div className="report-tabs">
       <div className="tabbar">
@@ -285,6 +293,7 @@ function LivePanel({ session }: { session: string }) {
   const [notice, setNotice] = useState("");
 
   const load = async () => {
+    if (!session) return;
     setLoading(true);
     setNotice("");
     try {
@@ -297,6 +306,8 @@ function LivePanel({ session }: { session: string }) {
   };
 
   useEffect(() => {
+    setData({});
+    setNotice("");
     if (session) void load();
   }, [session]);
 
@@ -313,7 +324,7 @@ function LivePanel({ session }: { session: string }) {
         <Metric title="Status" value={loading ? "Loading" : "Live"} />
       </div>
       <div className="panel">
-        <div className="panel-head"><div><h3>Live Values</h3><span>Raw fields exposed by the report service</span></div><span className="badge">{loading ? "LOADING" : "LIVE"}</span></div>
+        <div className="panel-head"><div><h3>Live Values</h3><span>Report values exposed by the live service</span></div><span className="badge">{loading ? "LOADING" : "LIVE"}</span></div>
         <div className="grid">{entries.map(([key, value]) => <div className="metric" key={key}><span>{key}</span><b>{typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")}</b></div>)}</div>
         {!entries.length && <div className="empty">No live report values.</div>}
       </div>
