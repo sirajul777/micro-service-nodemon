@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   Eye,
@@ -200,7 +200,7 @@ export default function PaymentManagementPage() {
     </div>
   );
 }
-function Metric({ icon, title, value, helper }: { icon: React.ReactNode; title: string; value: unknown; helper: string }) {
+function Metric({ icon, title, value, helper }: { icon: ReactNode; title: string; value: unknown; helper: string }) {
   return <div className="stat"><div className="stat-icon">{icon}</div><div><span>{title}</span><strong>{String(value)}</strong><small>{helper}</small></div></div>;
 }
 function DetailModal({ item, onClose }: { item: any; onClose: () => void }) {
