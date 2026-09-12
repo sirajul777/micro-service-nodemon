@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Eye,
   RefreshCw,
   Settings2,
   TestTube2,
+  Wallet,
+  Clock3,
+  CircleDollarSign,
+  AlertCircle,
 } from "lucide-react";
 import { payment } from "../api";
 import { TableControlBar, useTableControls } from "../components/TableControls";
@@ -98,6 +102,10 @@ export default function PaymentManagementPage() {
   const transactions: Item[] = data?.transactions || [];
   const controls = useTableControls({ rows: transactions });
   const stats = data?.stats || {};
+  const filteredByStatus = useMemo(() => {
+    if (!status) return transactions.length;
+    return transactions.filter((item) => String(item.status || "").toLowerCase() === status.toLowerCase()).length;
+  }, [transactions, status]);
   const runCheck = async (orderId: string) => {
     setBusy(true);
     setMessage("");
@@ -117,31 +125,19 @@ export default function PaymentManagementPage() {
         <div>
           <span className="eyebrow">PAYMENT OPERATIONS</span>
           <h3>Payment Management</h3>
-          <p>
-            Transactions, configuration, status checks, and payment testing.
-          </p>
+          <p>Transactions, configuration, status checks, and payment testing.</p>
         </div>
-        <button
-          className="button primary"
-          onClick={() => void load()}
-          disabled={busy}
-        >
+        <button className="button primary" onClick={() => void load()} disabled={busy}>
           <RefreshCw size={15} className={busy ? "spin" : ""} /> Refresh
         </button>
       </div>
       {message && <div className="error banner">{message}</div>}
-      <div className="stats">
-        <Metric
-          title="Transactions"
-          value={stats.total ?? stats.totalTransactions ?? transactions.length}
-        />
-        <Metric title="Pending" value={stats.pending ?? 0} />
-        <Metric title="Success" value={stats.success ?? stats.paid ?? 0} />
-        <Metric
-          title="Revenue"
-          value={money(stats.revenue ?? stats.totalAmount ?? 0)}
-        />
-      </div>
+      <section className="stats payment-summary">
+        <Metric icon={<Wallet size={18} />} title="Transactions" value={stats.total ?? stats.totalTransactions ?? transactions.length} helper={`${filteredByStatus} matching filter`} />
+        <Metric icon={<Clock3 size={18} />} title="Pending" value={stats.pending ?? 0} helper="Awaiting confirmation" />
+        <Metric icon={<CheckCircle2 size={18} />} title="Success" value={stats.success ?? stats.paid ?? 0} helper="Completed payments" />
+        <Metric icon={<CircleDollarSign size={18} />} title="Revenue" value={money(stats.revenue ?? stats.totalAmount ?? 0)} helper="Recorded payment value" />
+      </section>
       <div className="payment-grid">
         <section className="panel">
           <div className="panel-head">
@@ -150,13 +146,7 @@ export default function PaymentManagementPage() {
               <span>{controls.filtered.length} records</span>
             </div>
             <div className="panel-actions">
-              <select
-                value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value);
-                  void load(e.target.value);
-                }}
-              >
+              <select value={status} onChange={(e) => { setStatus(e.target.value); void load(e.target.value); }}>
                 <option value="">All status</option>
                 <option value="pending">Pending</option>
                 <option value="success">Success</option>
@@ -165,208 +155,54 @@ export default function PaymentManagementPage() {
               <span className="badge">{busy ? "WORKING" : "LIVE"}</span>
             </div>
           </div>
-          <TableControlBar
-            query={controls.query}
-            onQueryChange={controls.setQuery}
-            page={controls.page}
-            totalPages={controls.totalPages}
-            totalRows={controls.filtered.length}
-            pageSize={controls.pageSize}
-            onPrevious={controls.previous}
-            onNext={controls.next}
-          />
+          <TableControlBar query={controls.query} onQueryChange={controls.setQuery} page={controls.page} totalPages={controls.totalPages} totalRows={controls.filtered.length} pageSize={controls.pageSize} onPrevious={controls.previous} onNext={controls.next} />
           <div className="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>Order ID</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Profile</th>
-                  <th>Created</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Order ID</th><th>Amount</th><th>Status</th><th>Profile</th><th>Created</th><th>Actions</th></tr></thead>
               <tbody>
                 {controls.visible.map((r, i) => (
                   <tr key={String(r.orderId || r.id || i)}>
-                    <td>
-                      <b>{formatCell(r.orderId || r.id)}</b>
-                    </td>
-                    <td>{money(r.amount)}</td>
-                    <td>{formatCell(r.status)}</td>
+                    <td><b className="code-value">{formatCell(r.orderId || r.id)}</b></td>
+                    <td><span className="amount-value">{money(r.amount)}</span></td>
+                    <td><span className={`status-value status-${String(r.status || "").toLowerCase()}`}>{formatCell(r.status)}</span></td>
                     <td>{formatCell(r.profile)}</td>
-                    <td>{formatCell(r.createdAt)}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="icon tiny"
-                          title="Check status"
-                          disabled={busy}
-                          onClick={() =>
-                            void runCheck(String(r.orderId || r.id))
-                          }
-                        >
-                          <CheckCircle2 size={14} />
-                        </button>
-                        <button
-                          className="icon tiny"
-                          title="Details"
-                          disabled={busy}
-                          onClick={async () => {
-                            try {
-                              setSelected(
-                                await payment.get(String(r.orderId || r.id)),
-                              );
-                            } catch (e: any) {
-                              setMessage(
-                                e?.message || "Unable to load detail.",
-                              );
-                            }
-                          }}
-                        >
-                          <Eye size={14} />
-                        </button>
-                      </div>
-                    </td>
+                    <td className="code-value">{formatCell(r.createdAt)}</td>
+                    <td><div className="row-actions"><button className="icon tiny" title="Check status" disabled={busy} onClick={() => void runCheck(String(r.orderId || r.id))}><CheckCircle2 size={14} /></button><button className="icon tiny" title="Details" disabled={busy} onClick={async () => { try { setSelected(await payment.get(String(r.orderId || r.id))); } catch (e: any) { setMessage(e?.message || "Unable to load detail."); } }}><Eye size={14} /></button></div></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!controls.visible.length && (
-              <div className="empty">No payment transactions.</div>
-            )}
+            {!controls.visible.length && <div className="empty">No payment transactions.</div>}
           </div>
         </section>
         <section className="panel">
           <div className="panel-head">
-            <div>
-              <h3>
-                <Settings2 size={15} /> Payment Configuration
-              </h3>
-              <span>Stored payment settings</span>
-            </div>
-            <button
-              className="button primary"
-              onClick={saveConfig}
-              disabled={busy}
-            >
-              Save
-            </button>
+            <div><h3><Settings2 size={15} /> Payment Configuration</h3><span>Stored payment settings</span></div>
+            <button className="button primary" onClick={saveConfig} disabled={busy}>Save</button>
           </div>
           <div className="form-grid compact">
             {Object.entries(config).map(([key, value]) => (
-              <label key={key}>
-                <span>{humanize(key)}</span>
-                <input
-                  value={value}
-                  onChange={(e) =>
-                    setConfig((current) => ({
-                      ...current,
-                      [key]: e.target.value,
-                    }))
-                  }
-                />
-              </label>
+              <label key={key}><span>{humanize(key)}</span><input value={value} onChange={(e) => setConfig((current) => ({ ...current, [key]: e.target.value }))} /></label>
             ))}
           </div>
-          {!Object.keys(config).length && (
-            <div className="empty">
-              No payment configuration exposed by the backend.
-            </div>
-          )}
+          {!Object.keys(config).length && <div className="empty"><AlertCircle size={15} /> No payment configuration exposed by the backend.</div>}
         </section>
       </div>
       <section className="panel">
-        <div className="panel-head">
-          <div>
-            <h3>
-              <TestTube2 size={15} /> Payment Test
-            </h3>
-            <span>Run the backend payment test flow.</span>
-          </div>
-        </div>
+        <div className="panel-head"><div><h3><TestTube2 size={15} /> Payment Test</h3><span>Run the backend payment test flow.</span></div></div>
         <div className="form-grid compact">
-          <label>
-            <span>Amount</span>
-            <input
-              type="number"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </label>
-          <label>
-            <span>Profile</span>
-            <input
-              value={profile}
-              onChange={(e) => setProfile(e.target.value)}
-              placeholder="hotspot profile"
-            />
-          </label>
+          <label><span>Amount</span><input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+          <label><span>Profile</span><input value={profile} onChange={(e) => setProfile(e.target.value)} placeholder="hotspot profile" /></label>
         </div>
-        <div className="modal-actions">
-          <button
-            className="button primary"
-            disabled={busy}
-            onClick={() => void runTest()}
-          >
-            Run Payment Test
-          </button>
-        </div>
+        <div className="modal-actions"><button className="button primary" disabled={busy} onClick={() => void runTest()}>Run Payment Test</button></div>
       </section>
-      {selected && (
-        <DetailModal item={selected} onClose={() => setSelected(null)} />
-      )}
+      {selected && <DetailModal item={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
-function Metric({ title, value }: { title: string; value: unknown }) {
-  return (
-    <div className="stat">
-      <div>
-        <span>{title}</span>
-        <strong>{String(value)}</strong>
-      </div>
-    </div>
-  );
+function Metric({ icon, title, value, helper }: { icon: React.ReactNode; title: string; value: unknown; helper: string }) {
+  return <div className="stat"><div className="stat-icon">{icon}</div><div><span>{title}</span><strong>{String(value)}</strong><small>{helper}</small></div></div>;
 }
 function DetailModal({ item, onClose }: { item: any; onClose: () => void }) {
-  return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="modal">
-        <div className="modal-head">
-          <div>
-            <span className="eyebrow">PAYMENT DETAIL</span>
-            <h3>{item?.orderId || item?.id || "Transaction"}</h3>
-          </div>
-          <button className="icon" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <pre
-          style={{
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            margin: 0,
-            padding: 18,
-            maxHeight: 500,
-            overflow: "auto",
-          }}
-        >
-          {JSON.stringify(item, null, 2)}
-        </pre>
-        <div className="modal-actions">
-          <button className="button secondary" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="modal"><div className="modal-head"><div><span className="eyebrow">PAYMENT DETAIL</span><h3>{item?.orderId || item?.id || "Transaction"}</h3></div><button className="icon" onClick={onClose}>×</button></div><pre className="detail-pre">{JSON.stringify(item, null, 2)}</pre><div className="modal-actions"><button className="button secondary" onClick={onClose}>Close</button></div></div></div>;
 }
