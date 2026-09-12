@@ -1,1 +1,0 @@
-Sidebar parity note: Logout is intentionally implemented in GroupedApp so the grouped navigation matches the reference menu and uses the existing auth logout endpoint.
