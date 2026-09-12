@@ -6,6 +6,7 @@ option go_package = "github.com/mikhmon/mikrotik-go-service/proto/reportproto";
 
 service ReportRouterService {
   rpc ListSellingScripts(ListSellingScriptsRequest) returns (ListSellingScriptsResponse);
+  rpc GetResumeReport(GetResumeReportRequest) returns (GetResumeReportResponse);
 }
 
 message ListSellingScriptsRequest {
@@ -28,4 +29,27 @@ message ListSellingScriptsResponse {
   bool success = 1;
   string error = 2;
   repeated SellingScript scripts = 3;
+}
+
+message GetResumeReportRequest {
+  string session_id = 1;
+  string idbl = 2;
+}
+
+message ResumeDaily {
+  string date = 1;
+  int32 vouchers = 2;
+  double total = 3;
+}
+
+message GetResumeReportResponse {
+  bool success = 1;
+  string error = 2;
+  repeated ResumeDaily daily = 3;
+  int32 total_vouchers = 4;
+  double total_income = 5;
+  string currency = 6;
+  bool is_indo = 7;
+  string month = 8;
+  string year = 9;
 }
