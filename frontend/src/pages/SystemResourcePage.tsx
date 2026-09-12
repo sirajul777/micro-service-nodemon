@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Cpu, HardDrive, MemoryStick, RefreshCw, Server } from "lucide-react";
 import { router } from "../api";
 
@@ -25,6 +25,11 @@ const formatBytes = (value: any) => {
     i += 1;
   }
   return `${size.toFixed(size >= 100 ? 0 : 1)} ${units[i]}`;
+};
+
+const toPercent = (value: any) => {
+  const n = Number.parseFloat(String(value).replace("%", ""));
+  return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null;
 };
 
 export default function SystemResourcePage({ session }: Props) {
@@ -55,9 +60,24 @@ export default function SystemResourcePage({ session }: Props) {
   const totalMemory = pick(resource, ["totalMemory", "total-memory"]);
   const freeHdd = pick(resource, ["freeHdd", "free-hdd", "freeDisk"]);
   const totalHdd = pick(resource, ["totalHdd", "total-hdd", "totalDisk"]);
+  const cpuPercent = toPercent(cpu);
+  const memoryPercent = useMemo(() => {
+    const free = Number(freeMemory);
+    const total = Number(totalMemory);
+    return Number.isFinite(free) && Number.isFinite(total) && total > 0
+      ? Math.min(100, Math.max(0, ((total - free) / total) * 100))
+      : null;
+  }, [freeMemory, totalMemory]);
+  const storagePercent = useMemo(() => {
+    const free = Number(freeHdd);
+    const total = Number(totalHdd);
+    return Number.isFinite(free) && Number.isFinite(total) && total > 0
+      ? Math.min(100, Math.max(0, ((total - free) / total) * 100))
+      : null;
+  }, [freeHdd, totalHdd]);
 
   return (
-    <div className="stack">
+    <div className="stack system-resource-page">
       <div className="hero">
         <div>
           <span className="eyebrow">ROUTEROS HEALTH</span>
@@ -78,48 +98,45 @@ export default function SystemResourcePage({ session }: Props) {
         </div>
       </div>
       {notice && <div className="error banner">{notice}</div>}
-      <section className="stats">
-        <div className="stat">
-          <div className="stat-icon">
-            <Cpu size={18} />
-          </div>
-          <div>
+
+      <section className="stats resource-stats">
+        <div className="stat resource-stat">
+          <div className="stat-icon"><Cpu size={18} /></div>
+          <div className="resource-stat-main">
             <span>CPU Load</span>
             <strong>
               {String(cpu)}
               {String(cpu) !== "—" && !String(cpu).includes("%") ? "%" : ""}
             </strong>
+            {cpuPercent !== null && <div className="resource-progress"><i style={{ width: `${cpuPercent}%` }} /></div>}
           </div>
+          <small>{cpuPercent === null ? "RouterOS snapshot" : `${cpuPercent.toFixed(0)}% used`}</small>
         </div>
-        <div className="stat">
-          <div className="stat-icon">
-            <MemoryStick size={18} />
-          </div>
-          <div>
+        <div className="stat resource-stat">
+          <div className="stat-icon"><MemoryStick size={18} /></div>
+          <div className="resource-stat-main">
             <span>Free Memory</span>
             <strong>{formatBytes(freeMemory)}</strong>
+            {memoryPercent !== null && <div className="resource-progress"><i style={{ width: `${memoryPercent}%` }} /></div>}
           </div>
-          <small>Total {formatBytes(totalMemory)}</small>
+          <small>{memoryPercent === null ? `Total ${formatBytes(totalMemory)}` : `${memoryPercent.toFixed(0)}% used · ${formatBytes(totalMemory)} total`}</small>
         </div>
-        <div className="stat">
-          <div className="stat-icon">
-            <HardDrive size={18} />
-          </div>
-          <div>
+        <div className="stat resource-stat">
+          <div className="stat-icon"><HardDrive size={18} /></div>
+          <div className="resource-stat-main">
             <span>Free Storage</span>
             <strong>{formatBytes(freeHdd)}</strong>
+            {storagePercent !== null && <div className="resource-progress"><i style={{ width: `${storagePercent}%` }} /></div>}
           </div>
-          <small>Total {formatBytes(totalHdd)}</small>
+          <small>{storagePercent === null ? `Total ${formatBytes(totalHdd)}` : `${storagePercent.toFixed(0)}% used · ${formatBytes(totalHdd)} total`}</small>
         </div>
-        <div className="stat">
-          <div className="stat-icon">
-            <Server size={18} />
-          </div>
-          <div>
+        <div className="stat resource-stat">
+          <div className="stat-icon"><Server size={18} /></div>
+          <div className="resource-stat-main">
             <span>Uptime</span>
             <strong>{String(pick(resource, ["uptime"]))}</strong>
           </div>
-          <small>Version {String(pick(resource, ["version"]))}</small>
+          <small>RouterOS {String(pick(resource, ["version"]))}</small>
         </div>
       </section>
 
@@ -132,30 +149,10 @@ export default function SystemResourcePage({ session }: Props) {
           <span className="badge">{busy ? "LOADING" : "LIVE"}</span>
         </div>
         <div className="grid">
-          <div className="metric">
-            <span>Board</span>
-            <b>{String(pick(resource, ["boardName", "board-name"]))}</b>
-          </div>
-          <div className="metric">
-            <span>Architecture</span>
-            <b>
-              {String(
-                pick(resource, [
-                  "architectureName",
-                  "architecture-name",
-                  "architecture",
-                ]),
-              )}
-            </b>
-          </div>
-          <div className="metric">
-            <span>Build Time</span>
-            <b>{String(pick(resource, ["buildTime", "build-time"]))}</b>
-          </div>
-          <div className="metric">
-            <span>Platform</span>
-            <b>{String(pick(resource, ["platform"]))}</b>
-          </div>
+          <div className="metric"><span>Board</span><b>{String(pick(resource, ["boardName", "board-name"]))}</b></div>
+          <div className="metric"><span>Architecture</span><b>{String(pick(resource, ["architectureName", "architecture-name", "architecture"]))}</b></div>
+          <div className="metric"><span>Build Time</span><b>{String(pick(resource, ["buildTime", "build-time"]))}</b></div>
+          <div className="metric"><span>Platform</span><b>{String(pick(resource, ["platform"]))}</b></div>
         </div>
       </section>
     </div>
