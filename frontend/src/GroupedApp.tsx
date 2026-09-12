@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import App from "./App";
 import RouterSessionsPage from "./pages/RouterSessionsPage";
+import DashboardPage from "./pages/DashboardPage";
 import "./grouped-navigation.css";
 
 type ExistingTarget = {
@@ -196,6 +197,15 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
     };
   }, [labelByTarget, sessionMode]);
 
+  useEffect(() => {
+    if (!contentNode) return;
+    contentNode.classList.toggle(
+      "grouped-dashboard-active",
+      !sessionMode && active === "Dashboard",
+    );
+    return () => contentNode.classList.remove("grouped-dashboard-active");
+  }, [contentNode, active, sessionMode]);
+
   if (!mountNode) return null;
   return (
     <>
@@ -256,6 +266,14 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
         </nav>,
         mountNode,
       )}
+      {!sessionMode && active === "Dashboard" && contentNode
+        ? createPortal(
+            <div className="dashboard-parity-host">
+              <DashboardPage />
+            </div>,
+            contentNode,
+          )
+        : null}
       {sessionMode && contentNode
         ? createPortal(
             <div className="session-overlay">
