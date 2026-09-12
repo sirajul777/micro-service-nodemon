@@ -6,6 +6,7 @@ import {
   CreditCard,
   FileText,
   KeyRound,
+  LogOut,
   Network,
   QrCode,
   Router as RouterIcon,
@@ -17,6 +18,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import App from "./App";
+import { auth } from "./api";
 import RouterSessionsPage from "./pages/RouterSessionsPage";
 import DashboardPage from "./pages/DashboardPage";
 import "./grouped-navigation.css";
@@ -121,12 +123,13 @@ const groups: MenuGroup[] = [
       existing("User Management", "System Users", Users),
       route("Ganti Password", "/users", KeyRound, false, true),
       route("Mobile API", "/users", Server, false, true),
-      route("Sessions", "/routers", RouterIcon),
+      existing("Sessions", "Sessions", RouterIcon),
       existing("Scheduler", "Scheduler", Activity, true),
       existing("DHCP Leases", "DHCP Leases", Network, true),
       existing("Interfaces", "Interfaces", RouterIcon, true),
       existing("Interface Traffic", "Interface Traffic", Activity, true),
       existing("System Resource", "System Resource", Server, true),
+      existing("Logout", "Logout", LogOut),
     ],
   },
 ];
@@ -227,8 +230,16 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
                         ? "Module entry is not implemented yet"
                         : undefined
                     }
-                    onClick={() => {
+                    onClick={async () => {
                       if (item.disabled) return;
+                      if (item.label === "Logout") {
+                        try {
+                          await auth.logout();
+                        } finally {
+                          window.location.reload();
+                        }
+                        return;
+                      }
                       if (item.requiresSession) {
                         const selector =
                           document.querySelector<HTMLSelectElement>(
