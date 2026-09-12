@@ -47,6 +47,16 @@ export class ReportRouterGrpcClient implements OnModuleDestroy {
     });
   }
 
+  getResumeReport(sessionId: string, idbl = '') {
+    return new Promise<any>((resolve, reject) => {
+      const deadline = new Date(Date.now() + 90000);
+      this.client.GetResumeReport({ sessionId, idbl }, { deadline }, (err: ServiceError | null, response: any) => {
+        if (err) return reject(err);
+        resolve(response);
+      });
+    });
+  }
+
   close() { this.client?.close?.(); }
   onModuleDestroy() { this.close(); }
 }

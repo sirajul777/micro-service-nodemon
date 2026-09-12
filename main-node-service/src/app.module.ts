@@ -12,6 +12,7 @@ import { HotspotGrpcController } from './erp/hotspot-grpc.controller';
 import { PppoeGrpcController } from './erp/pppoe-grpc.controller';
 import { PppoeWriteController } from './erp/pppoe-write.controller';
 import { VoucherBatchGrpcController } from './erp/voucher-batch-grpc.controller';
+import { ReportResumeGrpcController } from './proxy/report-resume-grpc.controller';
 import { AuthService } from './auth/auth.service';
 import { AuthGrpcClient } from './auth/auth-grpc.client';
 import { ErpGrpcClient } from './erp/erp-grpc.client';
@@ -43,6 +44,7 @@ import { SecurityMiddleware } from './security/security.middleware';
     VoucherBatchGrpcController,
     PaymentWebhookController,
     SchedulerGrpcController,
+    ReportResumeGrpcController,
     ProxyController,
     HealthController,
   ],
