@@ -29,6 +29,7 @@
         <link rel="stylesheet" href="assets/sidebar.css" />
         <link rel="stylesheet" href="assets/telegram.css" />
         <link rel="stylesheet" href="assets/topbar.css" />
+        <link rel="stylesheet" href="assets/billing-customer.css" />
     </head>
 <body>
 <%~ it.body %>
