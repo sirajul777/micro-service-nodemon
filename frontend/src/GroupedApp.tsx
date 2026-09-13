@@ -5,6 +5,7 @@ import App from "./App";
 import { auth } from "./api";
 import RouterSessionsPage from "./pages/RouterSessionsPage";
 import DashboardPage from "./pages/DashboardPage";
+import BillingPage from "./pages/BillingPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import MobileApiPage from "./pages/MobileApiPage";
 import "./grouped-navigation.css";
@@ -78,13 +79,14 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
           if (!selector?.value) { window.location.assign("/routers"); return; }
         }
         setActive(item.label);
-        if (item.label === "Ganti Password" || item.label === "Mobile API") return;
+        if (item.label === "Ganti Password" || item.label === "Mobile API" || item.label === "Pelanggan Billing") return;
         if (hasPath(item)) { window.location.assign(item.path); return; }
         const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar > nav:not(.grouped-nav) .nav"));
         const button = buttons.find((candidate) => candidate.textContent?.trim() === item.target);
         if (button) button.click();
       }}><Icon size={17} /><span>{item.label}</span></button>; })}</div>)}</nav>, mountNode)}
       {!sessionMode && active === "Dashboard" && contentNode ? createPortal(<div className="dashboard-parity-host"><DashboardPage /></div>, contentNode) : null}
+      {!sessionMode && active === "Pelanggan Billing" && contentNode ? createPortal(<div className="dashboard-parity-host"><BillingPage /></div>, contentNode) : null}
       {sessionMode && contentNode ? createPortal(<div className="session-overlay"><RouterSessionsPage /></div>, contentNode) : null}
       {!sessionMode && active === "Ganti Password" && contentNode ? createPortal(<div className="dashboard-parity-host"><ChangePasswordPage /></div>, contentNode) : null}
       {!sessionMode && active === "Mobile API" && contentNode ? createPortal(<div className="dashboard-parity-host"><MobileApiPage /></div>, contentNode) : null}
