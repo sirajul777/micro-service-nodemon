@@ -4,7 +4,6 @@ import { reports, router } from '../api';
 import './dashboard-parity.css';
 
 type Row = Record<string, any>;
-
 type Props = { session?: string };
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -127,10 +126,20 @@ export default function DashboardPage({ session: propSession = '' }: Props) {
 
   useEffect(() => {
     if (propSession) { setSession(propSession); return; }
+    let cancelled = false;
+    const sync = () => {
+      const value = readSessionFromDom();
+      if (!cancelled) setSession(value);
+    };
+    sync();
     const select = document.querySelector<HTMLSelectElement>('.router-box select');
-    if (!select) return;
-    const sync = () => setSession(select.value || '');
-    sync(); select.addEventListener('change', sync); return () => select.removeEventListener('change', sync);
+    select?.addEventListener('change', sync);
+    const timer = window.setInterval(sync, 500);
+    return () => {
+      cancelled = true;
+      select?.removeEventListener('change', sync);
+      window.clearInterval(timer);
+    };
   }, [propSession]);
 
   const load = async () => {
