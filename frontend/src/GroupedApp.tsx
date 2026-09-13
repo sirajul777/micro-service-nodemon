@@ -8,8 +8,8 @@ import DashboardPage from "./pages/DashboardPage";
 import BillingPage from "./pages/BillingPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import MobileApiPage from "./pages/MobileApiPage";
-import BotResellersPage from "./pages/BotResellersPage";
 import TelegramManagementPage from "./pages/TelegramManagementPage";
+import BotResellersPage from "./pages/BotResellersPage";
 import "./grouped-navigation.css";
 
 type ExistingTarget = { label: string; target: string; icon: any; requiresSession?: boolean; disabled?: boolean };
@@ -81,8 +81,8 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
           if (!selector?.value) { window.location.assign("/routers"); return; }
         }
         setActive(item.label);
-        if (item.label === "Ganti Password" || item.label === "Mobile API" || item.label === "Pelanggan Billing") return;
-        if (hasPath(item)) return;
+        if (item.label === "Ganti Password" || item.label === "Mobile API" || item.label === "Pelanggan Billing" || item.label === "Reseller Bot" || item.label === "Tools & Settings") return;
+        if (hasPath(item)) { window.history.pushState({}, "", item.path); window.dispatchEvent(new PopStateEvent("popstate")); return; }
         const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar > nav:not(.grouped-nav) .nav"));
         const button = buttons.find((candidate) => candidate.textContent?.trim() === item.target);
         if (button) button.click();
