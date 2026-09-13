@@ -35,11 +35,14 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
   const labelByTarget = useMemo(() => new Map(groups.flatMap((group) => group.items.map((item) => [hasPath(item) ? item.path : item.target, item.label]))), []);
   useEffect(() => {
     let cancelled = false;
+    let cleanup: (() => void) | undefined;
     const attach = () => {
+      if (cancelled) return true;
       const sidebar = document.querySelector<HTMLElement>(".sidebar");
       const content = document.querySelector<HTMLElement>(".content");
       if (!sidebar || !content) return false;
-      if (!cancelled) { setMountNode(sidebar); setContentNode(content); }
+      setMountNode(sidebar);
+      setContentNode(content);
       const syncActive = () => {
         if (sessionMode) return;
         const activeButton = sidebar.querySelector<HTMLElement>("nav:not(.grouped-nav) .nav.active");
@@ -49,12 +52,13 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
       syncActive();
       const observer = new MutationObserver(syncActive);
       observer.observe(sidebar, { subtree: true, attributes: true, attributeFilter: ["class"] });
-      return () => observer.disconnect();
+      cleanup = () => observer.disconnect();
+      return true;
     };
-    let cleanup: (() => void) | undefined;
     if (!attach()) {
-      const timer = window.setTimeout(() => { cleanup = attach() || undefined; }, 0);
-      return () => { cancelled = true; window.clearTimeout(timer); cleanup?.(); };
+      const observer = new MutationObserver(() => { if (attach()) observer.disconnect(); });
+      observer.observe(document.body, { childList: true, subtree: true });
+      cleanup = () => observer.disconnect();
     }
     return () => { cancelled = true; cleanup?.(); };
   }, [labelByTarget, sessionMode]);
