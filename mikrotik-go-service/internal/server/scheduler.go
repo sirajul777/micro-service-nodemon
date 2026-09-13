@@ -35,7 +35,11 @@ func (s *RouterServiceServer) AddScheduler(ctx context.Context, req *pb.AddSched
 	if err != nil { resp.Error = err.Error(); return resp, nil }
 	if len(existing) > 0 {
 		id := existing[0][".id"]
-		params := []string{"=.id="+id, "=on-event="+req.OnEvent}
+		params := []string{"=.id="+id}
+		if req.StartDate != "" { params = append(params, "=start-date="+req.StartDate) }
+		if req.StartTime != "" { params = append(params, "=start-time="+req.StartTime) }
+		if req.Interval != "" { params = append(params, "=interval="+req.Interval) }
+		if req.OnEvent != "" { params = append(params, "=on-event="+req.OnEvent) }
 		if req.Disabled != "" { params = append(params, "=disabled="+req.Disabled) }
 		if req.Comment != "" { params = append(params, "=comment="+req.Comment) }
 		if _, err := c.Run("/system/scheduler/set", params...); err != nil { resp.Error = err.Error(); return resp, nil }
@@ -61,7 +65,8 @@ func (s *RouterServiceServer) UpdateScheduler(ctx context.Context, req *pb.Updat
 	rows, err := c.Run("/system/scheduler/print", "?name="+req.Name)
 	if err != nil { resp.Error = err.Error(); return resp, nil }
 	if len(rows) == 0 { resp.Error = "scheduler tidak ditemukan"; return resp, nil }
-	params := []string{"=.id="+rows[0][".id"], "=on-event="+req.OnEvent}
+	params := []string{"=.id="+rows[0][".id"]}
+	if req.OnEvent != "" { params = append(params, "=on-event="+req.OnEvent) }
 	if req.Disabled != "" { params = append(params, "=disabled="+req.Disabled) }
 	if req.Comment != "" { params = append(params, "=comment="+req.Comment) }
 	if _, err := c.Run("/system/scheduler/set", params...); err != nil { resp.Error = err.Error(); return resp, nil }
