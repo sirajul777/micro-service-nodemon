@@ -1,0 +1,174 @@
+/* Billing customer page parity */
+#page-billing .billing-stats {
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+#page-billing .billing-stats .sbc {
+  min-height: 54px;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+#page-billing .billing-stats .sbc-icon {
+  width: 32px;
+  height: 32px;
+  font-size: 0.85rem;
+  border-radius: 10px;
+}
+
+#page-billing .billing-stats .sbc-val {
+  font-size: 1.3rem;
+  line-height: 1.05;
+}
+
+#page-billing .billing-stats .sbc-lbl {
+  margin-top: 2px;
+  font-size: 0.68rem;
+}
+
+#page-billing .billing-customer-card {
+  padding: 18px 16px 0;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+#page-billing .billing-card-header {
+  margin: 0;
+  min-height: 38px;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#page-billing .billing-card-title {
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+}
+
+#page-billing .billing-toolbar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+#page-billing .billing-toolbar select {
+  width: auto;
+  min-width: 116px;
+  height: 34px;
+  padding: 7px 28px 7px 11px;
+  font-size: 0.76rem;
+  border-radius: 9px;
+}
+
+#page-billing .billing-toolbar select + select {
+  min-width: 125px;
+}
+
+#page-billing .billing-toolbar .btn {
+  height: 34px;
+  white-space: nowrap;
+}
+
+#page-billing .billing-import-btn {
+  color: #58a6ff;
+  border-color: rgba(56, 139, 253, 0.3);
+}
+
+#page-billing .billing-add-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+#page-billing .billing-add-row .btn {
+  height: 32px;
+}
+
+#page-billing .billing-table-wrap {
+  overflow-x: auto;
+  margin: 0;
+}
+
+#page-billing .billing-table {
+  min-width: 1120px;
+}
+
+#page-billing .billing-table th {
+  padding: 11px 14px;
+  font-size: 0.68rem;
+}
+
+#page-billing .billing-table td {
+  padding: 10px 14px;
+  font-size: 0.82rem;
+}
+
+#page-billing .billing-table th:nth-child(1),
+#page-billing .billing-table td:nth-child(1) {
+  min-width: 180px;
+}
+
+#page-billing .billing-table th:nth-child(2),
+#page-billing .billing-table td:nth-child(2) {
+  min-width: 170px;
+}
+
+#page-billing .billing-table th:nth-child(3),
+#page-billing .billing-table td:nth-child(3) {
+  width: 86px;
+}
+
+#page-billing .billing-table th:nth-child(4),
+#page-billing .billing-table td:nth-child(4) {
+  min-width: 110px;
+}
+
+#page-billing .billing-table th:nth-child(5),
+#page-billing .billing-table td:nth-child(5) {
+  min-width: 130px;
+}
+
+#page-billing .billing-table th:nth-child(6),
+#page-billing .billing-table td:nth-child(6) {
+  min-width: 90px;
+}
+
+#page-billing .billing-table th:nth-child(7),
+#page-billing .billing-table td:nth-child(7) {
+  min-width: 92px;
+}
+
+#page-billing .billing-table th:nth-child(8),
+#page-billing .billing-table td:nth-child(8) {
+  min-width: 92px;
+}
+
+#page-billing .billing-table th:nth-child(9),
+#page-billing .billing-table td:nth-child(9) {
+  min-width: 188px;
+}
+
+@media (max-width: 1100px) {
+  #page-billing .billing-toolbar {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  #page-billing .billing-customer-card {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  #page-billing .billing-toolbar select,
+  #page-billing .billing-toolbar .btn {
+    flex: 1 1 auto;
+  }
+}
