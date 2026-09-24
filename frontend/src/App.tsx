@@ -34,6 +34,7 @@ import {
 import { ReportPageTabs } from "./pages/ReportPages";
 import BillingPage from "./pages/BillingPage";
 import PaymentManagementPage from "./pages/PaymentManagementPage";
+import QrisMonitorPage from "./pages/QrisMonitorPage";
 import PppoeProfilesPage from "./pages/PppoeProfilesPage";
 import PppoeSecretsPage from "./pages/PppoeSecretsPage";
 import PppoeActivePage from "./pages/PppoeActivePage";
@@ -362,7 +363,7 @@ export default function App() {
           ) : page === "pppoe-secrets" ? (
             <PppoeSecretsPage session={session} />
           ) : page === "qris" ? (
-            <QrisPage data={data} loading={loading} />
+            <QrisMonitorPage data={data} loading={loading} />
           ) : page === "selling-report" ? (
             reportPage
           ) : page === "resume-report" ? (
@@ -464,104 +465,44 @@ function Dashboard({ data, session }: any) {
       <div className="stats">
         {stats.map(([label, value, Icon]) => (
           <div className="stat" key={label}>
-            <div className="stat-icon">
-              <Icon size={18} />
-            </div>
-            <div>
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </div>
+            <div className="stat-icon"><Icon size={18} /></div>
+            <div><span>{label}</span><strong>{value}</strong></div>
           </div>
         ))}
+      </div>
+      <div className="panel">
+        <div className="panel-head">
+          <div><h3>Router Overview</h3><span>Current router snapshot</span></div>
+          <span className="badge">{loading ? "LOADING" : "LIVE"}</span>
+        </div>
+        <div className="grid">
+          <Metric n="Router" v={session?.name || session?.id || "—"} />
+          <Metric n="Address" v={session?.ip || "—"} />
+          <Metric n="Port" v={session?.port || 8728} />
+          <Metric n="Status" v="Connected" />
+        </div>
       </div>
     </>
   );
 }
-function ParityTable({
-  page,
-  data,
-  loading,
-}: {
-  page: Page;
-  data: any;
-  loading: boolean;
-}) {
-  let rows: any[] =
-    data?.users ||
-    data?.profiles ||
-    data?.connections ||
-    data?.secrets ||
-    data?.batches ||
-    data?.resellers ||
-    data?.schedulers ||
-    data?.leases ||
-    data?.logs ||
-    data ||
-    [];
-  if (!Array.isArray(rows))
-    rows = data?.data && Array.isArray(data.data) ? data.data : [data || {}];
+function Metric({ n, v }: { n: string; v: unknown }) {
+  return <div className="metric"><span>{n}</span><strong>{String(v)}</strong></div>;
+}
+function ParityTable({ page, data, loading }: any) {
+  const rows = Array.isArray(data) ? data : data?.data || data?.rows || data?.items || [];
   const cols: Record<string, string[]> = {
-    "hotspot-users": ["name", "profile", "comment", "disabled"],
-    "hotspot-active": ["name", "address", "macAddress", "uptime", "session"],
-    "hotspot-profiles": ["name", "rateLimit", "sharedUsers", "addressPool"],
-    "hotspot-log": ["time", "topics", "message"],
-    scheduler: [
-      "id",
-      "name",
-      "startDate",
-      "startTime",
-      "interval",
-      "onEvent",
-      "disabled",
-    ],
-    "dhcp-leases": [
-      "address",
-      "macAddress",
-      "hostName",
-      "server",
-      "status",
-      "expiresAfter",
-      "comment",
-    ],
-    "system-resource": [
-      "version",
-      "uptime",
-      "cpuLoad",
-      "freeMemory",
-      "totalMemory",
-      "freeHdd",
-      "totalHdd",
-    ],
-    "interface-traffic": ["name", "type", "tx", "rx", "running"],
-    interfaces: ["name", "type", "macAddress", "tx", "rx", "running"],
-    "pppoe-active": ["name", "address", "uptime", "service"],
-    "pppoe-profiles": [
-      "name",
-      "localAddress",
-      "remoteAddress",
-      "rateLimit",
-      "dns",
-    ],
-    "pppoe-secrets": [
-      "name",
-      "service",
-      "profile",
-      "remoteAddress",
-      "disabled",
-    ],
     "voucher-batches": ["id", "name", "status", "profile", "qty", "createdAt"],
     "voucher-types": ["id", "name", "price", "duration", "profile", "enabled"],
-    "payment-orders": [
-      "orderId",
-      "username",
-      "profile",
-      "amount",
-      "status",
-      "createdAt",
-    ],
+    "payment-orders": ["orderId", "username", "profile", "amount", "status", "createdAt"],
     resellers: ["id", "name", "username", "sessionId", "status"],
   };
   const columns = cols[page] || Object.keys(rows[0] || {}).slice(0, 8);
+  const humanize = (key: string) => key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+  const formatCell = (value: unknown) => {
+    if (value === null || value === undefined || value === "") return "—";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
   return (
     <div className="panel">
       <div className="panel-head">
@@ -573,44 +514,10 @@ function ParityTable({
       </div>
       <div className="table-wrap">
         <table>
-          <thead>
-            <tr>
-              {columns.map((c) => (
-                <th key={c}>{humanize(c)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={String(r.id || r.name || r.address || i)}>
-                {columns.map((c) => (
-                  <td key={c}>{formatCell(r[c])}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
+          <thead><tr>{columns.map((c) => <th key={c}>{humanize(c)}</th>)}</tr></thead>
+          <tbody>{rows.map((r: any, i: number) => <tr key={String(r.id || r.name || r.address || i)}>{columns.map((c) => <td key={c}>{formatCell(r[c])}</td>)}</tr>)}</tbody>
         </table>
         {!rows.length && <div className="empty">No records found.</div>}
-      </div>
-    </div>
-  );
-}
-function QrisPage({ data, loading }: any) {
-  const [stats, orders, callbacks] = data || [{}, [], []];
-  return (
-    <div className="panel">
-      <div className="panel-head">
-        <div>
-          <h3>QRIS Monitor</h3>
-          <span>Orders, callbacks and payment statistics</span>
-        </div>
-        <span className="badge">{loading ? "LOADING" : "LIVE"}</span>
-      </div>
-      <div className="grid">
-        <Metric n="Orders" v={orders?.length ?? 0} />
-        <Metric n="Callbacks" v={callbacks?.length ?? 0} />
-        <Metric n="Success" v={stats?.success ?? stats?.paid ?? 0} />
-        <Metric n="Pending" v={stats?.pending ?? 0} />
       </div>
     </div>
   );
@@ -695,127 +602,32 @@ function VoucherGeneratePage({
   return (
     <div className="panel">
       <div className="panel-head">
-        <div>
-          <h3>Voucher Generate</h3>
-          <span>Generate and export hotspot vouchers</span>
-        </div>
+        <div><h3>Voucher Generate</h3><span>Generate and export hotspot vouchers</span></div>
         <span className="badge">{busy ? "WORKING" : "READY"}</span>
       </div>
       {error && <div className="error banner">{error}</div>}
       <div className="grid">
-        <label className="metric">
-          <span>Profile</span>
-          <input
-            value={profile}
-            onChange={(e) => setProfile(e.target.value)}
-            placeholder="hotspot profile"
-          />
-        </label>
-        <label className="metric">
-          <span>Count</span>
-          <input
-            type="number"
-            min="1"
-            max="500"
-            value={count}
-            onChange={(e) => setCount(e.target.value)}
-          />
-        </label>
-        <label className="metric">
-          <span>Prefix</span>
-          <input
-            value={prefix}
-            onChange={(e) => setPrefix(e.target.value)}
-            placeholder="e.g. V"
-          />
-        </label>
-        <label className="metric">
-          <span>Price</span>
-          <input
-            type="number"
-            min="0"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
-        </label>
-        <label className="metric">
-          <span>Validity</span>
-          <input
-            value={validity}
-            onChange={(e) => setValidity(e.target.value)}
-            placeholder="1h / 1d"
-          />
-        </label>
-        <label className="metric">
-          <span>Caption</span>
-          <input
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Optional caption"
-          />
-        </label>
-        <label className="metric">
-          <span>Color</span>
-          <input
-            type="text"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-          />
-        </label>
+        <label className="metric"><span>Profile</span><input value={profile} onChange={(e) => setProfile(e.target.value)} placeholder="hotspot profile" /></label>
+        <label className="metric"><span>Count</span><input type="number" min="1" max="500" value={count} onChange={(e) => setCount(e.target.value)} /></label>
+        <label className="metric"><span>Prefix</span><input value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="e.g. V" /></label>
+        <label className="metric"><span>Price</span><input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} /></label>
+        <label className="metric"><span>Validity</span><input value={validity} onChange={(e) => setValidity(e.target.value)} placeholder="1h / 1d" /></label>
+        <label className="metric"><span>Caption</span><input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Optional caption" /></label>
+        <label className="metric"><span>Color</span><input type="text" value={color} onChange={(e) => setColor(e.target.value)} /></label>
       </div>
-      <div className="panel-actions">
-        <button className="primary" disabled={busy} onClick={generate}>
-          Generate
-        </button>
-        <button className="button secondary" disabled={busy} onClick={csv}>
-          Generate CSV
-        </button>
+      <div className="top-actions" style={{ marginTop: 16 }}>
+        <button className="primary" disabled={busy} onClick={() => void generate()}>{busy ? "Generating…" : "Generate"}</button>
+        <button className="button" disabled={busy} onClick={() => void csv()}>Export CSV</button>
       </div>
-      {vouchers.length > 0 && (
+      <div className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-head"><div><h3>Generated Vouchers</h3><span>{vouchers.length} generated</span></div></div>
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Password</th>
-                <th>Profile</th>
-                <th>Price</th>
-                <th>Validity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vouchers.map((v, i) => (
-                <tr key={i}>
-                  <td>{v.username || v.name || "—"}</td>
-                  <td>{v.password || "... (truncated)"} </td>
-                  <td>{v.profile || "—"}</td>
-                  <td>{Number(v.price ?? price).toLocaleString("id-ID")}</td>
-                  <td>{v.limitUptime || validity}</td>
-                </tr>
-              ))}
-            </tbody>
+          <table><thead><tr><th>Username</th><th>Password</th><th>Profile</th></tr></thead>
+            <tbody>{vouchers.map((v, i) => <tr key={i}><td>{v.username || v.user || "—"}</td><td>{v.password || "—"}</td><td>{v.profile || profile || "—"}</td></tr>)}</tbody>
           </table>
+          {!vouchers.length && <div className="empty">No generated vouchers yet.</div>}
         </div>
-      )}
+      </div>
     </div>
   );
-}
-function Metric({ n, v }: { n: string; v: unknown }) {
-  return (
-    <div className="stat">
-      <span>{n}</span>
-      <strong>{String(v)}</strong>
-    </div>
-  );
-}
-function humanize(v: string) {
-  return v
-    .replace(/([A-Z])/g, " $1")
-    .replace(/_/g, " ")
-    .replace(/^./, (c) => c.toUpperCase());
-}
-function formatCell(v: any) {
-  if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
 }
