@@ -8,6 +8,7 @@ import DashboardPage from "./pages/DashboardPage";
 import BillingPage from "./pages/BillingPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import MobileApiPage from "./pages/MobileApiPage";
+import PaymentManagementPage from "./pages/PaymentManagementPage";
 import TelegramManagementPage from "./pages/TelegramManagementPage";
 import BotResellersPage from "./pages/BotResellersPage";
 import "./grouped-navigation.css";
@@ -81,7 +82,7 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
           if (!selector?.value) { window.location.assign("/routers"); return; }
         }
         setActive(item.label);
-        if (item.label === "Ganti Password" || item.label === "Mobile API" || item.label === "Pelanggan Billing" || item.label === "Reseller Bot" || item.label === "Tools & Settings") return;
+        if (item.label === "Ganti Password" || item.label === "Mobile API" || item.label === "Pelanggan Billing" || item.label === "Reseller Bot" || item.label === "Tools & Settings" || item.label === "Transaksi Pembayaran" || item.label === "Payment Settings") return;
         if (hasPath(item)) { window.history.pushState({}, "", item.path); window.dispatchEvent(new PopStateEvent("popstate")); return; }
         const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar > nav:not(.grouped-nav) .nav"));
         const button = buttons.find((candidate) => candidate.textContent?.trim() === item.target);
@@ -92,6 +93,8 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
       {!sessionMode && active === "Reseller Bot" && contentNode ? createPortal(<div className="dashboard-parity-host"><BotResellersPage /></div>, contentNode) : null}
       {!sessionMode && active === "Tools & Settings" && contentNode ? createPortal(<div className="dashboard-parity-host"><TelegramManagementPage /></div>, contentNode) : null}
       {sessionMode && contentNode ? createPortal(<div className="session-overlay"><RouterSessionsPage /></div>, contentNode) : null}
+      {!sessionMode && active === "Transaksi Pembayaran" && contentNode ? createPortal(<div className="dashboard-parity-host"><PaymentManagementPage /></div>, contentNode) : null}
+      {!sessionMode && active === "Payment Settings" && contentNode ? createPortal(<div className="dashboard-parity-host"><PaymentManagementPage /></div>, contentNode) : null}
       {!sessionMode && active === "Ganti Password" && contentNode ? createPortal(<div className="dashboard-parity-host"><ChangePasswordPage /></div>, contentNode) : null}
       {!sessionMode && active === "Mobile API" && contentNode ? createPortal(<div className="dashboard-parity-host"><MobileApiPage /></div>, contentNode) : null}
     </>
