@@ -9,6 +9,20 @@ import BillingPage from "./pages/BillingPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import MobileApiPage from "./pages/MobileApiPage";
 import PaymentManagementPage from "./pages/PaymentManagementPage";
+import HotspotActivePage from "./pages/HotspotActivePage";
+import HotspotLogPage from "./pages/HotspotLogPage";
+import VoucherOperationsPage from "./pages/VoucherOperationsPage";
+import SchedulerPage from "./pages/SchedulerPage";
+import DhcpLeasesPage from "./pages/DhcpLeasesPage";
+import InterfacesPage from "./pages/InterfacesPage";
+import InterfaceTrafficPage from "./pages/InterfaceTrafficPage";
+import SystemResourcePage from "./pages/SystemResourcePage;
+import UsersPage from "./pages/UsersPage";
+import PppoeActivePage from "./pages/PppoeActivePage";
+import PppoeProfilesPage from "./pages/PppoeProfilesPage";
+import PppoeSecretsPage from "./pages/PppoeSecretsPage";
+import ResellersPage from "./pages/ResellersPage";
+import { ReportPageTabs } from "./pages/ReportPages";
 import TelegramManagementPage from "./pages/TelegramManagementPage";
 import BotResellersPage from "./pages/BotResellersPage";
 import "./grouped-navigation.css";
@@ -82,7 +96,16 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
           if (!selector?.value) { window.location.assign("/routers"); return; }
         }
         setActive(item.label);
-        if (item.label === "Ganti Password" || item.label === "Mobile API" || item.label === "Pelanggan Billing" || item.label === "Reseller Bot" || item.label === "Tools & Settings" || item.label === "Transaksi Pembayaran" || item.label === "Payment Settings") return;
+        const groupedPortals = new Set([
+          "Dashboard", "Pelanggan Billing", "Reseller Bot", "Tools & Settings",
+          "Transaksi Pembayaran", "Payment Settings", "Active Users", "Hotspot Log",
+          "Daftar Batch", "Settings Voucher", "PPPoE Active", "PPPoE Users",
+          "PPPoE Profiles", "Selling Report", "Resume Report", "Live Report",
+          "Scheduler", "DHCP Leases", "Interfaces", "Interface Traffic",
+          "System Resource", "User Management", "Reseller",
+          "Ganti Password", "Mobile API",
+        ]);
+        if (groupedPortals.has(item.label)) return;
         if (hasPath(item)) { window.history.pushState({}, "", item.path); window.dispatchEvent(new PopStateEvent("popstate")); return; }
         const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar > nav:not(.grouped-nav) .nav"));
         const button = buttons.find((candidate) => candidate.textContent?.trim() === item.target);
@@ -97,6 +120,22 @@ function SidebarBridge({ sessionMode = false }: { sessionMode?: boolean }) {
       {!sessionMode && active === "Payment Settings" && contentNode ? createPortal(<div className="dashboard-parity-host"><PaymentManagementPage /></div>, contentNode) : null}
       {!sessionMode && active === "Ganti Password" && contentNode ? createPortal(<div className="dashboard-parity-host"><ChangePasswordPage /></div>, contentNode) : null}
       {!sessionMode && active === "Mobile API" && contentNode ? createPortal(<div className="dashboard-parity-host"><MobileApiPage /></div>, contentNode) : null}
+      {!sessionMode && active === "Active Users" && contentNode ? createPortal(<div className="dashboard-parity-host"><HotspotActivePage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "Hotspot Log" && contentNode ? createPortal(<div className="dashboard-parity-host"><HotspotLogPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && (active === "Daftar Batch" || active === "Settings Voucher") && contentNode ? createPortal(<div className="dashboard-parity-host"><VoucherOperationsPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "PPPoE Active" && contentNode ? createPortal(<div className="dashboard-parity-host"><PppoeActivePage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "PPPoE Users" && contentNode ? createPortal(<div className="dashboard-parity-host"><PppoeSecretsPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "PPPoE Profiles" && contentNode ? createPortal(<div className="dashboard-parity-host"><PppoeProfilesPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "Selling Report" && contentNode ? createPortal(<div className="dashboard-parity-host"><ReportPageTabs session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} initial="selling" /></div>, contentNode) : null}
+      {!sessionMode && active === "Resume Report" && contentNode ? createPortal(<div className="dashboard-parity-host"><ReportPageTabs session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} initial="resume" /></div>, contentNode) : null}
+      {!sessionMode && active === "Live Report" && contentNode ? createPortal(<div className="dashboard-parity-host"><ReportPageTabs session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} initial="live" /></div>, contentNode) : null}
+      {!sessionMode && active === "Scheduler" && contentNode ? createPortal(<div className="dashboard-parity-host"><SchedulerPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "DHCP Leases" && contentNode ? createPortal(<div className="dashboard-parity-host"><DhcpLeasesPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "Interfaces" && contentNode ? createPortal(<div className="dashboard-parity-host"><InterfacesPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "Interface Traffic" && contentNode ? createPortal(<div className="dashboard-parity-host"><InterfaceTrafficPage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "System Resource" && contentNode ? createPortal(<div className="dashboard-parity-host"><SystemResourcePage session={document.querySelector<HTMLSelectElement>(".router-box select")?.value || ""} /></div>, contentNode) : null}
+      {!sessionMode && active === "User Management" && contentNode ? createPortal(<div className="dashboard-parity-host"><UsersPage /></div>, contentNode) : null}
+      {!sessionMode && active === "Reseller" && contentNode ? createPortal(<div className="dashboard-parity-host"><ResellersPage /></div>, contentNode) : null}
     </>
   );
 }
