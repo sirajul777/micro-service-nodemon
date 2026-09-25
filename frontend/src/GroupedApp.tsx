@@ -16,7 +16,7 @@ import SchedulerPage from "./pages/SchedulerPage";
 import DhcpLeasesPage from "./pages/DhcpLeasesPage";
 import InterfacesPage from "./pages/InterfacesPage";
 import InterfaceTrafficPage from "./pages/InterfaceTrafficPage";
-import SystemResourcePage from "./pages/SystemResourcePage;
+import SystemResourcePage from "./pages/SystemResourcePage";
 import UsersPage from "./pages/UsersPage";
 import PppoeActivePage from "./pages/PppoeActivePage";
 import PppoeProfilesPage from "./pages/PppoeProfilesPage";
